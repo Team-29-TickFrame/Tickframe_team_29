@@ -1,0 +1,22 @@
+# Lychee configuration for repository Markdown link checking.
+
+# Fail on broken links.
+accept = [200, 204, 206, 301, 302, 303, 307, 308]
+
+# Do not check email addresses.
+include_mail = false
+
+# Be reasonable with external services.
+max_retries = 2
+retry_wait_time = 2
+timeout = 20
+
+# Keep output suitable for CI logs.
+no_progress = true
+verbose = "info"
+
+# Exclusions should be narrow and justified.
+# Add excluded URLs only when they are authenticated, rate-limited,
+# unstable, or otherwise unsuitable for automated checking.
+exclude = [
+]
