@@ -16,6 +16,10 @@ with any modern browser or media player.
 The deployment is publicly accessible without authentication to the hosting
 control panel or private network access.
 
+## Prototype (MVP v1)
+
+- [Figma prototype (view-only)](https://www.figma.com/design/rHG9DGjIeDPResDNlMZrXn/Tickframe?node-id=0-1&t=ecf4MuhdmOd0OgEG-1)
+
 ## Requirements and analysis
 
 - [User stories and priorities](./user-stories.md)
