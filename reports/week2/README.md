@@ -22,6 +22,20 @@ control panel or private network access.
 - [Week 2 analysis](./analysis.md)
 - [LLM usage report](./llm-report.md)
 
+## Repository workflow (Week 2)
+
+- [PR/MR template](../../.github/PULL_REQUEST_TEMPLATE.md)
+- [Reviewed PR #1](https://github.com/IvanGuzhov822/Tickframe_team_29/pull/1) (reviewed by kristina19-gif)
+
+## Lychee link checking
+
+- **Configuration:** [lychee.toml](../../lychee.toml) and [.github/workflows/links.yml](../../.github/workflows/links.yml)
+- **Latest run on main:** https://github.com/IvanGuzhov822/Tickframe_team_29/actions/runs/27511430738
+
+### Excluded Lychee links
+
+See [docs/link-check-exclusions.md](../../docs/link-check-exclusions.md). No links excluded; manual verification not required.
+
 ## Local setup
 
 No package installation, API key, or `.env` file is required.
