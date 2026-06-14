@@ -33,7 +33,7 @@ No package installation, API key, or `.env` file is required.
    python3 -m http.server 8000
    ```
 
-3. Open <http://localhost:8000/>.
+3. Open [<http://localhost:8000/>.]
 4. Sign in with the built-in demo values shown on the page, or select
    `Continue as Guest`.
 
