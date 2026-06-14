@@ -7,7 +7,11 @@ cryptocurrency pattern analytics, navigation, and user-scoped mock alerts.
 
 - [MVP v0 report, access instructions, and smoke check](./mvp-v0-report.md)
 - Public MVP v0 deployment: <https://tickframe.h1n.ru/>
-- [Public MVP v0 video demonstration](./mvp-v0-demo.mov) — 1 minute 11 seconds
+- [Public MVP v0 video demonstration (MP4)](./mvp-v0-demo.mp4) — 1 minute 11 seconds
+
+The video uses browser-compatible H.264 in an MP4 container. If GitHub shows a
+download button instead of an embedded player, download the file and open it
+with any modern browser or media player.
 
 The deployment is publicly accessible without authentication to the hosting
 control panel or private network access.
