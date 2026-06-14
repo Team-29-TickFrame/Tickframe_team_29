@@ -7,7 +7,7 @@ Tickframe MVP v0 is a static web prototype/foundation for a crypto market patter
 - Week 2 index: [reports/week2/README.md](reports/week2/README.md)
 - MVP v0 report: [reports/week2/mvp-v0-report.md](reports/week2/mvp-v0-report.md)
 - Deployment URL: <https://tickframe.h1n.ru/>
-- Public demo video: [MP4 recording](reports/week2/mvp-v0-demo.mp4)
+- Public demo video: [open or download the MP4 recording](reports/week2/mvp-v0-demo.mp4?raw=true)
 
 ## Local Setup
 
