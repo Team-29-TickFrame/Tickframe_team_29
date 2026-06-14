@@ -28,7 +28,11 @@ network.
 
 ## Public video demonstration
 
-[MVP v0 video demonstration](./mvp-v0-demo.mov) — 1 minute 11 seconds.
+[Open or download the MVP v0 video demonstration (MP4)](./mvp-v0-demo.mp4?raw=true) — 1 minute 11 seconds.
+
+The recording is encoded as H.264 video in a browser-compatible MP4 container.
+If GitHub offers the file as a download instead of displaying an embedded
+player, download it and open it in any modern browser or media player.
 
 The recording shows only the public Tickframe application in an incognito
 browser window. It contains no audio, real credentials, personal data, hosting
