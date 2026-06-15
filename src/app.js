@@ -502,57 +502,131 @@ function bindShellEvents() {
   document.querySelector("#logout-button").addEventListener("click", logout);
 }
 
+function renderNavIcon(name) {
+  const icons = {
+    dashboard: '<path d="M4 5.5h6v6H4zM14 5.5h6v3h-6zM14 12.5h6v6h-6zM4 15.5h6v3H4z"/>',
+    alerts: '<path d="M12 3.5a5 5 0 0 0-5 5v2.2c0 1.8-.6 3.5-1.8 4.8h13.6A7.1 7.1 0 0 1 17 10.7V8.5a5 5 0 0 0-5-5ZM9.8 18.5h4.4"/>',
+    create: '<path d="M12 4v16M4 12h16"/>',
+    logout: '<path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/>',
+  };
+  return `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
+}
+
+function getRouteMeta() {
+  if (state.route === "alerts") return { eyebrow: "Signal desk", title: "Alert stream" };
+  if (state.route === "create-alert") return { eyebrow: "Signal desk", title: "New alert" };
+  if (state.route === "success") return { eyebrow: "Signal desk", title: "Alert saved" };
+  return { eyebrow: "Market intelligence", title: "BTC workspace" };
+}
+
 function renderLogin() {
+  const candles = getCurrentCandles();
+  const latest = candles[candles.length - 1];
+  const first = candles[0];
+  const change = ((latest.close - first.open) / first.open) * 100;
   return `
     <main class="login-page">
       <section class="brand-panel">
-        <div class="logo-mark">T</div>
-        <div>
-          <h1>TICKFRAME</h1>
-          <p>Crypto Pattern Analytics</p>
+        <div class="brand-lockup">
+          <div class="logo-mark">T</div>
+          <div class="wordmark">
+            <strong>TICKFRAME</strong>
+            <span>Pattern intelligence</span>
+          </div>
         </div>
-        <div class="hero-chart">${renderMiniChart(getCurrentCandles().map((candle) => candle.close).slice(-34), "large")}</div>
+        <div class="login-hero-copy">
+          <div class="eyebrow"><i></i> Live synthetic market</div>
+          <h1>See the setup<br />before the move.</h1>
+          <p>One focused workspace for price action, pattern confidence and alerts that matter.</p>
+        </div>
+        <div class="hero-market">
+          <div>
+            <span>BTC / USDT</span>
+            <strong>${formatPrice(latest.close)}</strong>
+          </div>
+          <b class="${change >= 0 ? "positive" : "negative"}">${change >= 0 ? "+" : ""}${change.toFixed(2)}%</b>
+        </div>
+        <div class="hero-chart">
+          <div class="hero-chart-grid"></div>
+          ${renderMiniChart(candles.map((candle) => candle.close).slice(-34), "large")}
+        </div>
+        <div class="brand-proof">
+          <span><b>84%</b> pattern confidence</span>
+          <span><b>1 sec</b> market refresh</span>
+          <span><b>0 noise</b> focused workflow</span>
+        </div>
       </section>
       <section class="login-card">
-        <h2>Welcome Back</h2>
-        <p>Sign in to continue to Tickframe</p>
+        <div class="login-card-head">
+          <span class="eyebrow">Private workspace</span>
+          <h2>Enter terminal</h2>
+          <p>Use the demo access below or continue as a guest.</p>
+        </div>
         <form id="login-form">
-          <label>Email
+          <label><span>Email</span>
             <input name="email" value="demo@tickframe.local" autocomplete="username" />
           </label>
-          <label>Password
+          <label><span>Password</span>
             <input name="password" type="password" value="demo123" autocomplete="current-password" />
           </label>
           ${state.lastError ? `<div class="error-message">${state.lastError}</div>` : ""}
-          <button class="primary-button" type="submit">Sign In</button>
+          <button class="primary-button" type="submit">Open workspace <span aria-hidden="true">→</span></button>
         </form>
-        <div class="divider">or</div>
-        <button id="guest-button" class="secondary-button" type="button">Continue as Guest</button>
-        <p class="hint">Demo only: user-scoped alerts are stored in localStorage.</p>
+        <div class="divider"><span>or</span></div>
+        <button id="guest-button" class="secondary-button" type="button">Continue as guest</button>
+        <p class="hint"><i></i> Demo data stays in this browser profile.</p>
       </section>
     </main>
   `;
 }
 
 function renderShell(content) {
+  const routeMeta = getRouteMeta();
+  const activeAlerts = readAlerts().filter((alert) => alert.status === "Active").length;
   return `
     <main class="app-shell">
       <aside class="sidebar">
         <div class="brand-row">
           <div class="logo-mark small">T</div>
-          <strong>TICKFRAME</strong>
+          <div class="wordmark">
+            <strong>TICKFRAME</strong>
+            <span>Terminal v0</span>
+          </div>
         </div>
+        <div class="sidebar-label">Workspace</div>
         <nav>
-          <button data-route="dashboard" class="${state.route === "dashboard" ? "active" : ""}">Dashboard</button>
-          <button data-route="alerts" class="${state.route === "alerts" ? "active" : ""}">Alerts <span>${readAlerts().filter((alert) => alert.status === "Active").length}</span></button>
-          <button data-route="create-alert" class="${state.route === "create-alert" ? "active" : ""}">Create Alert</button>
+          <button data-route="dashboard" class="${state.route === "dashboard" ? "active" : ""}">
+            ${renderNavIcon("dashboard")}<span class="nav-label">Dashboard</span>
+          </button>
+          <button data-route="alerts" class="${state.route === "alerts" ? "active" : ""}">
+            ${renderNavIcon("alerts")}<span class="nav-label">Alerts</span><span class="nav-count">${activeAlerts}</span>
+          </button>
+          <button data-route="create-alert" class="${state.route === "create-alert" ? "active" : ""}">
+            ${renderNavIcon("create")}<span class="nav-label">Create alert</span>
+          </button>
         </nav>
-        <button id="logout-button" class="logout-button">Log out</button>
+        <div class="sidebar-footer">
+          <div class="feed-health">
+            <i></i>
+            <div><strong>Market feed</strong><span>Live · 1s refresh</span></div>
+          </div>
+          <button id="logout-button" class="logout-button">${renderNavIcon("logout")}<span>Log out</span></button>
+        </div>
       </aside>
       <section class="main-panel">
         <header class="topbar">
-          <div class="asset-lock" aria-label="Selected asset">BTC/USDT</div>
-          <div class="user-pill">${state.user.name}</div>
+          <div class="terminal-context">
+            <span>${routeMeta.eyebrow}</span>
+            <h1>${routeMeta.title}</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="asset-lock" aria-label="Selected asset">
+              <span class="coin mini">B</span>
+              <div><strong>BTC / USDT</strong><small>Perpetual · synthetic</small></div>
+            </div>
+            <div class="market-status"><i></i> Live</div>
+            <div class="user-pill"><span>${state.user.name.charAt(0)}</span>${state.user.name}</div>
+          </div>
         </header>
         ${content}
       </section>
@@ -574,6 +648,10 @@ function renderDashboard() {
   return `
     <section class="dashboard-grid">
       <div class="market-card asset-card">
+        <div class="card-label-row">
+          <span class="eyebrow">Market pulse</span>
+          <span class="live-chip"><i></i> Tracking</span>
+        </div>
         <div class="asset-heading">
           <div class="coin">${asset.icon}</div>
           <div>
@@ -594,19 +672,38 @@ function renderDashboard() {
       </div>
 
       <div class="chart-card">
-        <div class="toolbar">
-          ${TIMEFRAMES.map((timeframe) => `<button data-timeframe="${timeframe.id}" class="${timeframe.id === state.selectedTimeframe ? "active" : ""}">${timeframe.label}</button>`).join("")}
-          <button>Indicators</button>
+        <div class="chart-header">
+          <div>
+            <span class="eyebrow">Execution window</span>
+            <h3>Price action</h3>
+          </div>
+          <div class="chart-legend">
+            <span><i class="up"></i> Up candle</span>
+            <span><i class="down"></i> Down candle</span>
+          </div>
+        </div>
+        <div class="toolbar-wrap">
+          <div class="toolbar">
+            ${TIMEFRAMES.map((timeframe) => `<button data-timeframe="${timeframe.id}" class="${timeframe.id === state.selectedTimeframe ? "active" : ""}">${timeframe.label}</button>`).join("")}
+          </div>
+          <button class="indicator-button">Indicators <span>2</span></button>
+        </div>
+        <div class="time-rail" aria-hidden="true">
+          <span>30D context</span><i></i><b>Live edge</b>
         </div>
         ${renderMainChart(candles, asset)}
       </div>
 
       <div class="pattern-card">
-        <p>Current Pattern</p>
+        <div class="card-label-row">
+          <span class="eyebrow">Detected setup</span>
+          <span class="pattern-state">Forming</span>
+        </div>
         <h3>${asset.pattern}</h3>
+        <p>Higher lows are compressing price beneath resistance.</p>
         ${renderPatternIcon(asset.pattern)}
         <div class="confidence">
-          <span>Confidence Score</span>
+          <span>Confidence score</span>
           <strong>${asset.confidence}%</strong>
           <div><i style="width:${asset.confidence}%"></i></div>
         </div>
@@ -618,16 +715,16 @@ function renderDashboard() {
       </div>
 
       <div class="metric-row">
-        ${renderMetric("RSI (14)", "61.2", "Neutral")}
-        ${renderMetric("MACD", "Bullish", "Signal")}
-        ${renderMetric("EMA Trend", "Uptrend", "Trend")}
-        ${renderMetric("Volume", asset.volume, "Current")}
-        ${renderMetric("Volatility", asset.volatility, "Realized")}
+        ${renderMetric("RSI · 14", "61.2", "Balanced", "neutral")}
+        ${renderMetric("MACD", "Bullish", "Momentum", "positive")}
+        ${renderMetric("EMA trend", "Uptrend", "Structure", "positive")}
+        ${renderMetric("Volume", asset.volume, "Participation", "neutral")}
+        ${renderMetric("Volatility", asset.volatility, "Realized", "neutral")}
       </div>
 
       <div class="signal-feed">
         <div class="section-heading">
-          <h3>Recent Alerts</h3>
+          <div><span class="eyebrow">Signal log</span><h3>Recent alerts</h3></div>
           <button data-route="alerts">View all</button>
         </div>
         ${activeAlerts.map(renderFeedItem).join("") || renderEmptyFeed()}
@@ -635,8 +732,8 @@ function renderDashboard() {
 
       <div class="opportunities">
         <div class="section-heading">
-          <h3>BTC Timeframe Snapshots</h3>
-          <button data-route="alerts">Alerts</button>
+          <div><span class="eyebrow">Alignment</span><h3>Timeframe snapshots</h3></div>
+          <button data-route="create-alert">Create alert</button>
         </div>
         ${["1m", "15m", "1h"].map((timeframeId, index) => renderOpportunity("BTC/USDT", timeframeId, 91 - index * 7, 75 - index * 3)).join("")}
       </div>
@@ -646,12 +743,18 @@ function renderDashboard() {
 
 function renderAlerts() {
   const alerts = readAlerts();
+  const activeCount = alerts.filter((alert) => alert.status === "Active").length;
   return `
     <section class="alerts-page">
       <div class="section-heading page-heading">
-        <h2>Alerts</h2>
-        <button class="primary-button small-button" data-route="create-alert">+ Create Alert</button>
+        <div>
+          <span class="eyebrow">Monitoring ${activeCount} active signals</span>
+          <h2>Your alert stream</h2>
+          <p>Pattern and momentum events saved to this browser profile.</p>
+        </div>
+        <button class="primary-button small-button" data-route="create-alert">Create alert <span>+</span></button>
       </div>
+      <div class="alert-table-head"><span>Signal</span><span>Delivery</span><span>Status</span></div>
       <div class="alert-list">
         ${alerts.map(renderAlertRow).join("") || renderNoAlerts()}
       </div>
@@ -663,16 +766,17 @@ function renderCreateAlert() {
   return `
     <section class="form-page">
       <div class="form-card">
-        <h2>Create New Alert</h2>
-        <p class="form-intro">Configure the alert inputs used by the smoke check. This is mock behavior, but the selected values are saved to this user.</p>
+        <span class="eyebrow">Alert builder</span>
+        <h2>Create a signal rule</h2>
+        <p class="form-intro">Choose what Tickframe should watch. The demo saves this rule to your current browser profile.</p>
         ${state.lastError ? `<div class="error-message">${state.lastError}</div>` : ""}
         <form id="create-alert-form">
           <input type="hidden" name="asset" value="BTC/USDT" />
           <div class="fixed-field">
-            <span>Coin / Pair</span>
-            <strong>BTC/USDT</strong>
+            <span>Market</span>
+            <strong><i class="coin mini">B</i> BTC / USDT</strong>
           </div>
-          <label>Alert Type
+          <label><span>Signal type</span>
             <select name="type">
               <option>Pattern Detected</option>
               <option>Confidence > 80%</option>
@@ -690,23 +794,31 @@ function renderCreateAlert() {
             <input id="confidence-range" name="threshold" type="range" min="1" max="100" value="80" />
           </div>
           <fieldset class="method-fieldset">
-            <legend>Notification Method</legend>
+            <legend>Delivery</legend>
             <label class="choice-row">
               <input name="methods" type="checkbox" value="In-App Notification" checked />
-              <span>In-App Notification</span>
+              <span><strong>In-app</strong><small>Show inside the Tickframe alert stream</small></span>
             </label>
             <label class="choice-row">
               <input name="methods" type="checkbox" value="Email" />
-              <span>Email</span>
+              <span><strong>Email</strong><small>Demo label only · no message is sent</small></span>
             </label>
             <label class="choice-row">
               <input name="methods" type="checkbox" value="SMS" />
-              <span>SMS</span>
+              <span><strong>SMS</strong><small>Demo label only · no message is sent</small></span>
             </label>
           </fieldset>
-          <button class="primary-button" type="submit">Create Alert</button>
+          <button class="primary-button" type="submit">Create alert <span aria-hidden="true">→</span></button>
         </form>
       </div>
+      <aside class="alert-preview">
+        <span class="eyebrow">Rule preview</span>
+        <div class="preview-orbit"><i></i><span>BTC</span></div>
+        <h3>Pattern detected</h3>
+        <p>Tickframe will watch BTC / USDT and add a signal when confidence crosses your threshold.</p>
+        <div class="preview-detail"><span>Market</span><strong>BTC / USDT</strong></div>
+        <div class="preview-detail"><span>State</span><strong class="positive">Ready to monitor</strong></div>
+      </aside>
     </section>
   `;
 }
@@ -714,24 +826,25 @@ function renderCreateAlert() {
 function renderSuccess() {
   return `
     <section class="state-page">
-      <div class="success-orb">OK</div>
-      <h2>Success!</h2>
+      <div class="success-orb"><span>✓</span></div>
+      <span class="eyebrow">Rule is live</span>
+      <h2>Alert created</h2>
       <p>${state.successMessage || "The alert was created."}</p>
-      <button id="continue-button" class="success-button">Continue</button>
+      <button id="continue-button" class="success-button">Open alert stream <span>→</span></button>
     </section>
   `;
 }
 
-function renderMetric(label, value, caption) {
-  return `<div class="metric"><span>${label}</span><strong>${value}</strong><small>${caption}</small></div>`;
+function renderMetric(label, value, caption, tone) {
+  return `<div class="metric ${tone}"><span>${label}</span><strong>${value}</strong><small>${caption}</small></div>`;
 }
 
 function renderFeedItem(alert) {
   return `
     <div class="feed-item">
       <i></i>
-      <strong>${alert.asset}</strong>
-      <span>${alert.type}</span>
+      <div><strong>${alert.asset}</strong><small>Perpetual</small></div>
+      <span>${alert.type}<small>Threshold ${alert.threshold}%</small></span>
       <time>${relativeTime(alert.createdAt)}</time>
     </div>
   `;
@@ -741,14 +854,17 @@ function renderAlertRow(alert) {
   const isActive = alert.status === "Active";
   return `
     <article class="alert-row">
-      <div class="alert-icon ${isActive ? "" : "muted"}">${isActive ? "^" : "x"}</div>
-      <div>
-        <h3>${alert.asset}</h3>
-        <p>${alert.type} - Threshold ${alert.threshold}%</p>
-        <small>${relativeTime(alert.createdAt)} - ${alert.method}</small>
+      <div class="alert-signal">
+        <div class="alert-icon ${isActive ? "" : "muted"}">${isActive ? "↗" : "—"}</div>
+        <div>
+          <h3>${alert.asset}</h3>
+          <p>${alert.type} · Threshold ${alert.threshold}%</p>
+          <small>${relativeTime(alert.createdAt)}</small>
+        </div>
       </div>
+      <div class="alert-method">${alert.method}</div>
       <div class="alert-actions">
-        <span class="${isActive ? "status-active" : "status-inactive"}">${alert.status}</span>
+        <span class="${isActive ? "status-active" : "status-inactive"}"><i></i>${alert.status}</span>
         <button type="button" class="delete-alert-button" data-delete-alert="${alert.id}">Delete</button>
       </div>
     </article>
@@ -763,13 +879,15 @@ function renderOpportunity(asset, timeframeId, confidence, hitRate) {
     <article class="opportunity-card">
       <div>
         <strong>${asset}</strong>
-        <small>${timeframe.label} snapshot</small>
+        <small>${timeframe.label} view</small>
+      </div>
+      ${renderMiniChart(candles.map((candle) => candle.close).slice(-18), "small")}
+      <div class="opportunity-score">
         <small>Confidence</small>
         <b>${confidence}%</b>
       </div>
-      ${renderMiniChart(candles.map((candle) => candle.close).slice(-18), "small")}
-      <div>
-        <small>Hit Rate</small>
+      <div class="opportunity-score">
+        <small>Hit rate</small>
         <b>${hitRate}%</b>
       </div>
     </article>
@@ -817,16 +935,16 @@ function renderMainChart(candles, asset) {
   const priceTicks = scale.ticks.map((value) => {
     const y = yFor(value);
     return `
-      <line x1="${chartLeft}" y1="${y.toFixed(2)}" x2="${chartRight}" y2="${y.toFixed(2)}" stroke="#142536" stroke-width="1" />
-      <text x="${priceAxisX}" y="${(y + 4).toFixed(2)}" fill="#7f91a5" font-size="12">${formatAxisPrice(value)}</text>
+      <line x1="${chartLeft}" y1="${y.toFixed(2)}" x2="${chartRight}" y2="${y.toFixed(2)}" stroke="#1a2635" stroke-width="1" />
+      <text x="${priceAxisX}" y="${(y + 4).toFixed(2)}" fill="#758398" font-size="12">${formatAxisPrice(value)}</text>
     `;
   }).join("");
   const timeTicks = [0, 0.25, 0.5, 0.75, 1].map((position) => {
     const candleIndex = Math.min(candles.length - 1, Math.round(position * (candles.length - 1)));
     const x = chartLeft + candleIndex * step + step / 2;
     return `
-      <line x1="${x.toFixed(2)}" y1="${chartBottom}" x2="${x.toFixed(2)}" y2="${volumeBottom}" stroke="#142536" stroke-width="1" opacity="0.45" />
-      <text x="${(x - 22).toFixed(2)}" y="${timeLabelY}" fill="#7f91a5" font-size="12">${formatAxisTime(candles[candleIndex].time, timeframe)}</text>
+      <line x1="${x.toFixed(2)}" y1="${chartBottom}" x2="${x.toFixed(2)}" y2="${volumeBottom}" stroke="#1a2635" stroke-width="1" opacity="0.45" />
+      <text x="${(x - 22).toFixed(2)}" y="${timeLabelY}" fill="#758398" font-size="12">${formatAxisTime(candles[candleIndex].time, timeframe)}</text>
     `;
   }).join("");
   const bodies = candles
@@ -837,14 +955,14 @@ function renderMainChart(candles, asset) {
       const highY = yFor(candle.high);
       const lowY = yFor(candle.low);
       const up = candle.close >= candle.open;
-      const color = up ? "#16c784" : "#ef4444";
+      const color = up ? "#4adea3" : "#ff6b7a";
       const isLive = index === candles.length - 1 && !candle.final;
       const bodyY = Math.min(openY, closeY);
       const bodyHeight = Math.max(8, Math.abs(closeY - openY));
       const volumeHeight = Math.max(5, (candle.volume / maxVolume) * (volumeBottom - volumeTop));
       return `
         <line x1="${x.toFixed(2)}" y1="${highY.toFixed(2)}" x2="${x.toFixed(2)}" y2="${lowY.toFixed(2)}" stroke="${color}" stroke-width="2.6" opacity="0.98" />
-        <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${bodyY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${bodyHeight.toFixed(2)}" rx="2" fill="${color}" stroke="${isLive ? "#edf5ff" : color}" stroke-width="${isLive ? 1.5 : 0}" />
+        <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${bodyY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${bodyHeight.toFixed(2)}" rx="1.5" fill="${color}" stroke="${isLive ? "#f4f7fb" : color}" stroke-width="${isLive ? 1.5 : 0}" />
         <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${(volumeBottom - volumeHeight).toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${volumeHeight.toFixed(2)}" rx="2" fill="${color}" opacity="0.45" />
       `;
     })
@@ -854,16 +972,17 @@ function renderMainChart(candles, asset) {
 
   return `
     <svg class="main-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${asset.symbol} moving candlestick chart">
-      <rect x="${chartLeft}" y="${chartTop}" width="${chartRight - chartLeft}" height="${volumeBottom - chartTop}" rx="6" fill="#07111b" opacity="0.35" />
+      <rect x="${chartLeft}" y="${chartTop}" width="${chartRight - chartLeft}" height="${volumeBottom - chartTop}" rx="4" fill="#080d14" opacity="0.55" />
       ${priceTicks}
       ${timeTicks}
+      ${renderPatternOverlay(asset.pattern, chartLeft, chartRight, chartTop, chartBottom, yFor, min, max)}
       ${bodies}
-      <line x1="${chartLeft}" y1="${volumeTop}" x2="${chartRight}" y2="${volumeTop}" stroke="#142536" stroke-width="1" />
-      <line x1="${chartLeft}" y1="${currentPriceY.toFixed(2)}" x2="${chartRight}" y2="${currentPriceY.toFixed(2)}" stroke="#16c784" stroke-dasharray="4 5" opacity="0.75" />
-      <rect x="${priceAxisX - 4}" y="${(currentPriceY - 12).toFixed(2)}" width="86" height="24" rx="5" fill="#10251f" stroke="#16c784" />
-      <text x="${priceAxisX + 3}" y="${(currentPriceY + 4).toFixed(2)}" fill="#16c784" font-size="12">${formatAxisPrice(latest.close)}</text>
-      <text x="${chartLeft}" y="16" fill="#7f91a5" font-size="12">30d synthetic tick history - ${state.selectedTimeframe} candles - price step ${formatAxisPrice(scale.step)}</text>
-      <text x="${chartRight - 132}" y="16" fill="#edf5ff" font-size="12">current closes in ${closesIn}</text>
+      <line x1="${chartLeft}" y1="${volumeTop}" x2="${chartRight}" y2="${volumeTop}" stroke="#1a2635" stroke-width="1" />
+      <line x1="${chartLeft}" y1="${currentPriceY.toFixed(2)}" x2="${chartRight}" y2="${currentPriceY.toFixed(2)}" stroke="#73e6ff" stroke-dasharray="4 5" opacity="0.8" />
+      <rect x="${priceAxisX - 4}" y="${(currentPriceY - 12).toFixed(2)}" width="86" height="24" rx="4" fill="#0f2830" stroke="#73e6ff" />
+      <text x="${priceAxisX + 3}" y="${(currentPriceY + 4).toFixed(2)}" fill="#73e6ff" font-size="12">${formatAxisPrice(latest.close)}</text>
+      <text x="${chartLeft}" y="16" fill="#758398" font-size="12">30d synthetic context · ${state.selectedTimeframe} candles · ${formatAxisPrice(scale.step)} step</text>
+      <text x="${chartRight - 132}" y="16" fill="#f4f7fb" font-size="12">closes in ${closesIn}</text>
     </svg>
   `;
 }
@@ -942,9 +1061,9 @@ function renderPatternOverlay(pattern, chartLeft, chartRight, chartTop, chartBot
 
   if (pattern === "Ascending Triangle") {
     return `
-      <path d="M ${x1} ${topLine} L ${x2} ${topLine}" stroke="#7c4dff" stroke-width="2" stroke-dasharray="6 5" fill="none" />
-      <path d="M ${x1} ${chartBottom - 30} L ${x2} ${topLine}" stroke="#16c784" stroke-width="2" fill="none" />
-      <text x="${x1 + 8}" y="${topLine - 8}" fill="#16c784" font-size="12">ascending triangle</text>
+      <path d="M ${x1} ${topLine} L ${x2} ${topLine}" stroke="#73e6ff" stroke-width="1.5" stroke-dasharray="6 5" fill="none" opacity="0.72" />
+      <path d="M ${x1} ${chartBottom - 30} L ${x2} ${topLine}" stroke="#73e6ff" stroke-width="1.5" fill="none" opacity="0.72" />
+      <text x="${x1 + 8}" y="${topLine - 8}" fill="#73e6ff" font-size="11">pattern boundary</text>
     `;
   }
 
@@ -1007,15 +1126,15 @@ function formatAxisTime(timestamp, timeframe) {
 function renderMiniChart(points, size) {
   const width = size === "large" ? 300 : 130;
   const height = size === "large" ? 170 : 46;
-  return `<svg class="mini-chart ${size}" viewBox="0 0 ${width} ${height}" aria-hidden="true"><path d="${buildPath(points, width, height, 8)}" fill="none" stroke="#16c784" stroke-width="${size === "large" ? 4 : 2}" /></svg>`;
+  return `<svg class="mini-chart ${size}" viewBox="0 0 ${width} ${height}" aria-hidden="true"><path d="${buildPath(points, width, height, 8)}" fill="none" stroke="#73e6ff" stroke-width="${size === "large" ? 3 : 2}" /></svg>`;
 }
 
 function renderPatternIcon() {
   return `
     <svg class="pattern-icon" viewBox="0 0 220 110" aria-hidden="true">
-      <path d="M16 84 L64 20 L108 70 L202 18" fill="none" stroke="#16c784" stroke-width="4" />
-      <path d="M28 88 L202 26" stroke="#5b35d5" stroke-width="3" />
-      <path d="M54 25 L205 18 L105 72 Z" fill="none" stroke="#16c784" stroke-width="2" opacity="0.65" />
+      <path d="M16 84 L64 20 L108 70 L202 18" fill="none" stroke="#4adea3" stroke-width="3" />
+      <path d="M28 88 L202 26" stroke="#73e6ff" stroke-width="2" stroke-dasharray="5 5" />
+      <path d="M54 25 L205 18 L105 72 Z" fill="rgba(115,230,255,.04)" stroke="#73e6ff" stroke-width="1.5" opacity="0.8" />
     </svg>
   `;
 }
