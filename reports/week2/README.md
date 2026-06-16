@@ -12,7 +12,7 @@ This project is licensed under the MIT License(licence located in the root)
 
 3.
 
-Prototype - https://www.figma.com/design/rHG9DGjIeDPResDNlMZrXn/Tickframe?node-id=0-1&t=ecf4MuhdmOd0OgEG-1
+Prototype - figma.com/design/rHG9DGjIeDPResDNlMZrXn/Tickframe?node-id=0-1&t=ecf4MuhdmOd0OgEG-1
 
 
 4.
