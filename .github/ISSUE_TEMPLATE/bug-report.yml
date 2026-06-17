@@ -1,1 +1,67 @@
-
+name: Bug Report
+description: Report a defect in the product or repository workflow.
+title: "Bug: Short title"
+labels:
+  - type:bug-report
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem description
+      placeholder: Describe the bug clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What should have happened.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What happened instead.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Browser, OS, branch, URL, or deployment
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria for the fix
+      placeholder: |
+        - ...
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: input
+    id: severity
+    attributes:
+      label: Severity
+      placeholder: Low / Medium / High
+  - type: input
+    id: implementer
+    attributes:
+      label: Implementer
+      placeholder: team member
+  - type: input
+    id: reviewer
+    attributes:
+      label: Reviewer
+      placeholder: different team member

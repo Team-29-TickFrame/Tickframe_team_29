@@ -1,0 +1,144 @@
+name: User Story
+description: Migrate or refine a user story for the Product Backlog.
+title: "US-000: Short title"
+labels:
+  - type:user-story
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill this form for a current product requirement. Keep the stable ID unchanged once assigned.
+  - type: input
+    id: stable_id
+    attributes:
+      label: Stable ID
+      placeholder: US-003
+    validations:
+      required: true
+  - type: input
+    id: short_title
+    attributes:
+      label: Short title
+      placeholder: View live market data
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: User-story statement
+      description: Write the full As a / I want / so that statement.
+      placeholder: As a Market Analyst, I want to view live normalized OHLCV data from multiple exchanges, so that I can monitor the current market state in real time.
+    validations:
+      required: true
+  - type: input
+    id: persona
+    attributes:
+      label: Persona
+      placeholder: Market Analyst
+    validations:
+      required: true
+  - type: input
+    id: desired_action
+    attributes:
+      label: Desired action
+      placeholder: View live normalized OHLCV data
+    validations:
+      required: true
+  - type: input
+    id: expected_value
+    attributes:
+      label: Expected value
+      placeholder: Monitor the current market state in real time
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: Add product context, scope boundaries, and why this story matters.
+    validations:
+      required: true
+  - type: dropdown
+    id: moscow
+    attributes:
+      label: MoSCoW priority
+      options:
+        - Must Have
+        - Should Have
+        - Could Have
+        - Won't Have
+    validations:
+      required: true
+  - type: dropdown
+    id: requirement_status
+    attributes:
+      label: Requirement status
+      options:
+        - Active
+        - Removed
+    validations:
+      required: true
+  - type: dropdown
+    id: work_status
+    attributes:
+      label: Work Status
+      options:
+        - To Do
+        - Ready
+        - In Progress
+        - Review
+        - Done
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes, constraints, assumptions, and open questions
+      placeholder: Include any scope notes, technical constraints, dependencies, or unresolved questions.
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: List the observable and testable acceptance criteria.
+      placeholder: |
+        - Given ...
+        - When ...
+        - Then ...
+    validations:
+      required: true
+  - type: dropdown
+    id: story_points
+    attributes:
+      label: Story points
+      options:
+        - "1"
+        - "2"
+        - "3"
+        - "5"
+        - "8"
+        - "13"
+  - type: input
+    id: mvp_version
+    attributes:
+      label: MVP version
+      placeholder: MVP v1
+  - type: input
+    id: sprint
+    attributes:
+      label: Sprint milestone
+      placeholder: Sprint 1
+  - type: input
+    id: implementer
+    attributes:
+      label: Implementer
+      placeholder: z1nnyy
+  - type: input
+    id: reviewer
+    attributes:
+      label: Reviewer
+      placeholder: different team member
+  - type: textarea
+    id: traceability
+    attributes:
+      label: Traceability notes
+      description: Link the story to supporting PBIs, PRs/MRs, or evidence when available.

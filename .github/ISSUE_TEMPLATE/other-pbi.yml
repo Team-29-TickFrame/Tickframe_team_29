@@ -1,1 +1,87 @@
-
+name: Other PBI
+description: Create a technical, documentation, design, or workflow backlog item.
+title: "PBI: Short title"
+labels:
+  - type:other-pbi
+body:
+  - type: input
+    id: pbi_type
+    attributes:
+      label: PBI type
+      placeholder: Documentation / Technical / Workflow / Design / Test / Deployment
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: Describe the work and why it matters to the product.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - ...
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: dropdown
+    id: moscow
+    attributes:
+      label: MoSCoW priority
+      options:
+        - Must Have
+        - Should Have
+        - Could Have
+        - Won't Have
+    validations:
+      required: true
+  - type: dropdown
+    id: work_status
+    attributes:
+      label: Work Status
+      options:
+        - To Do
+        - Ready
+        - In Progress
+        - Review
+        - Done
+  - type: dropdown
+    id: story_points
+    attributes:
+      label: Story points
+      options:
+        - "1"
+        - "2"
+        - "3"
+        - "5"
+        - "8"
+        - "13"
+  - type: input
+    id: mvp_version
+    attributes:
+      label: MVP version
+      placeholder: MVP v1
+  - type: input
+    id: sprint
+    attributes:
+      label: Sprint milestone
+      placeholder: Sprint 1
+  - type: input
+    id: implementer
+    attributes:
+      label: Implementer
+      placeholder: team member
+  - type: input
+    id: reviewer
+    attributes:
+      label: Reviewer
+      placeholder: different team member
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Verification or evidence notes
+      placeholder: Link PRs, screenshots, deployment URLs, or tests.

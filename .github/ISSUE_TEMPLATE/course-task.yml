@@ -1,1 +1,35 @@
-
+name: Course Task
+description: Track reporting, grading evidence, submission packaging, or course administration.
+title: "Course Task: Short title"
+labels:
+  - type:course-task
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: Describe the course task and the expected outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Expected evidence or deliverable
+      placeholder: Explain what should be submitted or demonstrated.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      placeholder: Team member or subgroup
+  - type: input
+    id: reviewer
+    attributes:
+      label: Reviewer
+      placeholder: team member if review is needed
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      placeholder: Add timing, submission, or packaging constraints if needed.
