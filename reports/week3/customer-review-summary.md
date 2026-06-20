@@ -7,54 +7,52 @@ Date: 19-06-2026
 - Customer 2
 
 ## Demoed Artifacts
-- MVP version 0 (frontend mock / simulated data)
-- MVP version 1 (partial UI with candlestick visualization and metrics)
+- MVP version 0 (frontend mock with simulated data)
+- MVP version 1 (implemented increment with candlestick visualization and metrics)
 
 ## Planned vs Implemented MVP v1 Scope
 
-### Implemented
-- Basic UI for trading/candlestick interface
-- Metrics:
+### Implemented in MVP v1
+- Trading interface UI with candlestick visualization
+- Market metrics calculation:
   - RSI
   - Volume
-- Simulated or partial data pipeline
+- Initial data pipeline (partially simulated / prototype implementation)
 
-### Not implemented / missing
-- Pattern detection (not completed)
-- Backend unclear / not properly demonstrated
-- Missing or unpushed MVP v1 repository
-- No clear deployment link for V1
+### Not implemented in MVP v1
+- Pattern detection module (pending implementation)
+- Fully integrated backend service (not demonstrated during the review)
+- Public repository containing finalized MVP v1 increment
+- Production deployment link for MVP v1
 
 ## Customer Feedback
-- No visible backend implementation
-- No accessible MVP v1 source code
-- Confusion about repository structure and versions
-- Request for:
-  - GitHub repository (updated)
-  - Figma design file
-  - MVP v1 deployment link
+- Requested access to a complete and up-to-date repository
+- Requested Figma design source file
+- Requested accessible deployment of MVP v1 for validation
+- Noted lack of visibility into backend implementation and system architecture
+- Requested clearer mapping between reported and observable system components
 
 ## Key Decisions
-- MVP v1 increment is conditionally accepted
-- Approval depends on:
-  - repository delivery
-  - deployment verification
-  - Figma availability
+- MVP v1 increment received conditional acceptance pending post-meeting verification of artifacts (repository, deployment, and design assets)
+- Team committed to providing required materials for validation within agreed follow-up timeline
 
 ## Risks Identified
-- Lack of clear backend ownership (dependency on Team Member B)
-- Missing commits / unclear version control structure
-- Possible mismatch between claimed and actual implemented scope
-- Pattern detection not yet implemented
+- Dependency risk due to unclear ownership of backend implementation
+- Incomplete synchronization between development artifacts and version control repository
+- Incomplete implementation of pattern detection within the current increment
+- Limited visibility of system architecture during review
 
 ## Action Items
-- Provide updated GitHub repository
-- Provide MVP v1 deployment link
-- Provide Figma design link
-- Clarify backend framework and architecture
-- Complete or document pattern detection plan
+- Provide updated and complete GitHub repository reflecting MVP v1
+- Provide MVP v1 deployment link for external validation
+- Provide Figma design source file
+- Clarify backend architecture and framework selection
+- Finalize specification and implementation plan for pattern detection module
 
 ## Product Backlog Update
-- Pattern detection moved to "in progress"
-- Repository and deployment stabilization prioritized
-- Documentation of architecture required before next review
+- Pattern detection remains in "In Progress"
+- Repository alignment and deployment stabilization prioritized for next iteration
+- Architecture documentation added as a required deliverable before next Sprint Review
+
+## Meeting Execution Note
+During the Sprint Review, MVP v1 could not be demonstrated due to technical constraints affecting availability of the deployed increment. As a result, MVP v0 was presented as the primary demonstrable artifact during the live session. MVP v1 was shared with the customer following the meeting for asynchronous review and validation.
