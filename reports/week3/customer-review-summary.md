@@ -1,4 +1,4 @@
-# Sprint Review Summary (Week 3)
+# Sprint Review Summary
 Date: 19-06-2026
 
 ## Participants
