@@ -1,4 +1,4 @@
-## LLM Usage Report (Week 3)
+## LLM Usage Report
 
 # Overview
 
