@@ -1,0 +1,91 @@
+config_version: "1.0.0"
+market_type: spot
+base_timeframe: 1s
+allowed_lateness_ms: 10000
+raw_trade_retention_hours: 72
+
+exchanges:
+  binance:
+    websocket_urls:
+      - wss://data-stream.binance.vision/stream
+      - wss://stream.binance.com:9443/stream
+      - wss://stream.binance.com:443/stream
+  bybit:
+    websocket_urls:
+      - wss://stream.bybit.com/v5/public/spot
+      - wss://stream.bytick.com/v5/public/spot
+      - wss://stream.bybit-tr.com/v5/public/spot
+      - wss://stream.bybit.kz/v5/public/spot
+      - wss://stream.bybitgeorgia.ge/v5/public/spot
+
+instruments:
+  - id: BTC-USDT
+    name: Bitcoin
+    base: BTC
+    quote: USDT
+    symbols:
+      binance: BTCUSDT
+      bybit: BTCUSDT
+  - id: ETH-USDT
+    name: Ethereum
+    base: ETH
+    quote: USDT
+    symbols:
+      binance: ETHUSDT
+      bybit: ETHUSDT
+  - id: SOL-USDT
+    name: Solana
+    base: SOL
+    quote: USDT
+    symbols:
+      binance: SOLUSDT
+      bybit: SOLUSDT
+  - id: XRP-USDT
+    name: XRP
+    base: XRP
+    quote: USDT
+    symbols:
+      binance: XRPUSDT
+      bybit: XRPUSDT
+  - id: AVAX-USDT
+    name: Avalanche
+    base: AVAX
+    quote: USDT
+    symbols:
+      binance: AVAXUSDT
+      bybit: AVAXUSDT
+  - id: TON-USDT
+    name: Toncoin
+    base: TON
+    quote: USDT
+    symbols:
+      binance: TONUSDT
+      bybit: TONUSDT
+  - id: TRX-USDT
+    name: TRON
+    base: TRX
+    quote: USDT
+    symbols:
+      binance: TRXUSDT
+      bybit: TRXUSDT
+  - id: BONK-USDT
+    name: Bonk
+    base: BONK
+    quote: USDT
+    symbols:
+      binance: BONKUSDT
+      bybit: BONKUSDT
+  - id: PENGU-USDT
+    name: Pudgy Penguins
+    base: PENGU
+    quote: USDT
+    symbols:
+      binance: PENGUUSDT
+      bybit: PENGUUSDT
+  - id: FLOKI-USDT
+    name: Floki
+    base: FLOKI
+    quote: USDT
+    symbols:
+      binance: FLOKIUSDT
+      bybit: FLOKIUSDT
