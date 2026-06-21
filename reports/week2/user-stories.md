@@ -41,7 +41,7 @@ so that I can monitor the current market state in real time.
 ### Notes and constraints
  • Data should be aggregated into a common format.
  • Support at least two exchanges.
- • Initial MVP supports certain trading pairs.
+ • Initial MVP supports the ten agreed USDT instruments.
 
 
 ## US-04: Detect chart patterns
@@ -100,7 +100,8 @@ Initial metrics include:
 ## US-07: Visualize patterns on charts
 
 **Requirement status:** Active
-**MoSCoW priority:** Should Have
+**MoSCoW priority:** Must Have
+
 As a Market Analyst,
 I want detected patterns to be displayed directly on charts,
 so that I can visually validate generated signals.
@@ -130,7 +131,8 @@ so that I can evaluate the effectiveness and reliability of detection algorithms
 **MoSCoW priority:** Should Have
 
 As a Market Analyst,
-I want to analyze correlations between cryptocurrency trading pairs, so that I can identify broader market relationships and dependencies.
+I want to analyze correlations between cryptocurrency trading pairs,
+so that I can identify broader market relationships and dependencies.
 
 ### Notes and constraints
  • Correlations should be computed using historical price data.

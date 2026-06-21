@@ -1,58 +1,195 @@
-# Tickframe MVP v0
+# Tickframe
 
-Tickframe MVP v0 is a static web prototype/foundation for a crypto market pattern analytics product. It demonstrates mock authentication, a BTC/USDT dashboard, generated candlestick data, timeframe controls, user-scoped alerts, alert creation, and alert deletion.
+Tickframe is a real-time crypto market data and pattern-analysis product. The
+current version collects public Binance and Bybit Spot trades, normalizes them,
+builds reproducible `1s` OHLCV candles, stores them in TimescaleDB, and exposes
+the result in a read-only React terminal with deterministic market metrics.
 
-## MVP v0 Links
+Binance and Bybit remain independent sources. The UI never blends them into a
+synthetic price or candle.
 
-- Week 2 index: [reports/week2/README.md](reports/week2/README.md)
-- MVP v0 report: [reports/week2/mvp-v0-report.md](reports/week2/mvp-v0-report.md)
+## Current Scope
 
-## Local Setup
+- 10 USDT instruments: BTC, ETH, SOL, XRP, AVAX, TON, TRX, BONK, PENGU, FLOKI
+- Public Binance and Bybit WebSocket collectors
+- Event-time `1s` OHLCV with gaps and late-trade revisions
+- TimescaleDB history with stable delayed `1s`, `5s`, `15s` raw-trade
+  rollups plus `1m`, `5m`, `15m`, and `1h`
+- Automatic backward history loading on chart scroll
+- Versioned metrics engine with VWAP, realized volatility, Parkinson and
+  Garman-Klass estimators, RSI, momentum, mean reversion, divergences,
+  statistical anomalies, cross-pair correlations, and deterministic metric
+  events
+- REST history plus a live market WebSocket
+- React and TypeScript terminal with exchange, instrument, and timeframe controls
+- TimescaleDB persistence and Docker Compose deployment
 
+Pattern detectors and chart-pattern confidence are already exposed through the
+metrics layer, while the backtest harness is still planned next. The UI
+deliberately separates metric events from trading advice and does not invent
+buy/sell signals.
 
-Run from the repository root:
+Storage is bounded: raw trades are retained for 72 hours, `1s` candles for 14
+days, and older `1m`/`5m`/`15m`/`1h` continuous aggregates are kept for
+long-term analysis. Exchange REST backfills are stored separately as imported
+historical candles, so 30-day `1m` history is not deleted by the `1s` retention
+policy. Old second candles are compressed automatically.
+
+## Planning and workflow
+
+- Current user-story index: [docs/user-stories.md](docs/user-stories.md)
+- Current roadmap: [docs/roadmap.md](docs/roadmap.md)
+- Definition of Done: [docs/definition-of-done.md](docs/definition-of-done.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Issue forms: [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/)
+- PR template: [.github/pull_request_template.md](.github/pull_request_template.md)
+
+## Run the Complete Product
+
+Create the local environment file and choose a real password:
 
 ```bash
-python -m http.server 4173
+cp .env.example .env
+docker compose up --build
 ```
 
 Open:
 
-```text
-http://localhost:4173
-```
+- Frontend: <http://127.0.0.1:4173>
+- API docs: <http://127.0.0.1:8000/docs>
+- Health: <http://127.0.0.1:8000/health>
 
-Demo account:
+Useful API checks:
 
-```text
-Email: demo@tickframe.local
-Password: demo123
-```
+- Candles: <http://127.0.0.1:8000/api/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=100>
+- Metrics: <http://127.0.0.1:8000/api/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=300>
 
- `Continue as Guest` also can be used. Alerts are stored separately for the demo user and guest user in browser `localStorage`.
-
-## Deploy on a VM
-
-For MVP v0, the app can be served as a static site from a virtual machine.
-
-### Quick Deployment
-
-1. Copy or clone this repository onto the VM.
-2. Open the project folder:
+Load 30 days of public `1m` OHLCV for every configured instrument and exchange:
 
 ```bash
-cd /path/to/tickframe
+docker compose exec backend python -m backend.scripts.backfill_candles --days 30
 ```
 
-3. Start the static server:
+Faster parallel loader:
 
 ```bash
-python -m http.server 4173 --bind 0.0.0.0
+docker compose exec backend python -m backend.scripts.history --days 30
 ```
 
-4. Open TCP port `4173` in the VM firewall or cloud security group.
-5. Visit:
+The command is idempotent: reruns update the same candle keys instead of
+duplicating rows.
 
-```text
-http://YOUR_SERVER_IP:4173
+Load official Binance `1s` historical candles for exact second charts:
+
+```bash
+docker compose exec backend python -m backend.scripts.history --exchange binance --timeframe 1s --days 1
 ```
+
+Bybit Spot REST does not expose historical `1s` klines. Tickframe keeps Bybit
+live seconds when our WebSocket captured trades, and can explicitly fall back
+to Binance `1s` historical candles for gap-free second charts when Bybit
+seconds are unavailable.
+
+If an exchange endpoint is blocked or unstable on the current network, override
+the comma-separated fallback list in `.env`:
+
+```bash
+TICKFRAME_BINANCE_WS_URLS=wss://data-stream.binance.vision/stream,wss://stream.binance.com:9443/stream
+TICKFRAME_BYBIT_WS_URLS=wss://stream.bybit.com/v5/public/spot,wss://stream.bybit-tr.com/v5/public/spot,wss://stream.bybit.kz/v5/public/spot
+TICKFRAME_BINANCE_REST_URLS=https://data-api.binance.vision/api/v3/klines,https://api.binance.com/api/v3/klines
+TICKFRAME_BYBIT_REST_URLS=https://api.bybit.kz/v5/market/kline,https://api.bybit.com/v5/market/kline,https://api.bytick.com/v5/market/kline
+TICKFRAME_BINANCE_1S_BACKFILL_HOURS=24h
+TICKFRAME_SECOND_REPAIR_HOURS=72h
+TICKFRAME_STABLE_CHART_DELAY_MS=10000
+```
+
+After backend startup or exchange reconnection, Tickframe automatically
+backfills recent public `1m` OHLCV into `historical_candles` so chart windows do
+not keep permanent holes after local downtime. The default recovery window is
+72 hours and can be changed with `TICKFRAME_RECOVERY_BACKFILL_HOURS`; accepted
+examples are `72`, `72h`, or `12d`. After changing `.env`, recreate the backend
+container with `docker compose up -d --build --force-recreate backend`.
+
+Short chart timeframes (`1s`, `5s`, `15s`) are intentionally delayed by
+`TICKFRAME_STABLE_CHART_DELAY_MS` and rebuilt from `raw_trades` instead of the
+freshest finalized candle rows. The default is `10000` ms. This trades a small
+display lag for fewer gaps and fewer incorrect OHLC values when exchange
+messages arrive late.
+
+During the same recovery run, Tickframe also repairs already stored `1s`
+candles from retained `raw_trades`. `TICKFRAME_SECOND_REPAIR_HOURS` controls
+the repair window and is capped by the raw-trade retention period. This can fix
+past `1s` candle gaps when the trades were received but the candle row was
+missing, incomplete, or finalized too early.
+
+Tickframe also backfills recent official Binance `1s` REST candles on recovery;
+`TICKFRAME_BINANCE_1S_BACKFILL_HOURS` controls that window. These rows are used
+directly for Binance second charts and as an explicit `binance_proxy_1s` source
+for Bybit second charts when exact Bybit seconds do not exist locally.
+
+Stop the stack with:
+
+```bash
+docker compose down
+```
+
+## Local Development
+
+Run the backend in one terminal:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r backend/requirements-dev.txt
+uvicorn backend.app.main:app --reload --port 8000
+```
+
+Run the frontend in another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Vite serves <http://127.0.0.1:4173> and proxies `/api`, `/health`, and `/ws`
+to the backend on port `8000`.
+
+Useful checks:
+
+```bash
+cd frontend
+npm run build
+
+cd ..
+python3 -m unittest discover -s backend/tests
+```
+
+## Deployment
+
+The complete product needs a Linux VM or VPS. Shared static hosting cannot run
+the Python collectors, WebSocket service, or TimescaleDB.
+
+The historical MVP v0 remains available at <https://tickframe.h1n.ru/>. It is a
+static prototype and does not represent the current live-data MVP v1 stack.
+Public MVP v1 deployment and the `v1.0.0` release are tracked in
+[PB-07](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/43).
+
+On the server, install Docker, copy the repository, create `.env`, and run:
+
+```bash
+docker compose up -d --build
+```
+
+For public deployment, put a host-level reverse proxy in front of the Compose
+frontend, terminate HTTPS/WSS there, keep TimescaleDB private, enable persistent
+backups, and synchronize the host clock with NTP.
+
+## Project Notes
+
+- Backend details: [backend/README.md](backend/README.md)
+- Week 2 submission index: [reports/week2/README.md](reports/week2/README.md)
+- Week 3 submission index: [reports/week3/README.md](reports/week3/README.md)
+- MVP v0 report: [reports/week2/mvp-v0-report.md](reports/week2/mvp-v0-report.md)
+
+Never commit real `.env` files, passwords, or API credentials.
