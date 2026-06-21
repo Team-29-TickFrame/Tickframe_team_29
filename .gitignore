@@ -2,7 +2,11 @@
 .env.*
 !.env.example
 node_modules/
+.pnpm-store/
 dist/
 build/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
 .DS_Store
 Thumbs.db
