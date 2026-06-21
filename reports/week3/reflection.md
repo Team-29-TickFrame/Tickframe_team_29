@@ -1,10 +1,10 @@
 # Reflection
 
-Learning Points
+## Learning Points
 
 During Week 3, the team gained practical experience in backlog management, documentation maintenance, MVP delivery, and customer review preparation.
 
-Key lessons learned:
+## Key lessons learned:
 
 * Maintaining a structured Product Backlog with stable identifiers and traceability links significantly improves Sprint planning and reporting.
 * Creating supporting documentation such as docs/user-stories.md, docs/roadmap.md, docs/definition-of-done.md, CHANGELOG.md, and the updated README.md improves project transparency and onboarding.
@@ -14,24 +14,24 @@ Key lessons learned:
 * The Sprint Review highlighted the importance of ensuring that all team members understand the current implementation status and can explain completed work.
 * Release preparation requires consistent version control practices, changelog maintenance, and clear mapping between delivered functionality and release artifacts.
 
-Validated Assumptions
+# Validated Assumptions
 
-Confirmed Assumptions
+## Confirmed Assumptions
 
 * Documentation-focused PBIs improved project organization and traceability.
 * Historical OHLCV data, metrics computation, anomaly detection, and alert generation represent the core functionality required for MVP v1.
 * Milestones, releases, and MVP version tracking provide useful visibility into Sprint progress and delivery scope.
 
-Rejected or Partially Rejected Assumptions
+## Rejected or Partially Rejected Assumptions
 
 * The assumption that all team members had sufficient visibility into backend implementation was not fully validated during the Sprint Review.
 * The assumption that MVP v1 artifacts were fully accessible for review proved incorrect because some deployment and repository materials were unavailable during the meeting.
 * The assumption that all planned MVP v1 functionality could be demonstrated was only partially validated, as pattern detection remained unfinished.
 * The assumption that requirements interpretation was fully aligned was challenged during discussions about metrics, patterns, and detector functionality.
 
-Friction and Gaps
+# Friction and Gaps
 
-Several challenges and risks were identified during MVP v1 delivery and review:
+## Several challenges and risks were identified during MVP v1 delivery and review:
 
 * MVP v1 source code and deployment artifacts were not fully available during the Sprint Review.
 * The project relied heavily on a small number of contributors for backend implementation, creating knowledge-sharing risks.
@@ -41,11 +41,11 @@ Several challenges and risks were identified during MVP v1 delivery and review:
 * Documentation and implementation progress were occasionally out of sync, making completed work harder to demonstrate.
 * Additional testing is required for metrics computation, anomaly detection, breakout alerts, and backtesting functionality.
 
-Planned Response
+## Planned Response
 
 During the next Sprint, the team will focus on improving implementation transparency, delivery readiness, and feature completeness.
 
-Planned actions include:
+## Planned actions include:
 
 * Completing the remaining MVP v1 functionality, particularly pattern detection and detector validation.
 * Improving repository discipline to ensure that all completed work is committed, reviewed, and accessible before customer meetings.
