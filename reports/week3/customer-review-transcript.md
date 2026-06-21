@@ -1,4 +1,4 @@
-# Customer Sprint Review Transcript (Week 3)
+# Customer Sprint Review Transcript
 Date: 19-06-2026
 
 00:00:10 - Team Member A: Before we begin the Sprint Review meeting, do we have your permission to record this meeting?
