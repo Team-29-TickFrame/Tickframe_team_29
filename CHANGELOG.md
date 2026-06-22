@@ -2,18 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on Keep a Changelog and this project follows Semantic Versioning.
+The format follows [Keep a Changelog](https://keepachangelog.com/) and the
+project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
 ### Added
-- Initial Assignment 3 workflow foundation (issue templates, PR template, merge-commit policy evidence).
+- Dockerized React/TypeScript market terminal with live Binance and Bybit
+  instrument selection, candlestick history, health state, metrics, correlations,
+  and deterministic event cards.
+- Assignment 3 workflow, backlog, and release preparation updates.
 
 ### Changed
-- 
+- Product documentation and repository workflow are being aligned with the
+  current MVP v1 delivery.
 
 ### Fixed
-- 
+- No entries yet.
 
-## [v1.0.0] - YYYY-MM-DD
-### Added
-- MVP v1 release.
+### Removed
+- No entries yet.
+
+### Deprecated
+- No entries yet.
+
+### Security
+- No entries yet.

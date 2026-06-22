@@ -2,7 +2,19 @@
 .env.*
 !.env.example
 node_modules/
+.pnpm-store/
 dist/
 build/
+*.tsbuildinfo
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
 .DS_Store
 Thumbs.db
+
+# Local course handoff artifacts
+swp_26/
+*.mov
+AGENT_CONTEXT.md
