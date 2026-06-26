@@ -151,3 +151,54 @@ export function marketWebSocketUrl(): string {
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
 }
+
+export function metricsWebSocketUrl(
+  exchange: Exchange,
+  instrumentId: string,
+  timeframe: Timeframe,
+  windowName: "default" | "24h",
+): string {
+  const configured = import.meta.env.VITE_METRICS_WS_URL as string | undefined;
+  const base = configured || "/ws/v1/metrics";
+  const url = new URL(base, window.location.origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("exchange", exchange);
+  url.searchParams.set("instrumentId", instrumentId);
+  url.searchParams.set("timeframe", timeframe);
+  url.searchParams.set("window", windowName);
+  return url.toString();
+}
+
+export function candleWebSocketUrl(
+  exchange: Exchange,
+  instrumentId: string,
+  timeframe: Timeframe,
+): string {
+  const configured = import.meta.env.VITE_CANDLES_WS_URL as string | undefined;
+  const base = configured || "/ws/v1/candles";
+  const url = new URL(base, window.location.origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("exchange", exchange);
+  url.searchParams.set("instrumentId", instrumentId);
+  url.searchParams.set("timeframe", timeframe);
+  return url.toString();
+}
+
+export function stableCandleWebSocketUrl(
+  exchange: Exchange,
+  instrumentId: string,
+  timeframe: Timeframe,
+  limit = 20,
+): string {
+  const configured = import.meta.env.VITE_STABLE_CANDLES_WS_URL as
+    | string
+    | undefined;
+  const base = configured || "/ws/v1/candles/stable";
+  const url = new URL(base, window.location.origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("exchange", exchange);
+  url.searchParams.set("instrumentId", instrumentId);
+  url.searchParams.set("timeframe", timeframe);
+  url.searchParams.set("limit", String(limit));
+  return url.toString();
+}

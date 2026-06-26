@@ -21,6 +21,7 @@ synthetic price or candle.
   statistical anomalies, cross-pair correlations, and deterministic metric
   events
 - REST history plus a live market WebSocket
+- Persisted metric history plus pushed metric snapshots for the terminal
 - React and TypeScript terminal with exchange, instrument, and timeframe controls
 - TimescaleDB persistence and Docker Compose deployment
 
@@ -63,6 +64,9 @@ Useful API checks:
 
 - Candles: <http://127.0.0.1:8000/api/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=100>
 - Metrics: <http://127.0.0.1:8000/api/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=300>
+- Metrics stream: `ws://127.0.0.1:8000/ws/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&window=24h`
+- Stable candle stream: `ws://127.0.0.1:8000/ws/v1/candles/stable?exchange=binance&instrumentId=BTC-USDT&timeframe=1s&limit=20`
+- Provisional candle stream: `ws://127.0.0.1:8000/ws/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1s`
 
 Load 30 days of public `1m` OHLCV for every configured instrument and exchange:
 
@@ -100,7 +104,7 @@ TICKFRAME_BINANCE_REST_URLS=https://data-api.binance.vision/api/v3/klines,https:
 TICKFRAME_BYBIT_REST_URLS=https://api.bybit.kz/v5/market/kline,https://api.bybit.com/v5/market/kline,https://api.bytick.com/v5/market/kline
 TICKFRAME_BINANCE_1S_BACKFILL_HOURS=24h
 TICKFRAME_SECOND_REPAIR_HOURS=72h
-TICKFRAME_STABLE_CHART_DELAY_MS=10000
+TICKFRAME_STABLE_CHART_DELAY_MS=2000
 ```
 
 After backend startup or exchange reconnection, Tickframe automatically
@@ -112,9 +116,9 @@ container with `docker compose up -d --build --force-recreate backend`.
 
 Short chart timeframes (`1s`, `5s`, `15s`) are intentionally delayed by
 `TICKFRAME_STABLE_CHART_DELAY_MS` and rebuilt from `raw_trades` instead of the
-freshest finalized candle rows. The default is `10000` ms. This trades a small
-display lag for fewer gaps and fewer incorrect OHLC values when exchange
-messages arrive late.
+freshest finalized candle rows. The default is `2000` ms, aligned with the
+default `allowed_lateness_ms` candle watermark. Late exchange messages can
+still revise recent candles instead of being hidden.
 
 During the same recovery run, Tickframe also repairs already stored `1s`
 candles from retained `raw_trades`. `TICKFRAME_SECOND_REPAIR_HOURS` controls
@@ -126,6 +130,18 @@ Tickframe also backfills recent official Binance `1s` REST candles on recovery;
 `TICKFRAME_BINANCE_1S_BACKFILL_HOURS` controls that window. These rows are used
 directly for Binance second charts and as an explicit `binance_proxy_1s` source
 for Bybit second charts when exact Bybit seconds do not exist locally.
+
+Metric points, metric events, and latest metric summaries are persisted in
+TimescaleDB. The REST metrics endpoint remains available for initial loads and
+fallbacks, while `/ws/v1/metrics` pushes fresh backend-owned summaries after
+new or recovered candle windows are recomputed.
+
+The chart loads its initial history through REST, then listens to
+`/ws/v1/candles/stable` for event-driven stable candle updates and
+`/ws/v1/candles` for provisional live overlays. Provisional overlays are not
+persisted as canonical history; they let the user see the current forming candle
+near real time while stable candles remain delayed enough to preserve OHLC
+correctness.
 
 Stop the stack with:
 

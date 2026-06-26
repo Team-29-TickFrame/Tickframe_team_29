@@ -1,4 +1,4 @@
-import asyncio
+import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -233,10 +233,134 @@ async def market_stream(websocket: WebSocket) -> None:
     last_revision = -1
     try:
         while True:
-            if service.store.revision != last_revision:
+            revision = service.market_stream_revision
+            if revision != last_revision:
                 snapshot = await service.store.market_snapshot(unix_ms())
                 await websocket.send_json(snapshot)
-                last_revision = snapshot["revision"]
-            await asyncio.sleep(0.1)
+                last_revision = revision
+            await service.wait_for_market_update(last_revision)
+    except WebSocketDisconnect:
+        return
+
+
+@app.websocket("/ws/v1/metrics")
+async def metrics_stream(
+    websocket: WebSocket,
+    exchange: str,
+    instrument_id: str = Query(alias="instrumentId"),
+    timeframe: str = Query(default="1m"),
+    window: str = Query(default="default"),
+) -> None:
+    await websocket.accept()
+    if (
+        exchange not in config.exchanges
+        or timeframe not in TIMEFRAME_SECONDS
+        or window not in {"default", "24h"}
+    ):
+        await websocket.close(code=1008)
+        return
+    try:
+        ensure_supported_market(exchange, instrument_id)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    last_revision = -1
+    try:
+        while True:
+            revision, snapshot = service.cached_metrics(
+                exchange=exchange,
+                instrument_id=instrument_id,
+                timeframe=timeframe,
+                window_name=window,
+            )
+            if snapshot is not None and revision != last_revision:
+                await websocket.send_json(snapshot)
+                last_revision = revision
+            await service.wait_for_metric_update(
+                exchange=exchange,
+                instrument_id=instrument_id,
+                timeframe=timeframe,
+                window_name=window,
+                last_revision=last_revision,
+            )
+    except WebSocketDisconnect:
+        return
+
+
+@app.websocket("/ws/v1/candles/stable")
+async def stable_candle_stream(
+    websocket: WebSocket,
+    exchange: str,
+    instrument_id: str = Query(alias="instrumentId"),
+    timeframe: str = Query(default="1s"),
+    limit: int = Query(default=20, ge=1, le=500),
+) -> None:
+    await websocket.accept()
+    if exchange not in config.exchanges or timeframe not in TIMEFRAME_SECONDS:
+        await websocket.close(code=1008)
+        return
+    try:
+        ensure_supported_market(exchange, instrument_id)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    last_revision = -1
+    last_payload = ""
+    try:
+        while True:
+            revision = service.stable_candle_revision
+            if revision != last_revision:
+                snapshot = await service.stable_candle_snapshot(
+                    exchange=exchange,
+                    instrument_id=instrument_id,
+                    timeframe=timeframe,
+                    limit=limit,
+                )
+                payload = json.dumps(snapshot, sort_keys=True)
+                if payload != last_payload:
+                    await websocket.send_json(snapshot)
+                    last_payload = payload
+                last_revision = revision
+            await service.wait_for_stable_candle_update(last_revision)
+    except WebSocketDisconnect:
+        return
+
+
+@app.websocket("/ws/v1/candles")
+async def candle_stream(
+    websocket: WebSocket,
+    exchange: str,
+    instrument_id: str = Query(alias="instrumentId"),
+    timeframe: str = Query(default="1s"),
+) -> None:
+    await websocket.accept()
+    if exchange not in config.exchanges or timeframe not in TIMEFRAME_SECONDS:
+        await websocket.close(code=1008)
+        return
+    try:
+        ensure_supported_market(exchange, instrument_id)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    last_payload = ""
+    last_revision = -1
+    try:
+        while True:
+            revision = service.provisional_candle_revision
+            if revision != last_revision:
+                snapshot = await service.provisional_candle_snapshot(
+                    exchange=exchange,
+                    instrument_id=instrument_id,
+                    timeframe=timeframe,
+                )
+                payload = json.dumps(snapshot, sort_keys=True)
+                if payload != last_payload:
+                    await websocket.send_json(snapshot)
+                    last_payload = payload
+                last_revision = revision
+            await service.wait_for_provisional_candle_update(last_revision)
     except WebSocketDisconnect:
         return
