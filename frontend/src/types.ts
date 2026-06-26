@@ -195,6 +195,40 @@ export interface MetricsResponse {
   };
 }
 
+export type MlPatternStatus =
+  | "pattern_detected"
+  | "no_reliable_pattern"
+  | "unsupported_timeframe"
+  | "insufficient_data"
+  | "model_unavailable";
+
+export interface MlPatternResponse {
+  status: MlPatternStatus;
+  message: string;
+  modelVersion: string;
+  modelType?: string;
+  supportedTimeframes: Timeframe[];
+  exchange: Exchange;
+  instrumentId: string;
+  timeframe: Timeframe;
+  windowSize: number;
+  source: HistorySource | string;
+  generatedAt: number;
+  confidenceThreshold?: number;
+  prediction: {
+    label: string;
+    confidence: number;
+  } | null;
+  alternatives: Array<{
+    label: string;
+    confidence: number;
+  }>;
+  dataFrom?: number | null;
+  dataTo?: number | null;
+  candleCount?: number;
+  experimental?: boolean;
+}
+
 export interface CollectorHealth {
   exchange: Exchange;
   connected: boolean;

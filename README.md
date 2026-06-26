@@ -64,6 +64,7 @@ Useful API checks:
 
 - Candles: <http://127.0.0.1:8000/api/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=100>
 - Metrics: <http://127.0.0.1:8000/api/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=300>
+- Experimental ML pattern: <http://127.0.0.1:8000/api/v1/patterns/ml?exchange=binance&instrumentId=BTC-USDT&timeframe=1m>
 - Metrics stream: `ws://127.0.0.1:8000/ws/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&window=24h`
 - Stable candle stream: `ws://127.0.0.1:8000/ws/v1/candles/stable?exchange=binance&instrumentId=BTC-USDT&timeframe=1s&limit=20`
 - Provisional candle stream: `ws://127.0.0.1:8000/ws/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1s`
@@ -181,6 +182,21 @@ cd ..
 python3 -m unittest discover -s backend/tests
 ```
 
+## ML Training Pipeline
+
+The first maintained pattern-recognition experiment lives in
+[ml/pattern_recognition](ml/pattern_recognition). It trains a synthetic `1m`
+baseline for 96-candle windows and saves reproducible model artifacts.
+
+```bash
+python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json
+```
+
+The training pipeline itself is offline. The saved baseline artifact is exposed
+through the experimental `/api/v1/patterns/ml` endpoint and the dashboard ML
+pattern panel for the `1m` timeframe only. Other timeframes remain unsupported
+until separate training and validation artifacts exist for them.
+
 ## Deployment
 
 The complete product needs a Linux VM or VPS. Shared static hosting cannot run
@@ -204,6 +220,7 @@ backups, and synchronize the host clock with NTP.
 ## Project Notes
 
 - Backend details: [backend/README.md](backend/README.md)
+- Pattern ML pipeline: [ml/pattern_recognition/README.md](ml/pattern_recognition/README.md)
 - Week 2 submission index: [reports/week2/README.md](reports/week2/README.md)
 - Week 3 submission index: [reports/week3/README.md](reports/week3/README.md)
 - MVP v0 report: [reports/week2/mvp-v0-report.md](reports/week2/mvp-v0-report.md)

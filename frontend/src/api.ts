@@ -7,6 +7,7 @@ import type {
   InstrumentsResponse,
   MarketsResponse,
   MetricsResponse,
+  MlPatternResponse,
   Timeframe,
 } from "./types";
 
@@ -139,6 +140,20 @@ export function fetchMetrics(
   if (options.from !== undefined) query.set("from", String(options.from));
   if (options.to !== undefined) query.set("to", String(options.to));
   return request<MetricsResponse>(`/api/v1/metrics?${query}`, { signal });
+}
+
+export function fetchMlPattern(
+  exchange: Exchange,
+  instrumentId: string,
+  timeframe: Timeframe,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({
+    exchange,
+    instrumentId,
+    timeframe,
+  });
+  return request<MlPatternResponse>(`/api/v1/patterns/ml?${query}`, { signal });
 }
 
 export function marketWebSocketUrl(): string {

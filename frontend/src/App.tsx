@@ -14,6 +14,7 @@ import {
   fetchInstruments,
   fetchMarkets,
   fetchMetrics,
+  fetchMlPattern,
   login,
   logout,
   marketWebSocketUrl,
@@ -37,6 +38,7 @@ import type {
   MarketsResponse,
   MetricEvent,
   MetricsResponse,
+  MlPatternResponse,
   StreamStatus,
   Timeframe,
 } from "./types";
@@ -373,6 +375,13 @@ function formatConfidence(value: number | null): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function patternLabel(value: string): string {
+  return value
+    .split("_")
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function formatAge(value: number | null | undefined): string {
   if (value === null || value === undefined) return "no data";
   if (value < 1_000) return `${Math.round(value)} ms`;
@@ -537,13 +546,19 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     scope: string;
     value: MetricsResponse | null;
   }>({ scope: "", value: null });
+  const [mlPatternData, setMlPatternData] = useState<{
+    scope: string;
+    value: MlPatternResponse | null;
+  }>({ scope: "", value: null });
   const [candlesLoading, setCandlesLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [mlPatternLoading, setMlPatternLoading] = useState(false);
   const [candleError, setCandleError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [mlPatternError, setMlPatternError] = useState<string | null>(null);
   const [instrumentMenuOpen, setInstrumentMenuOpen] = useState(false);
   const historyLoadingRef = useRef(false);
 
@@ -808,6 +823,44 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     metricsData.scope === candleScope ? metricsData.value : null;
   const statsMetrics =
     statsData.scope === statsScope ? statsData.value : null;
+  const latestClosedCandleTime = candles.at(-1)?.closeTime ?? null;
+  const mlPatternScope = `${exchange}:${instrumentId}:${timeframe}:${latestClosedCandleTime ?? "none"}`;
+  const mlPattern =
+    mlPatternData.scope === mlPatternScope ? mlPatternData.value : null;
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    const scope = mlPatternScope;
+
+    const loadPattern = async () => {
+      setMlPatternLoading(true);
+      try {
+        const response = await fetchMlPattern(
+          exchange,
+          instrumentId,
+          timeframe,
+          controller.signal,
+        );
+        if (!active) return;
+        setMlPatternData({ scope, value: response });
+        setMlPatternError(null);
+      } catch (requestError) {
+        if (!active || (requestError as Error).name === "AbortError") return;
+        setMlPatternError("ML pattern recognition is temporarily unavailable.");
+        setMlPatternData({ scope, value: null });
+      } finally {
+        if (active) setMlPatternLoading(false);
+      }
+    };
+
+    void loadPattern();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [exchange, instrumentId, timeframe, latestClosedCandleTime, mlPatternScope]);
+
   const latestMetrics = statsMetrics?.latest ?? null;
   const statsSummary = statsMetrics?.summary ?? null;
   const metricEvents = metrics?.events ?? [];
@@ -973,10 +1026,16 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           </div>
         </header>
 
-        {(error || candleError || metricsError || statsError) && (
+        {(error || candleError || metricsError || statsError || mlPatternError) && (
           <div className="system-notice" role="status">
             <span>DATA NOTICE</span>
-            <p>{error ?? candleError ?? statsError ?? metricsError}</p>
+            <p>
+              {error ??
+                candleError ??
+                statsError ??
+                metricsError ??
+                mlPatternError}
+            </p>
           </div>
         )}
 
@@ -1308,6 +1367,85 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           </div>
 
           <aside className="events-column">
+            <article className="panel ml-pattern-panel">
+              <div className="panel-head compact">
+                <div className="panel-title-with-logo">
+                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                  <div>
+                    <span className="eyebrow">ML PATTERN</span>
+                    <strong>{mlPattern?.modelVersion ?? "pattern-baseline-v0"}</strong>
+                  </div>
+                </div>
+                <span
+                  className={`quality-badge ${
+                    mlPatternLoading
+                      ? "warn"
+                      : mlPattern?.status === "pattern_detected"
+                        ? "good"
+                        : "neutral"
+                  }`}
+                >
+                  {mlPatternLoading
+                    ? "CALC"
+                    : timeframe === "1m"
+                      ? "ML ON"
+                      : "LOCKED"}
+                </span>
+              </div>
+              <div className="ml-pattern-body">
+                <div className="ml-pattern-result">
+                  <span>
+                    {mlPattern?.status === "pattern_detected"
+                      ? "Detected pattern"
+                      : "Current state"}
+                  </span>
+                  <strong>
+                    {mlPattern?.prediction &&
+                    mlPattern.status === "pattern_detected"
+                      ? patternLabel(mlPattern.prediction.label)
+                      : mlPattern?.status === "unsupported_timeframe"
+                        ? "Switch to 1m"
+                        : mlPattern?.status === "insufficient_data"
+                          ? "Collecting candles"
+                          : "No reliable pattern"}
+                  </strong>
+                  <small>
+                    {mlPattern?.message ??
+                      "Waiting for the ML detector response."}
+                  </small>
+                </div>
+
+                <div className="ml-pattern-stats">
+                  <div>
+                    <span>Confidence</span>
+                    <strong>
+                      {mlPattern?.prediction
+                        ? formatConfidence(mlPattern.prediction.confidence)
+                        : "--"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Window</span>
+                    <strong>{mlPattern?.windowSize ?? 96} candles</strong>
+                  </div>
+                  <div>
+                    <span>Source</span>
+                    <strong>{mlPattern?.source ?? "--"}</strong>
+                  </div>
+                </div>
+
+                {mlPattern?.alternatives && mlPattern.alternatives.length > 0 && (
+                  <div className="ml-alternatives">
+                    {mlPattern.alternatives.slice(0, 3).map((item) => (
+                      <span key={item.label}>
+                        {patternLabel(item.label)}
+                        <b>{formatConfidence(item.confidence)}</b>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </article>
             <article className="panel signal-panel">
               <div className="panel-head compact">
                 <div className="panel-title-with-logo">
