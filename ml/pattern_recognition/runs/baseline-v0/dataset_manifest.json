@@ -1,0 +1,43 @@
+{
+  "classCounts": {
+    "double_bottom": 900,
+    "double_top": 900,
+    "flag": 900,
+    "head_and_shoulders": 900,
+    "none": 900,
+    "triangle": 900
+  },
+  "dataset": "synthetic-patterns-1m-v0",
+  "generatedAt": "2026-06-26T11:18:15.923982+00:00",
+  "labels": [
+    "head_and_shoulders",
+    "triangle",
+    "flag",
+    "double_top",
+    "double_bottom",
+    "none"
+  ],
+  "samplesPerClass": 900,
+  "seed": 42,
+  "testClassCounts": {
+    "double_bottom": 180,
+    "double_top": 180,
+    "flag": 180,
+    "head_and_shoulders": 180,
+    "none": 180,
+    "triangle": 180
+  },
+  "testExamples": 1080,
+  "timeframe": "1m",
+  "totalExamples": 5400,
+  "trainClassCounts": {
+    "double_bottom": 720,
+    "double_top": 720,
+    "flag": 720,
+    "head_and_shoulders": 720,
+    "none": 720,
+    "triangle": 720
+  },
+  "trainExamples": 4320,
+  "windowSize": 96
+}
