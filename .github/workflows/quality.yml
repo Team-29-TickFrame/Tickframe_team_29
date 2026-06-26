@@ -27,6 +27,9 @@ jobs:
       - name: Lint backend and ML code
         run: ruff check backend ml
 
+      - name: Check backend and ML formatting
+        run: ruff format --check backend ml
+
       - name: Run backend tests with coverage
         run: |
           coverage run --source=backend.app,ml.pattern_recognition -m unittest discover -s backend/tests
