@@ -22,6 +22,23 @@ interface MarketChartProps {
 
 const DEFAULT_VISIBLE_BARS = 120;
 
+function volumeColor(candle: DisplayCandle): string {
+  return candle.close >= candle.open
+    ? "rgba(53, 229, 138, 0.26)"
+    : "rgba(255, 78, 103, 0.24)";
+}
+
+function candleSignature(candle: DisplayCandle): string {
+  return [
+    candle.time,
+    candle.open,
+    candle.high,
+    candle.low,
+    candle.close,
+    candle.volume,
+  ].join(":");
+}
+
 function pricePrecision(value: number): number {
   if (value >= 1000) return 2;
   if (value >= 1) return 4;
@@ -47,6 +64,8 @@ export default function MarketChart({
     first: number;
     last: number;
   } | null>(null);
+  const renderedTimesRef = useRef<number[]>([]);
+  const renderedSignaturesRef = useRef<string[]>([]);
   const historyStateRef = useRef({
     hasMore,
     historyLoading,
@@ -186,6 +205,8 @@ export default function MarketChart({
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      renderedTimesRef.current = [];
+      renderedSignaturesRef.current = [];
     };
   }, []);
 
@@ -214,6 +235,8 @@ export default function MarketChart({
       lastScopeRef.current = scopeKey;
       resetPendingRef.current = true;
       previousRangeRef.current = null;
+      renderedTimesRef.current = [];
+      renderedSignaturesRef.current = [];
     }
 
     const multiplier = 10 ** precision;
@@ -225,25 +248,57 @@ export default function MarketChart({
       },
     });
 
-    candleSeries.setData(
-      candles.map((candle) => ({
-        time: candle.time as UTCTimestamp,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-      })),
+    const candlePoints = candles.map((candle) => ({
+      time: candle.time as UTCTimestamp,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+    }));
+    const volumePoints = candles.map((candle) => ({
+      time: candle.time as UTCTimestamp,
+      value: candle.volume,
+      color: volumeColor(candle),
+    }));
+    const nextTimes = candles.map((candle) => candle.time);
+    const nextSignatures = candles.map(candleSignature);
+    const previousTimes = renderedTimesRef.current;
+    const previousSignatures = renderedSignaturesRef.current;
+    const prefixTimesMatch = previousTimes.every(
+      (time, index) => nextTimes[index] === time,
     );
-    volumeSeries.setData(
-      candles.map((candle) => ({
-        time: candle.time as UTCTimestamp,
-        value: candle.volume,
-        color:
-          candle.close >= candle.open
-            ? "rgba(53, 229, 138, 0.26)"
-            : "rgba(255, 78, 103, 0.24)",
-      })),
+    const firstChangedIndex = nextSignatures.findIndex(
+      (signature, index) => previousSignatures[index] !== signature,
     );
+    const dataUnchanged =
+      !resetPendingRef.current &&
+      !historyWasPrepended &&
+      candles.length === previousTimes.length &&
+      firstChangedIndex === -1;
+    const canUpdateTail =
+      !resetPendingRef.current &&
+      !historyWasPrepended &&
+      candles.length >= previousTimes.length &&
+      previousTimes.length > 0 &&
+      prefixTimesMatch &&
+      firstChangedIndex >= previousTimes.length - 1;
+
+    if (dataUnchanged) {
+      previousRangeRef.current = nextRange;
+      return;
+    }
+
+    if (canUpdateTail) {
+      for (let index = firstChangedIndex; index < candles.length; index += 1) {
+        candleSeries.update(candlePoints[index]);
+        volumeSeries.update(volumePoints[index]);
+      }
+    } else {
+      candleSeries.setData(candlePoints);
+      volumeSeries.setData(volumePoints);
+    }
+    renderedTimesRef.current = nextTimes;
+    renderedSignaturesRef.current = nextSignatures;
 
     if (resetPendingRef.current && candles.length > 0) {
       resetPendingRef.current = false;

@@ -30,6 +30,7 @@ def compute_metrics(
     candles: Iterable[Dict[str, Any]],
     *,
     timeframe: str,
+    event_limit: Optional[int] = 8,
 ) -> Dict[str, Any]:
     ordered = sorted(candles, key=lambda candle: int(candle["openTime"]))
     opens = [_decimal_or_none(candle.get("open")) for candle in ordered]
@@ -160,6 +161,7 @@ def compute_metrics(
             points,
             highs=highs,
             lows=lows,
+            limit=event_limit,
         ),
         "points": points,
     }
@@ -170,11 +172,12 @@ def collect_events(
     *,
     highs: List[Optional[Decimal]],
     lows: List[Optional[Decimal]],
-    limit: int = 8,
+    limit: Optional[int] = 8,
 ) -> List[Dict[str, Any]]:
     events = metric_events(points)
     events.extend(pattern_events(points, highs=highs, lows=lows))
-    return sorted(events, key=lambda event: event["openTime"], reverse=True)[:limit]
+    ordered = sorted(events, key=lambda event: event["openTime"], reverse=True)
+    return ordered if limit is None else ordered[:limit]
 
 
 def metric_events(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

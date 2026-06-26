@@ -6,7 +6,8 @@ export type HistorySource =
   | "memory"
   | "raw_trades"
   | "historical_candles"
-  | "binance_proxy_1s";
+  | "binance_proxy_1s"
+  | "provisional";
 export type Timeframe =
   | "1s"
   | "5s"
@@ -69,7 +70,12 @@ export interface Candle {
   baseVolume: string;
   quoteVolume: string;
   tradeCount: number;
-  status: "complete" | "complete_empty" | "incomplete" | "recovered";
+  status:
+    | "complete"
+    | "complete_empty"
+    | "incomplete"
+    | "recovered"
+    | "provisional";
   revision: number;
   firstTradeId: string | null;
   lastTradeId: string | null;
@@ -87,6 +93,23 @@ export interface CandlesResponse {
   count: number;
   hasMore: boolean;
   nextBefore: number | null;
+  chartLatency: {
+    generatedAt: number;
+    dataTo: number;
+    effectiveLagMs: number;
+    stableDelayMs: number;
+    allowedLatenessMs: number;
+  };
+  candles: Candle[];
+}
+
+export interface CandleStreamResponse {
+  exchange: Exchange;
+  instrumentId: string;
+  timeframe: Timeframe;
+  source: "provisional";
+  generatedAt: number;
+  revision: number;
   candles: Candle[];
 }
 
@@ -125,6 +148,7 @@ export interface MetricEvent {
 
 export interface MetricsResponse {
   exchange: Exchange;
+  marketType: string;
   instrumentId: string;
   timeframe: Timeframe;
   source: HistorySource;
@@ -161,6 +185,14 @@ export interface MetricsResponse {
     source: HistorySource | string;
   }>;
   points: MetricPoint[];
+  metricsLatency: {
+    generatedAt: number;
+    dataTo: number;
+    effectiveLagMs: number;
+    calculatedAt: number;
+    computeDurationMs: number;
+    windowName: string;
+  };
 }
 
 export interface CollectorHealth {
@@ -187,8 +219,25 @@ export interface HealthResponse {
     processedTrades: number;
     revisedCandles: number;
   };
+  streams: {
+    marketRevision: number;
+    provisionalCandleRevision: number;
+    stableCandleRevision: number;
+    metricRevision: number;
+  };
+  metrics: {
+    queueSize: number;
+    queueCapacity: number;
+    pendingScopes: number;
+    computedSnapshots: number;
+    cachedScopes: number;
+    cachedCorrelations: number;
+    correlationRefreshMs: number;
+    lastError: string | null;
+  };
   chart: {
     stableDelayMs: number;
+    allowedLatenessMs: number;
     rawTradeTimeframes: Timeframe[];
     rawTradeRetentionHours: number;
     secondRepairHours: number;
@@ -200,6 +249,9 @@ export interface HealthResponse {
     queueCapacity: number;
     writtenTrades: number;
     writtenCandles: number;
+    writtenMetricPoints: number;
+    writtenMetricEvents: number;
+    writtenMetricSummaries: number;
     lastError: string | null;
   };
   recovery: {

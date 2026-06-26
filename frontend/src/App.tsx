@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import {
+  candleWebSocketUrl,
   fetchCandles,
   fetchCurrentUser,
   fetchHealth,
@@ -16,13 +17,17 @@ import {
   login,
   logout,
   marketWebSocketUrl,
+  metricsWebSocketUrl,
   register,
+  stableCandleWebSocketUrl,
 } from "./api";
 import MarketChart from "./components/MarketChart";
 import type {
   AuthResponse,
   AuthUser,
   Candle,
+  CandleStreamResponse,
+  CandlesResponse,
   DisplayCandle,
   Exchange,
   HealthResponse,
@@ -51,6 +56,8 @@ const METRICS_LIMIT = 300;
 const STATS_TIMEFRAME: Timeframe = "1m";
 const STATS_LIMIT = 24 * 60;
 const STATS_WINDOW_MS = 24 * 60 * 60 * 1000;
+const METRICS_FALLBACK_POLL_MS = 10_000;
+const STATS_FALLBACK_POLL_MS = 60_000;
 const AUTH_TOKEN_STORAGE_KEY = "tickframe.authToken";
 const GUEST_AUTH_TOKEN = "guest";
 const GUEST_AUTH_RESPONSE: AuthResponse = {
@@ -516,7 +523,12 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     values: Candle[];
     hasMore: boolean;
     source: HistorySource | null;
-  }>({ scope: "", values: [], hasMore: false, source: null });
+    latency: CandlesResponse["chartLatency"] | null;
+  }>({ scope: "", values: [], hasMore: false, source: null, latency: null });
+  const [provisionalData, setProvisionalData] = useState<{
+    scope: string;
+    values: Candle[];
+  }>({ scope: "", values: [] });
   const [metricsData, setMetricsData] = useState<{
     scope: string;
     value: MetricsResponse | null;
@@ -538,7 +550,6 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   useEffect(() => {
     let active = true;
     let initialController: AbortController | null = null;
-    let pollController: AbortController | null = null;
     const scope = `${exchange}:${instrumentId}:${timeframe}`;
 
     const loadInitial = async () => {
@@ -557,6 +568,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           values: response.candles,
           hasMore: response.hasMore,
           source: response.source,
+          latency: response.chartLatency,
         });
         setCandleError(null);
       } catch (requestError) {
@@ -567,55 +579,78 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       }
     };
 
-    const pollLatest = async () => {
-      pollController?.abort();
-      pollController = new AbortController();
-      try {
-        const response = await fetchCandles(
-          exchange,
-          instrumentId,
-          { timeframe, limit: 20 },
-          pollController.signal,
-        );
-        if (!active) return;
-        setCandleData((current) =>
-          current.scope === scope
-            ? {
-                ...current,
-                values: mergeCandles(current.values, response.candles),
-                source: response.source,
-              }
-            : current,
-        );
-        setCandleError(null);
-      } catch (requestError) {
-        if ((requestError as Error).name !== "AbortError") {
-          setCandleError("Live candle refresh is temporarily unavailable.");
-        }
-      }
-    };
-
     setCandleData({
       scope,
       values: [],
       hasMore: false,
       source: null,
+      latency: null,
     });
     setHistoryLoading(false);
     historyLoadingRef.current = false;
     void loadInitial();
-    const pollInterval =
-      timeframe === "1s" || timeframe === "5s" ? 2_000 : 5_000;
-    const interval = window.setInterval(
-      () => void pollLatest(),
-      pollInterval,
-    );
 
     return () => {
       active = false;
       initialController?.abort();
-      pollController?.abort();
-      window.clearInterval(interval);
+    };
+  }, [exchange, instrumentId, timeframe]);
+
+  useEffect(() => {
+    const scope = `${exchange}:${instrumentId}:${timeframe}`;
+    let closed = false;
+    const socket = new WebSocket(
+      stableCandleWebSocketUrl(exchange, instrumentId, timeframe, 20),
+    );
+
+    socket.addEventListener("message", (event) => {
+      if (closed) return;
+      try {
+        const snapshot = JSON.parse(event.data) as CandlesResponse;
+        setCandleData((current) =>
+          current.scope === scope
+            ? {
+                ...current,
+                values: mergeCandles(current.values, snapshot.candles),
+                source: current.source ?? snapshot.source,
+                latency: snapshot.chartLatency,
+              }
+            : current,
+        );
+        setCandleError(null);
+      } catch {
+        setCandleError("A malformed stable candle snapshot was ignored.");
+      }
+    });
+
+    return () => {
+      closed = true;
+      socket.close();
+    };
+  }, [exchange, instrumentId, timeframe]);
+
+  useEffect(() => {
+    const scope = `${exchange}:${instrumentId}:${timeframe}`;
+    let closed = false;
+    const socket = new WebSocket(
+      candleWebSocketUrl(exchange, instrumentId, timeframe),
+    );
+
+    setProvisionalData({ scope, values: [] });
+    socket.addEventListener("message", (event) => {
+      if (closed) return;
+      try {
+        const snapshot = JSON.parse(event.data) as CandleStreamResponse;
+        setProvisionalData({ scope, values: snapshot.candles });
+        setCandleError(null);
+      } catch {
+        setCandleError("A malformed live candle snapshot was ignored.");
+      }
+    });
+
+    return () => {
+      closed = true;
+      socket.close();
     };
   }, [exchange, instrumentId, timeframe]);
 
@@ -650,7 +685,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     void loadMetrics();
     const interval = window.setInterval(
       () => void loadMetrics(),
-      timeframe === "1s" || timeframe === "5s" ? 3_000 : 6_000,
+      METRICS_FALLBACK_POLL_MS,
     );
 
     return () => {
@@ -695,7 +730,10 @@ function Dashboard({ session, onLogout }: DashboardProps) {
 
     setStatsData({ scope, value: null });
     void loadStats();
-    const interval = window.setInterval(() => void loadStats(), 30_000);
+    const interval = window.setInterval(
+      () => void loadStats(),
+      STATS_FALLBACK_POLL_MS,
+    );
 
     return () => {
       active = false;
@@ -704,10 +742,66 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     };
   }, [exchange, instrumentId]);
 
+  useEffect(() => {
+    const scope = `${exchange}:${instrumentId}:${timeframe}`;
+    let closed = false;
+    const socket = new WebSocket(
+      metricsWebSocketUrl(exchange, instrumentId, timeframe, "default"),
+    );
+
+    socket.addEventListener("message", (event) => {
+      if (closed) return;
+      try {
+        const snapshot = JSON.parse(event.data) as MetricsResponse;
+        setMetricsData({ scope, value: snapshot });
+        setMetricsLoading(false);
+        setMetricsError(null);
+      } catch {
+        setMetricsError("A malformed metrics snapshot was ignored.");
+      }
+    });
+
+    return () => {
+      closed = true;
+      socket.close();
+    };
+  }, [exchange, instrumentId, timeframe]);
+
+  useEffect(() => {
+    const scope = `${exchange}:${instrumentId}:24h`;
+    let closed = false;
+    const socket = new WebSocket(
+      metricsWebSocketUrl(exchange, instrumentId, STATS_TIMEFRAME, "24h"),
+    );
+
+    socket.addEventListener("message", (event) => {
+      if (closed) return;
+      try {
+        const snapshot = JSON.parse(event.data) as MetricsResponse;
+        setStatsData({ scope, value: snapshot });
+        setStatsLoading(false);
+        setStatsError(null);
+      } catch {
+        setStatsError("A malformed 24h statistics snapshot was ignored.");
+      }
+    });
+
+    return () => {
+      closed = true;
+      socket.close();
+    };
+  }, [exchange, instrumentId]);
+
   const candleScope = `${exchange}:${instrumentId}:${timeframe}`;
   const statsScope = `${exchange}:${instrumentId}:24h`;
   const candles =
     candleData.scope === candleScope ? candleData.values : [];
+  const provisionalCandles =
+    provisionalData.scope === candleScope ? provisionalData.values : [];
+  const chartCandles = useMemo(
+    () => mergeCandles(candles, provisionalCandles),
+    [candles, provisionalCandles],
+  );
   const hasMoreHistory =
     candleData.scope === candleScope && candleData.hasMore;
   const metrics =
@@ -790,8 +884,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     (source) => marketMap.get(`${source}:${instrumentId}`) ?? null,
   );
   const displayCandles = useMemo(
-    () => toDisplayCandles(candles),
-    [candles],
+    () => toDisplayCandles(chartCandles),
+    [chartCandles],
   );
 
   const gapCount = candles.filter(
@@ -1019,6 +1113,9 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 <span>{displayCandles.length} bars</span>
                 <span>{gapCount} gaps</span>
                 <span>{candleData.source ?? "loading"} history</span>
+                {provisionalCandles.length > 0 && <span>live overlay</span>}
+                <span>chart lag {formatAge(candleData.latency?.effectiveLagMs)}</span>
+                <span>late window {formatAge(health?.chart.allowedLatenessMs)}</span>
                 <span>updated {formatClock(selectedMarket?.receivedTimestamp)}</span>
               </div>
             </article>

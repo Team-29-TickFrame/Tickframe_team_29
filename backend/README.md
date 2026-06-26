@@ -149,17 +149,17 @@ Short chart timeframes (`1s`, `5s`, `15s`) use `raw_trades` with a stable
 display delay. Configure the delay in `.env`:
 
 ```bash
-TICKFRAME_STABLE_CHART_DELAY_MS=10000
+TICKFRAME_STABLE_CHART_DELAY_MS=2000
 # also accepted:
-TICKFRAME_STABLE_CHART_DELAY_MS=10s
+TICKFRAME_STABLE_CHART_DELAY_MS=2s
 TICKFRAME_BINANCE_1S_BACKFILL_HOURS=24h
 TICKFRAME_SECOND_REPAIR_HOURS=72h
 ```
 
-Use a larger value, for example `15000` or `30000`, if a network frequently
-delivers exchange trade messages late. Live last-trade prices still update
-immediately; only the candle history endpoint waits before exposing the newest
-short-timeframe bucket.
+Use a larger value, for example `10000` or `30000`, if a network frequently
+delivers exchange trade messages late. Live last-trade prices and provisional
+candle overlays still update immediately; stable candle history waits before
+exposing the newest short-timeframe bucket.
 
 The stored `1s` repair window is controlled by `TICKFRAME_SECOND_REPAIR_HOURS`.
 It is capped by the `raw_trade_retention_hours` setting because exact seconds
@@ -223,7 +223,7 @@ TICKFRAME_RECOVERY_BACKFILL_HOURS=12d
 TICKFRAME_DISABLE_RECOVERY_BACKFILL=0
 TICKFRAME_BINANCE_1S_BACKFILL_HOURS=24h
 TICKFRAME_SECOND_REPAIR_HOURS=72h
-TICKFRAME_STABLE_CHART_DELAY_MS=10000
+TICKFRAME_STABLE_CHART_DELAY_MS=2000
 ```
 
 After changing `.env`, recreate the backend container so Docker passes the new
@@ -238,6 +238,8 @@ Metrics responses include:
 - `version`: current metrics calculation version, currently `metrics-v3`
 - `windows`: rolling periods used by RSI, momentum, volatility estimators,
   mean reversion, price-volume divergence, and volume-spike calculations
+- `metricsLatency`: the data freshness and backend compute duration for the
+  returned metric window
 - `latest`: the newest complete metric point in the response
 - `points`: one metric point per returned candle
 - `events`: deterministic metric events such as `volume_spike`,
@@ -247,7 +249,36 @@ Metrics responses include:
   `bullish_price_volume_divergence`, and
   `bearish_price_volume_divergence`
 - `crossPairCorrelations`: same-window return correlations against the other
-  configured instruments on the selected exchange
+  configured instruments on the selected exchange; these are cached for
+  60000 ms per active metric scope because peer comparison is the heaviest part
+  of the metrics response
+
+Metric history is also persisted in `metric_points` and `metric_events`, while
+`metric_summaries` stores the latest backend-owned snapshots used by the metrics
+WebSocket:
+
+```text
+/ws/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&window=24h
+```
+
+Current forming candles are streamed separately from canonical history:
+
+```text
+/ws/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1s
+```
+
+These snapshots use `source=provisional` and are intended for live chart
+overlays. They are not a replacement for stable candle history.
+
+Latest stable candles are pushed without frontend polling through:
+
+```text
+/ws/v1/candles/stable?exchange=binance&instrumentId=BTC-USDT&timeframe=1s&limit=20
+```
+
+The stable stream is built from the in-memory finalized candle window, so it is
+not delayed by the asynchronous database writer. REST history remains the source
+for initial loads and older pagination.
 
 Current metrics:
 

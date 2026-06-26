@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from datetime import datetime
 from decimal import Decimal
@@ -47,6 +48,9 @@ class DatabaseWriter:
         self.last_error: Optional[str] = None
         self.written_trades = 0
         self.written_candles = 0
+        self.written_metric_points = 0
+        self.written_metric_events = 0
+        self.written_metric_summaries = 0
         self._task: Optional[asyncio.Task] = None
 
     async def start(self) -> None:
@@ -82,6 +86,10 @@ class DatabaseWriter:
     async def enqueue_candle(self, candle: Candle) -> None:
         if self.engine is not None:
             await self.queue.put(("candle", candle))
+
+    async def enqueue_metrics(self, payload: Dict[str, Any]) -> None:
+        if self.engine is not None:
+            await self.queue.put(("metrics", payload))
 
     async def candle_history(
         self,
@@ -284,6 +292,11 @@ class DatabaseWriter:
             for kind, value in batch
             if kind == "candle" and isinstance(value, Candle)
         ]
+        metric_snapshots = [
+            value
+            for kind, value in batch
+            if kind == "metrics" and isinstance(value, dict)
+        ]
 
         async with self.engine.begin() as connection:
             if trades:
@@ -365,6 +378,9 @@ class DatabaseWriter:
                 )
                 self.written_candles += 1
 
+            for snapshot in metric_snapshots:
+                await self._write_metric_snapshot(connection, snapshot)
+
     @staticmethod
     def _trade_params(trade: Trade) -> Dict[str, Any]:
         return {
@@ -421,7 +437,312 @@ class DatabaseWriter:
             "queueCapacity": self.queue.maxsize,
             "writtenTrades": self.written_trades,
             "writtenCandles": self.written_candles,
+            "writtenMetricPoints": self.written_metric_points,
+            "writtenMetricEvents": self.written_metric_events,
+            "writtenMetricSummaries": self.written_metric_summaries,
             "lastError": self.last_error,
+        }
+
+    async def _write_metric_snapshot(
+        self,
+        connection: Any,
+        snapshot: Dict[str, Any],
+    ) -> None:
+        response = snapshot["response"]
+        source_candles = {
+            int(candle["openTime"]): candle
+            for candle in snapshot.get("sourceCandles", [])
+        }
+        calculated_at = int(snapshot["calculatedAt"])
+        points = [
+            self._metric_point_params(
+                response,
+                point,
+                source_candles.get(int(point["openTime"])),
+                calculated_at,
+            )
+            for point in response.get("points", [])
+        ]
+        if points:
+            await connection.execute(
+                text(
+                    """
+                    INSERT INTO metric_points (
+                        exchange, market_type, instrument_id, timeframe,
+                        metrics_version, open_time, close_time, close, vwap,
+                        vwap_deviation_pct, realized_volatility_pct,
+                        parkinson_volatility_pct, garman_klass_volatility_pct,
+                        rsi, short_momentum_pct, momentum_pct,
+                        mean_reversion_z_score, distance_to_mean_pct,
+                        price_volume_divergence_pct, volume_spike_ratio,
+                        base_volume, trade_count, status, source,
+                        source_candle_revision, source_candle_status,
+                        source_candle_finalized_at, calculated_at
+                    ) VALUES (
+                        :exchange, :market_type, :instrument_id, :timeframe,
+                        :metrics_version,
+                        to_timestamp(:open_time_ms / 1000.0),
+                        to_timestamp(:close_time_ms / 1000.0),
+                        :close, :vwap, :vwap_deviation_pct,
+                        :realized_volatility_pct,
+                        :parkinson_volatility_pct,
+                        :garman_klass_volatility_pct,
+                        :rsi, :short_momentum_pct, :momentum_pct,
+                        :mean_reversion_z_score, :distance_to_mean_pct,
+                        :price_volume_divergence_pct, :volume_spike_ratio,
+                        :base_volume, :trade_count, :status, :source,
+                        :source_candle_revision, :source_candle_status,
+                        to_timestamp(:source_candle_finalized_at_ms / 1000.0),
+                        to_timestamp(:calculated_at_ms / 1000.0)
+                    )
+                    ON CONFLICT (
+                        exchange, market_type, instrument_id, timeframe,
+                        metrics_version, open_time
+                    ) DO UPDATE SET
+                        close_time = EXCLUDED.close_time,
+                        close = EXCLUDED.close,
+                        vwap = EXCLUDED.vwap,
+                        vwap_deviation_pct = EXCLUDED.vwap_deviation_pct,
+                        realized_volatility_pct =
+                            EXCLUDED.realized_volatility_pct,
+                        parkinson_volatility_pct =
+                            EXCLUDED.parkinson_volatility_pct,
+                        garman_klass_volatility_pct =
+                            EXCLUDED.garman_klass_volatility_pct,
+                        rsi = EXCLUDED.rsi,
+                        short_momentum_pct = EXCLUDED.short_momentum_pct,
+                        momentum_pct = EXCLUDED.momentum_pct,
+                        mean_reversion_z_score =
+                            EXCLUDED.mean_reversion_z_score,
+                        distance_to_mean_pct = EXCLUDED.distance_to_mean_pct,
+                        price_volume_divergence_pct =
+                            EXCLUDED.price_volume_divergence_pct,
+                        volume_spike_ratio = EXCLUDED.volume_spike_ratio,
+                        base_volume = EXCLUDED.base_volume,
+                        trade_count = EXCLUDED.trade_count,
+                        status = EXCLUDED.status,
+                        source = EXCLUDED.source,
+                        source_candle_revision =
+                            EXCLUDED.source_candle_revision,
+                        source_candle_status = EXCLUDED.source_candle_status,
+                        source_candle_finalized_at =
+                            EXCLUDED.source_candle_finalized_at,
+                        calculated_at = EXCLUDED.calculated_at
+                    """
+                ),
+                points,
+            )
+            self.written_metric_points += len(points)
+
+        events = snapshot.get("allEvents", response.get("events", []))
+        event_params = [
+            self._metric_event_params(response, event, calculated_at)
+            for event in events
+        ]
+        await connection.execute(
+            text(
+                """
+                DELETE FROM metric_events
+                WHERE exchange = :exchange
+                  AND market_type = :market_type
+                  AND instrument_id = :instrument_id
+                  AND timeframe = :timeframe
+                  AND metrics_version = :metrics_version
+                  AND open_time >= to_timestamp(:from_ms / 1000.0)
+                  AND open_time < to_timestamp(:to_ms / 1000.0)
+                """
+            ),
+            {
+                "exchange": response["exchange"],
+                "market_type": snapshot["marketType"],
+                "instrument_id": response["instrumentId"],
+                "timeframe": response["timeframe"],
+                "metrics_version": response["version"],
+                "from_ms": response["from"],
+                "to_ms": response["to"],
+            },
+        )
+        if event_params:
+            await connection.execute(
+                text(
+                    """
+                    INSERT INTO metric_events (
+                        exchange, market_type, instrument_id, timeframe,
+                        metrics_version, open_time, event_key, close_time,
+                        type, metric, severity, confidence, value, threshold,
+                        description, calculated_at
+                    ) VALUES (
+                        :exchange, :market_type, :instrument_id, :timeframe,
+                        :metrics_version,
+                        to_timestamp(:open_time_ms / 1000.0),
+                        :event_key,
+                        to_timestamp(:close_time_ms / 1000.0),
+                        :type, :metric, :severity, :confidence, :value,
+                        :threshold, :description,
+                        to_timestamp(:calculated_at_ms / 1000.0)
+                    )
+                    ON CONFLICT (
+                        exchange, market_type, instrument_id, timeframe,
+                        metrics_version, open_time, event_key
+                    ) DO UPDATE SET
+                        close_time = EXCLUDED.close_time,
+                        type = EXCLUDED.type,
+                        metric = EXCLUDED.metric,
+                        severity = EXCLUDED.severity,
+                        confidence = EXCLUDED.confidence,
+                        value = EXCLUDED.value,
+                        threshold = EXCLUDED.threshold,
+                        description = EXCLUDED.description,
+                        calculated_at = EXCLUDED.calculated_at
+                    """
+                ),
+                event_params,
+            )
+            self.written_metric_events += len(event_params)
+
+        summary = self._metric_summary_params(snapshot)
+        await connection.execute(
+            text(
+                """
+                INSERT INTO metric_summaries (
+                    exchange, market_type, instrument_id, timeframe,
+                    metrics_version, window_name, window_start, window_end,
+                    point_count, source, summary, latest, windows, events,
+                    cross_pair_correlations, calculated_at, compute_duration_ms,
+                    updated_at
+                ) VALUES (
+                    :exchange, :market_type, :instrument_id, :timeframe,
+                    :metrics_version, :window_name,
+                    to_timestamp(:window_start_ms / 1000.0),
+                    to_timestamp(:window_end_ms / 1000.0),
+                    :point_count, :source, CAST(:summary AS jsonb),
+                    CAST(:latest AS jsonb), CAST(:windows AS jsonb),
+                    CAST(:events AS jsonb),
+                    CAST(:cross_pair_correlations AS jsonb),
+                    to_timestamp(:calculated_at_ms / 1000.0),
+                    :compute_duration_ms,
+                    NOW()
+                )
+                ON CONFLICT (
+                    exchange, market_type, instrument_id, timeframe,
+                    metrics_version, window_name
+                ) DO UPDATE SET
+                    window_start = EXCLUDED.window_start,
+                    window_end = EXCLUDED.window_end,
+                    point_count = EXCLUDED.point_count,
+                    source = EXCLUDED.source,
+                    summary = EXCLUDED.summary,
+                    latest = EXCLUDED.latest,
+                    windows = EXCLUDED.windows,
+                    events = EXCLUDED.events,
+                    cross_pair_correlations =
+                        EXCLUDED.cross_pair_correlations,
+                    calculated_at = EXCLUDED.calculated_at,
+                    compute_duration_ms = EXCLUDED.compute_duration_ms,
+                    updated_at = NOW()
+                """
+            ),
+            summary,
+        )
+        self.written_metric_summaries += 1
+
+    @staticmethod
+    def _metric_point_params(
+        response: Dict[str, Any],
+        point: Dict[str, Any],
+        candle: Optional[Dict[str, Any]],
+        calculated_at_ms: int,
+    ) -> Dict[str, Any]:
+        return {
+            "exchange": response["exchange"],
+            "market_type": response["marketType"],
+            "instrument_id": response["instrumentId"],
+            "timeframe": response["timeframe"],
+            "metrics_version": response["version"],
+            "open_time_ms": int(point["openTime"]),
+            "close_time_ms": int(point["closeTime"]),
+            "close": point.get("close"),
+            "vwap": point.get("vwap"),
+            "vwap_deviation_pct": point.get("vwapDeviationPct"),
+            "realized_volatility_pct": point.get("realizedVolatilityPct"),
+            "parkinson_volatility_pct": point.get("parkinsonVolatilityPct"),
+            "garman_klass_volatility_pct": point.get(
+                "garmanKlassVolatilityPct"
+            ),
+            "rsi": point.get("rsi"),
+            "short_momentum_pct": point.get("shortMomentumPct"),
+            "momentum_pct": point.get("momentumPct"),
+            "mean_reversion_z_score": point.get("meanReversionZScore"),
+            "distance_to_mean_pct": point.get("distanceToMeanPct"),
+            "price_volume_divergence_pct": point.get(
+                "priceVolumeDivergencePct"
+            ),
+            "volume_spike_ratio": point.get("volumeSpikeRatio"),
+            "base_volume": point.get("baseVolume"),
+            "trade_count": int(point.get("tradeCount", 0)),
+            "status": point.get("status"),
+            "source": candle.get("source") if candle else response.get("source"),
+            "source_candle_revision": (
+                int(candle["revision"]) if candle and candle.get("revision") else None
+            ),
+            "source_candle_status": candle.get("status") if candle else None,
+            "source_candle_finalized_at_ms": (
+                int(candle["finalizedAt"])
+                if candle and candle.get("finalizedAt")
+                else int(point["closeTime"])
+            ),
+            "calculated_at_ms": calculated_at_ms,
+        }
+
+    @staticmethod
+    def _metric_event_params(
+        response: Dict[str, Any],
+        event: Dict[str, Any],
+        calculated_at_ms: int,
+    ) -> Dict[str, Any]:
+        event_key = f"{event['type']}:{event['metric']}"
+        return {
+            "exchange": response["exchange"],
+            "market_type": response["marketType"],
+            "instrument_id": response["instrumentId"],
+            "timeframe": response["timeframe"],
+            "metrics_version": response["version"],
+            "open_time_ms": int(event["openTime"]),
+            "close_time_ms": int(event["closeTime"]),
+            "event_key": event_key,
+            "type": event["type"],
+            "metric": event["metric"],
+            "severity": event["severity"],
+            "confidence": event.get("confidence"),
+            "value": event.get("value"),
+            "threshold": event.get("threshold"),
+            "description": event["description"],
+            "calculated_at_ms": calculated_at_ms,
+        }
+
+    @staticmethod
+    def _metric_summary_params(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+        response = snapshot["response"]
+        return {
+            "exchange": response["exchange"],
+            "market_type": response["marketType"],
+            "instrument_id": response["instrumentId"],
+            "timeframe": response["timeframe"],
+            "metrics_version": response["version"],
+            "window_name": snapshot["windowName"],
+            "window_start_ms": response["from"],
+            "window_end_ms": response["to"],
+            "point_count": int(response["count"]),
+            "source": response["source"],
+            "summary": json.dumps(response["summary"]),
+            "latest": json.dumps(response["latest"]),
+            "windows": json.dumps(response["windows"]),
+            "events": json.dumps(response["events"]),
+            "cross_pair_correlations": json.dumps(
+                response["crossPairCorrelations"]
+            ),
+            "calculated_at_ms": int(snapshot["calculatedAt"]),
+            "compute_duration_ms": int(snapshot["computeDurationMs"]),
         }
 
     @staticmethod

@@ -1,7 +1,8 @@
 import asyncio
 import os
 import time
-from typing import Dict, List, Optional, Sequence, Tuple
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import asyncpg
 
@@ -18,7 +19,12 @@ from .database import DatabaseWriter
 from .exchanges.base import ExchangeCollector
 from .exchanges.binance import BinanceCollector
 from .exchanges.bybit import BybitCollector
-from .history import aggregate_memory_candles, resolve_time_range, timeframe_ms
+from .history import (
+    TIMEFRAME_SECONDS,
+    aggregate_memory_candles,
+    resolve_time_range,
+    timeframe_ms,
+)
 from .metrics import compute_metrics, compute_return_correlation
 from .models import Trade
 from .store import LiveStore
@@ -29,9 +35,15 @@ def unix_ms() -> int:
 
 
 RAW_TRADE_CHART_TIMEFRAMES = {"1s", "5s", "15s"}
-DEFAULT_STABLE_CHART_DELAY_MS = 10_000
+DEFAULT_STABLE_CHART_DELAY_MS = 2_000
 DEFAULT_SECOND_REPAIR_HOURS = 72.0
 DEFAULT_BINANCE_SECOND_BACKFILL_HOURS = 24.0
+METRICS_DEFAULT_LIMIT = 300
+METRICS_24H_TIMEFRAME = "1m"
+METRICS_24H_LIMIT = 24 * 60
+METRICS_24H_WINDOW_MS = 24 * 60 * 60 * 1000
+CORRELATION_REFRESH_MS = 60_000
+MetricScope = Tuple[str, str, str, str]
 
 
 class MarketDataService:
@@ -43,6 +55,9 @@ class MarketDataService:
             allowed_lateness_ms=config.allowed_lateness_ms
         )
         self.trade_queue: "asyncio.Queue[Trade]" = asyncio.Queue(maxsize=200_000)
+        self.metric_queue: "asyncio.Queue[MetricScope]" = asyncio.Queue(
+            maxsize=10_000
+        )
         self.collectors: Dict[str, ExchangeCollector] = {
             "binance": BinanceCollector(
                 config,
@@ -59,6 +74,15 @@ class MarketDataService:
         }
         self._disconnected_since: Dict[str, int] = {}
         self._tasks: List[asyncio.Task] = []
+        self._pending_metric_scopes: Set[MetricScope] = set()
+        self.metric_cache: Dict[MetricScope, Dict[str, object]] = {}
+        self.metric_scope_revisions: Dict[MetricScope, int] = {}
+        self.correlation_cache: Dict[MetricScope, Dict[str, object]] = {}
+        self.metric_revision = 0
+        self.market_stream_revision = 0
+        self.provisional_candle_revision = 0
+        self.stable_candle_revision = 0
+        self._stream_condition = asyncio.Condition()
         self._recovery_task: Optional[asyncio.Task] = None
         self._recovery_lock = asyncio.Lock()
         self.recovery_enabled = os.getenv("TICKFRAME_DISABLE_RECOVERY_BACKFILL") != "1"
@@ -104,12 +128,15 @@ class MarketDataService:
         }
         self.processed_trades = 0
         self.revised_candles = 0
+        self.computed_metric_snapshots = 0
+        self.last_metric_error: Optional[str] = None
 
     async def start(self) -> None:
         await self.database.start()
         self._tasks = [
             asyncio.create_task(self._consume_trades(), name="trade-consumer"),
             asyncio.create_task(self._finalize_candles(), name="candle-finalizer"),
+            asyncio.create_task(self._process_metric_updates(), name="metrics-worker"),
         ]
         for collector in self.collectors.values():
             collector.start()
@@ -125,6 +152,7 @@ class MarketDataService:
             except asyncio.CancelledError:
                 pass
         await self.trade_queue.join()
+        await self.metric_queue.join()
         for task in self._tasks:
             task.cancel()
         for task in self._tasks:
@@ -136,6 +164,64 @@ class MarketDataService:
 
     async def enqueue_trade(self, trade: Trade) -> None:
         await self.trade_queue.put(trade)
+
+    async def wait_for_market_update(
+        self,
+        last_revision: int,
+        timeout: float = 30.0,
+    ) -> int:
+        return await self._wait_for_stream_revision(
+            "market_stream_revision",
+            last_revision,
+            timeout,
+        )
+
+    async def wait_for_provisional_candle_update(
+        self,
+        last_revision: int,
+        timeout: float = 30.0,
+    ) -> int:
+        return await self._wait_for_stream_revision(
+            "provisional_candle_revision",
+            last_revision,
+            timeout,
+        )
+
+    async def wait_for_stable_candle_update(
+        self,
+        last_revision: int,
+        timeout: float = 30.0,
+    ) -> int:
+        return await self._wait_for_stream_revision(
+            "stable_candle_revision",
+            last_revision,
+            timeout,
+        )
+
+    async def wait_for_metric_update(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+        window_name: str,
+        last_revision: int,
+        timeout: float = 30.0,
+    ) -> int:
+        scope = (exchange, instrument_id, timeframe, window_name)
+        async with self._stream_condition:
+            if self.metric_scope_revisions.get(scope, -1) == last_revision:
+                try:
+                    await asyncio.wait_for(
+                        self._stream_condition.wait_for(
+                            lambda: self.metric_scope_revisions.get(scope, -1)
+                            != last_revision
+                        ),
+                        timeout=timeout,
+                    )
+                except asyncio.TimeoutError:
+                    pass
+            return self.metric_scope_revisions.get(scope, -1)
 
     async def candle_history(
         self,
@@ -247,6 +333,17 @@ class MarketDataService:
             "count": len(page.candles),
             "hasMore": page.has_more,
             "nextBefore": next_before,
+            "chartLatency": {
+                "generatedAt": now_ms,
+                "dataTo": response_to,
+                "effectiveLagMs": max(0, now_ms - response_to),
+                "stableDelayMs": (
+                    self.stable_chart_delay_ms
+                    if timeframe in RAW_TRADE_CHART_TIMEFRAMES
+                    else 0
+                ),
+                "allowedLatenessMs": self.config.allowed_lateness_ms,
+            },
             "candles": page.candles,
         }
 
@@ -260,6 +357,219 @@ class MarketDataService:
         from_ms: Optional[int],
         to_ms: Optional[int],
     ) -> Dict[str, object]:
+        window_name = self._metrics_window_name(
+            timeframe=timeframe,
+            limit=limit,
+            from_ms=from_ms,
+            to_ms=to_ms,
+        )
+        payload = await self._build_metrics_snapshot(
+            exchange=exchange,
+            instrument_id=instrument_id,
+            timeframe=timeframe,
+            limit=limit,
+            from_ms=from_ms,
+            to_ms=to_ms,
+            window_name=window_name,
+        )
+        await self._publish_metrics_snapshot(payload)
+        return payload["response"]
+
+    async def provisional_candle_snapshot(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+    ) -> Dict[str, object]:
+        now_ms = unix_ms()
+        bucket_ms = timeframe_ms(timeframe)
+        lookback_ms = max(
+            bucket_ms + self.config.allowed_lateness_ms + 1_000,
+            3_000,
+        )
+        from_ms = max(0, now_ms - lookback_ms)
+        to_ms = now_ms + bucket_ms
+        base_candles = await self.store.candle_snapshot(
+            exchange,
+            instrument_id,
+            self.store.candle_limit,
+        )
+        provisional_candles = [
+            candle.to_api()
+            for candle in self.aggregator.provisional()
+            if candle.exchange == exchange
+            and candle.instrument_id == instrument_id
+        ]
+        live_seconds = [
+            {
+                **candle,
+                "status": "provisional"
+                if candle.get("status") == "provisional"
+                else candle.get("status"),
+            }
+            for candle in [*base_candles, *provisional_candles]
+            if int(candle["openTime"]) >= from_ms
+            and int(candle["openTime"]) < to_ms
+        ]
+
+        if timeframe == "1s":
+            values = [
+                {**candle, "source": "provisional"}
+                for candle in provisional_candles
+                if int(candle["openTime"]) >= from_ms
+            ]
+        else:
+            grouped: Dict[int, List[Dict[str, object]]] = {}
+            for candle in live_seconds:
+                bucket = (int(candle["openTime"]) // bucket_ms) * bucket_ms
+                grouped.setdefault(bucket, []).append(candle)
+            values = [
+                self._aggregate_provisional_bucket(
+                    sorted(
+                        bucket_candles,
+                        key=lambda item: int(item["openTime"]),
+                    ),
+                    timeframe=timeframe,
+                    bucket_open_ms=bucket,
+                    bucket_ms=bucket_ms,
+                    now_ms=now_ms,
+                )
+                for bucket, bucket_candles in sorted(grouped.items())
+            ]
+
+        return {
+            "exchange": exchange,
+            "instrumentId": instrument_id,
+            "timeframe": timeframe,
+            "source": "provisional",
+            "generatedAt": now_ms,
+            "revision": self.store.revision,
+            "candles": values[-2:],
+        }
+
+    async def stable_candle_snapshot(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+        limit: int,
+    ) -> Dict[str, object]:
+        now_ms = unix_ms()
+        bucket_ms = timeframe_ms(timeframe)
+        response_to = max(0, now_ms - self.stable_chart_delay_ms)
+        response_to = (response_to // bucket_ms) * bucket_ms
+        response_from = max(0, response_to - ((limit + 1) * bucket_ms))
+        base_candles = await self.store.candle_snapshot(
+            exchange,
+            instrument_id,
+            self.store.candle_limit,
+        )
+        page = aggregate_memory_candles(
+            base_candles,
+            timeframe=timeframe,
+            from_ms=response_from,
+            to_ms=response_to,
+            limit=limit,
+        )
+        next_before = (
+            page.candles[0]["openTime"]
+            if page.candles and page.has_more
+            else None
+        )
+        return {
+            "exchange": exchange,
+            "instrumentId": instrument_id,
+            "timeframe": timeframe,
+            "source": page.source,
+            "from": response_from,
+            "to": response_to,
+            "count": len(page.candles),
+            "hasMore": page.has_more,
+            "nextBefore": next_before,
+            "revision": self.stable_candle_revision,
+            "chartLatency": {
+                "generatedAt": now_ms,
+                "dataTo": response_to,
+                "effectiveLagMs": max(0, now_ms - response_to),
+                "stableDelayMs": self.stable_chart_delay_ms,
+                "allowedLatenessMs": self.config.allowed_lateness_ms,
+            },
+            "candles": page.candles,
+        }
+
+    @staticmethod
+    def _aggregate_provisional_bucket(
+        candles: List[Dict[str, object]],
+        *,
+        timeframe: str,
+        bucket_open_ms: int,
+        bucket_ms: int,
+        now_ms: int,
+    ) -> Dict[str, object]:
+        priced = [
+            candle
+            for candle in candles
+            if all(
+                candle.get(field) is not None
+                for field in ("open", "high", "low", "close")
+            )
+        ]
+        first = priced[0] if priced else None
+        last = priced[-1] if priced else None
+        high = (
+            max(Decimal(str(candle["high"])) for candle in priced)
+            if priced
+            else None
+        )
+        low = (
+            min(Decimal(str(candle["low"])) for candle in priced)
+            if priced
+            else None
+        )
+        base_volume = sum(
+            (Decimal(str(candle["baseVolume"])) for candle in candles),
+            Decimal("0"),
+        )
+        quote_volume = sum(
+            (Decimal(str(candle["quoteVolume"])) for candle in candles),
+            Decimal("0"),
+        )
+        return {
+            "exchange": candles[0]["exchange"],
+            "marketType": candles[0]["marketType"],
+            "instrumentId": candles[0]["instrumentId"],
+            "timeframe": timeframe,
+            "openTime": bucket_open_ms,
+            "closeTime": bucket_open_ms + bucket_ms,
+            "open": first["open"] if first else None,
+            "high": str(high) if high is not None else None,
+            "low": str(low) if low is not None else None,
+            "close": last["close"] if last else None,
+            "baseVolume": str(base_volume),
+            "quoteVolume": str(quote_volume),
+            "tradeCount": sum(int(candle.get("tradeCount", 0)) for candle in candles),
+            "status": "provisional",
+            "revision": max(int(candle.get("revision", 1)) for candle in candles),
+            "firstTradeId": first.get("firstTradeId") if first else None,
+            "lastTradeId": last.get("lastTradeId") if last else None,
+            "finalizedAt": now_ms,
+            "source": "provisional",
+        }
+
+    async def _build_metrics_snapshot(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+        limit: int,
+        from_ms: Optional[int],
+        to_ms: Optional[int],
+        window_name: str,
+    ) -> Dict[str, object]:
+        started_at = unix_ms()
         history = await self.candle_history(
             exchange=exchange,
             instrument_id=instrument_id,
@@ -271,18 +581,27 @@ class MarketDataService:
         metrics = compute_metrics(
             history["candles"],
             timeframe=timeframe,
+            event_limit=None,
         )
-        correlations = await self._cross_pair_correlations(
+        all_events = metrics["events"]
+        response_metrics = {
+            **metrics,
+            "events": all_events[:8],
+        }
+        correlations = await self._cached_cross_pair_correlations(
             exchange=exchange,
             instrument_id=instrument_id,
             timeframe=timeframe,
+            window_name=window_name,
             limit=limit,
             from_ms=history["from"],
             to_ms=history["to"],
             target_candles=history["candles"],
         )
-        return {
+        finished_at = unix_ms()
+        response = {
             "exchange": exchange,
+            "marketType": self.config.market_type,
             "instrumentId": instrument_id,
             "timeframe": timeframe,
             "source": history["source"],
@@ -290,9 +609,60 @@ class MarketDataService:
             "to": history["to"],
             "hasMore": history["hasMore"],
             "nextBefore": history["nextBefore"],
-            **metrics,
+            **response_metrics,
             "crossPairCorrelations": correlations,
+            "metricsLatency": {
+                "generatedAt": finished_at,
+                "dataTo": history["to"],
+                "effectiveLagMs": max(0, finished_at - int(history["to"])),
+                "calculatedAt": finished_at,
+                "computeDurationMs": max(0, finished_at - started_at),
+                "windowName": window_name,
+            },
         }
+        return {
+            "response": response,
+            "marketType": self.config.market_type,
+            "windowName": window_name,
+            "allEvents": all_events,
+            "sourceCandles": history["candles"],
+            "calculatedAt": finished_at,
+            "computeDurationMs": max(0, finished_at - started_at),
+        }
+
+    async def _publish_metrics_snapshot(self, payload: Dict[str, object]) -> None:
+        response = payload["response"]
+        assert isinstance(response, dict)
+        await self.database.enqueue_metrics(payload)
+        window_name = str(payload["windowName"])
+        if window_name == "custom":
+            return
+        scope = (
+            str(response["exchange"]),
+            str(response["instrumentId"]),
+            str(response["timeframe"]),
+            window_name,
+        )
+        self.metric_cache[scope] = response
+        self.metric_revision += 1
+        self.metric_scope_revisions[scope] = self.metric_revision
+        self.computed_metric_snapshots += 1
+        self.last_metric_error = None
+        await self._notify_streams(metrics=True)
+
+    def cached_metrics(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+        window_name: str,
+    ) -> Tuple[int, Optional[Dict[str, object]]]:
+        scope = (exchange, instrument_id, timeframe, window_name)
+        return (
+            self.metric_scope_revisions.get(scope, -1),
+            self.metric_cache.get(scope),
+        )
 
     async def handle_connection_state(
         self,
@@ -328,11 +698,20 @@ class MarketDataService:
                     trade,
                     received_at_ms=trade.received_timestamp_ms,
                 )
-                await self.database.enqueue_trade(trade)
+                notify_stable = False
                 if revised is not None:
                     self.revised_candles += 1
                     await self.store.apply_candle(revised)
+                    notify_stable = True
+                await self._notify_streams(
+                    market=True,
+                    provisional=True,
+                    stable=notify_stable,
+                )
+                await self.database.enqueue_trade(trade)
+                if revised is not None:
                     await self.database.enqueue_candle(revised)
+                    await self._schedule_metrics_for_candle(revised)
                 self.processed_trades += 1
             finally:
                 self.trade_queue.task_done()
@@ -340,13 +719,152 @@ class MarketDataService:
     async def _finalize_candles(self) -> None:
         while True:
             now = unix_ms()
-            for candle in self.aggregator.finalize_due(
+            finalized = self.aggregator.finalize_due(
                 now,
                 self._active_streams(),
-            ):
+            )
+            for candle in finalized:
                 await self.store.apply_candle(candle)
                 await self.database.enqueue_candle(candle)
+                await self._schedule_metrics_for_candle(candle)
+            if finalized:
+                await self._notify_streams(stable=True)
             await asyncio.sleep(0.1)
+
+    async def _schedule_metrics_for_candle(self, candle: object) -> None:
+        if getattr(candle, "timeframe", None) != "1s":
+            return
+        close_time_ms = int(getattr(candle, "close_time_ms"))
+        recovered = getattr(candle, "status", None) == "recovered"
+        for timeframe in TIMEFRAME_SECONDS:
+            bucket_ms = timeframe_ms(timeframe)
+            if timeframe != "1s" and not recovered and close_time_ms % bucket_ms:
+                continue
+            await self._enqueue_metric_scope(
+                (
+                    getattr(candle, "exchange"),
+                    getattr(candle, "instrument_id"),
+                    timeframe,
+                    "default",
+                )
+            )
+            if timeframe == METRICS_24H_TIMEFRAME:
+                await self._enqueue_metric_scope(
+                    (
+                        getattr(candle, "exchange"),
+                        getattr(candle, "instrument_id"),
+                        timeframe,
+                        "24h",
+                    )
+                )
+
+    async def _wait_for_stream_revision(
+        self,
+        revision_name: str,
+        last_revision: int,
+        timeout: float,
+    ) -> int:
+        async with self._stream_condition:
+            if getattr(self, revision_name) == last_revision:
+                try:
+                    await asyncio.wait_for(
+                        self._stream_condition.wait_for(
+                            lambda: getattr(self, revision_name) != last_revision
+                        ),
+                        timeout=timeout,
+                    )
+                except asyncio.TimeoutError:
+                    pass
+            return int(getattr(self, revision_name))
+
+    async def _notify_streams(
+        self,
+        *,
+        market: bool = False,
+        provisional: bool = False,
+        stable: bool = False,
+        metrics: bool = False,
+    ) -> None:
+        async with self._stream_condition:
+            if market:
+                self.market_stream_revision += 1
+            if provisional:
+                self.provisional_candle_revision += 1
+            if stable:
+                self.stable_candle_revision += 1
+            if market or provisional or stable or metrics:
+                self._stream_condition.notify_all()
+
+    async def _enqueue_metric_scope(self, scope: MetricScope) -> None:
+        if scope in self._pending_metric_scopes:
+            return
+        self._pending_metric_scopes.add(scope)
+        try:
+            self.metric_queue.put_nowait(scope)
+        except asyncio.QueueFull:
+            self._pending_metric_scopes.discard(scope)
+
+    async def _process_metric_updates(self) -> None:
+        while True:
+            scope = await self.metric_queue.get()
+            self._pending_metric_scopes.discard(scope)
+            try:
+                exchange, instrument_id, timeframe, window_name = scope
+                options = self._metrics_window_options(
+                    timeframe=timeframe,
+                    window_name=window_name,
+                )
+                payload = await self._build_metrics_snapshot(
+                    exchange=exchange,
+                    instrument_id=instrument_id,
+                    timeframe=timeframe,
+                    window_name=window_name,
+                    **options,
+                )
+                await self._publish_metrics_snapshot(payload)
+            except Exception as error:
+                self.last_metric_error = str(error)
+            finally:
+                self.metric_queue.task_done()
+
+    def _metrics_window_options(
+        self,
+        *,
+        timeframe: str,
+        window_name: str,
+    ) -> Dict[str, Optional[int]]:
+        if window_name == "24h":
+            now_ms = unix_ms()
+            return {
+                "limit": METRICS_24H_LIMIT,
+                "from_ms": now_ms - METRICS_24H_WINDOW_MS,
+                "to_ms": now_ms,
+            }
+        return {
+            "limit": METRICS_DEFAULT_LIMIT,
+            "from_ms": None,
+            "to_ms": None,
+        }
+
+    @staticmethod
+    def _metrics_window_name(
+        *,
+        timeframe: str,
+        limit: int,
+        from_ms: Optional[int],
+        to_ms: Optional[int],
+    ) -> str:
+        if (
+            timeframe == METRICS_24H_TIMEFRAME
+            and from_ms is not None
+            and to_ms is not None
+            and to_ms - from_ms <= METRICS_24H_WINDOW_MS + 60_000
+            and limit >= METRICS_24H_LIMIT
+        ):
+            return "24h"
+        if from_ms is None and to_ms is None and limit <= METRICS_DEFAULT_LIMIT:
+            return "default"
+        return "custom"
 
     def _active_streams(self) -> List[StreamKey]:
         streams: List[StreamKey] = []
@@ -386,8 +904,25 @@ class MarketDataService:
                 "processedTrades": self.processed_trades,
                 "revisedCandles": self.revised_candles,
             },
+            "streams": {
+                "marketRevision": self.market_stream_revision,
+                "provisionalCandleRevision": self.provisional_candle_revision,
+                "stableCandleRevision": self.stable_candle_revision,
+                "metricRevision": self.metric_revision,
+            },
+            "metrics": {
+                "queueSize": self.metric_queue.qsize(),
+                "queueCapacity": self.metric_queue.maxsize,
+                "pendingScopes": len(self._pending_metric_scopes),
+                "computedSnapshots": self.computed_metric_snapshots,
+                "cachedScopes": len(self.metric_cache),
+                "cachedCorrelations": len(self.correlation_cache),
+                "correlationRefreshMs": CORRELATION_REFRESH_MS,
+                "lastError": self.last_metric_error,
+            },
             "chart": {
                 "stableDelayMs": self.stable_chart_delay_ms,
+                "allowedLatenessMs": self.config.allowed_lateness_ms,
                 "rawTradeTimeframes": sorted(RAW_TRADE_CHART_TIMEFRAMES),
                 "rawTradeRetentionHours": self.config.raw_trade_retention_hours,
                 "secondRepairHours": self.second_repair_hours,
@@ -447,6 +982,42 @@ class MarketDataService:
             key=lambda item: abs(float(item["correlation"])),
             reverse=True,
         )
+
+    async def _cached_cross_pair_correlations(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+        window_name: str,
+        limit: int,
+        from_ms: int,
+        to_ms: int,
+        target_candles: List[Dict[str, object]],
+    ) -> List[Dict[str, object]]:
+        now_ms = unix_ms()
+        scope = (exchange, instrument_id, timeframe, window_name)
+        cached = self.correlation_cache.get(scope)
+        if (
+            cached is not None
+            and now_ms - int(cached["calculatedAt"]) < CORRELATION_REFRESH_MS
+        ):
+            return list(cached["values"])
+
+        values = await self._cross_pair_correlations(
+            exchange=exchange,
+            instrument_id=instrument_id,
+            timeframe=timeframe,
+            limit=limit,
+            from_ms=from_ms,
+            to_ms=to_ms,
+            target_candles=target_candles,
+        )
+        self.correlation_cache[scope] = {
+            "calculatedAt": now_ms,
+            "values": values,
+        }
+        return values
 
     def _schedule_recovery(self, reason: str, exchanges: Sequence[str]) -> None:
         if not self.recovery_enabled or not self.database.database_url:

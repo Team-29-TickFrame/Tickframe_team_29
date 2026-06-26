@@ -70,6 +70,25 @@ class ServiceHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response["count"], 5)
         self.assertEqual(response["latest"]["close"], 100.0)
 
+    async def test_stable_candle_snapshot_uses_memory_window(self) -> None:
+        self.service.stable_chart_delay_ms = 2_000
+
+        with patch("backend.app.service.unix_ms", return_value=8_000):
+            response = await self.service.stable_candle_snapshot(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="1s",
+                limit=3,
+            )
+
+        self.assertEqual(response["source"], "memory")
+        self.assertEqual(response["to"], 6_000)
+        self.assertEqual(response["chartLatency"]["effectiveLagMs"], 2_000)
+        self.assertEqual(
+            [candle["openTime"] for candle in response["candles"]],
+            [2_000, 3_000, 4_000],
+        )
+
     async def test_metrics_snapshot_includes_cross_pair_correlations(self) -> None:
         service = MarketDataService(load_config())
         for second in range(8):
