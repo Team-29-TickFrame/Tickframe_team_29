@@ -1,0 +1,19 @@
+{
+  "experiment": "pattern-baseline-v0",
+  "dataset": "synthetic-patterns-1m-v0",
+  "seed": 42,
+  "timeframe": "1m",
+  "windowSize": 96,
+  "samplesPerClass": 900,
+  "testFraction": 0.2,
+  "confidenceThreshold": 0.65,
+  "labels": [
+    "head_and_shoulders",
+    "triangle",
+    "flag",
+    "double_top",
+    "double_bottom",
+    "none"
+  ],
+  "outputDir": "ml/pattern_recognition/runs/baseline-v0"
+}
