@@ -2,9 +2,9 @@
 
 ## Meeting Information
 
-- Date: Planned for Week 4 customer session
-- Participants: Customer and team representatives
-- Format: Recorded or otherwise documented customer session
+- Date: 2026-06-27
+- Participants: customer/stakeholder and team representatives
+- Format: recorded online customer session
 - Sprint: Sprint 2
 - MVP version: MVP v2
 
@@ -18,45 +18,43 @@ Private recording links, exact timecodes, credentials, and customer-identifying 
 
 ## Scope Reviewed
 
-The Sprint 2 review will cover the Sprint Goal, delivered product increment, addressed customer feedback, UAT results, quality requirements, automated quality test evidence, CI/quality gates, and remaining risks.
+The Sprint 2 review covered the Tickframe Analytics increment, including the main dashboard, live market data display, candlestick chart context, ML pattern panel, metric events, and real-time data availability indicators.
 
 ## Demonstrated Artifacts
 
-- Delivered product increment: To be added after Sprint 2 increment is ready
+- Delivered product increment: Tickframe Analytics dashboard
 - Sprint 2 milestone: https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/2
-- UAT scenarios: To be linked after `docs/user-acceptance-tests.md` is merged
-- Quality requirements: To be linked after `docs/quality-requirements.md` is merged
-- Quality requirement tests: To be linked after `docs/quality-requirement-tests.md` is merged
-- Testing documentation: To be linked after `docs/testing.md` is merged
+- UAT scenarios: `docs/user-acceptance-tests.md`
 
 ## Customer Feedback
 
-To be completed after the Week 4 customer session.
-
 | Feedback point | Customer comment | Team response | Follow-up issue/PBI |
 |---|---|---|---|
-| To be added after session | To be added after session | To be added after session | To be added after session |
+| Main dashboard and product flow | The customer/stakeholder confirmed that the demonstrated flow was understandable and approved the result. | Keep the current dashboard flow and continue improving clarity in later increments. | No immediate follow-up required |
+| Market data and analytics output | The customer/stakeholder approved the demonstrated market chart, analytics output, ML pattern panel, and metric events. | Preserve the demonstrated analytics flow as part of the Sprint 2 increment. | No immediate follow-up required |
+| Real-time data availability | The customer/stakeholder approved the demonstrated real-time data availability indicators. | Continue maintaining live data/status visibility in later work. | No immediate follow-up required |
 
 ## UAT Results Discussed
 
-To be completed after the Week 4 customer session.
-
 | UAT scenario | Result | Notes |
 |---|---|---|
-| UAT-001 | To be executed | To be added after session |
-| UAT-002 | To be executed | To be added after session |
-| UAT-003 | To be executed | To be added after session |
+| UAT-001 | Passed | The product opened successfully and the main dashboard was shown. |
+| UAT-002 | Passed | Market chart, analytics output, ML pattern panel, and metric events were shown and approved. |
+| UAT-003 | Passed | Real-time data availability was shown through live exchange values, data/status indicators, and venue delta. |
 
 ## Acceptance or Requested Changes
 
-To be completed after the Week 4 customer session.
+The customer/stakeholder approved the demonstrated Sprint 2 increment and UAT flows. No immediate public follow-up issue was required from the reviewed UAT scenarios.
 
 ## Resulting Backlog Updates
 
-To be completed after the Week 4 customer session.
+No new public follow-up PBI was required based on the approved UAT scenarios. The team will continue maintaining real-time data visibility, analytics clarity, and quality gates in later Sprint work.
+
+## Risks and Follow-Up Actions
 
 ## Risks and Follow-Up Actions
 
 | Risk or action | Owner | Follow-up |
 |---|---|---|
-| To be added after session | To be added after session | To be added after session |
+| Continue maintaining real-time data availability evidence | Team | Keep live data/status indicators covered by later testing and review |
+| Keep UAT evidence public-safe | Team | Store private recording links and exact timecodes only in Moodle/private submission |
