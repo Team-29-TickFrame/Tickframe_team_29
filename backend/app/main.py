@@ -9,11 +9,12 @@ from fastapi import (
     Header,
     HTTPException,
     Query,
+    Response,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .auth import AuthConflict, AuthInvalidCredentials, AuthService
 from .config import load_config
@@ -40,6 +41,39 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class DisplayLatencySample(BaseModel):
+    channel: str
+    exchange: str
+    instrument_id: str = Field(alias="instrumentId")
+    timeframe: Optional[str] = None
+    price: Optional[str] = None
+    exchange_timestamp: Optional[int] = Field(
+        default=None,
+        alias="exchangeTimestamp",
+    )
+    backend_received_at: Optional[int] = Field(
+        default=None,
+        alias="backendReceivedAt",
+    )
+    backend_generated_at: Optional[int] = Field(
+        default=None,
+        alias="backendGeneratedAt",
+    )
+    data_timestamp: Optional[int] = Field(default=None, alias="dataTimestamp")
+    frontend_received_at: int = Field(alias="frontendReceivedAt")
+    displayed_at: int = Field(alias="displayedAt")
+
+
+class DisplayLatencyRequest(BaseModel):
+    samples: list[DisplayLatencySample]
+
+
+def model_dump_aliases(model: BaseModel) -> dict:
+    if hasattr(model, "model_dump"):
+        return model.model_dump(by_alias=True)
+    return model.dict(by_alias=True)
 
 
 def ensure_supported_market(exchange: str, instrument_id: str) -> None:
@@ -93,6 +127,27 @@ app.add_middleware(
 @app.get("/health")
 async def health() -> dict:
     return service.health()
+
+
+@app.get("/metrics")
+async def prometheus_metrics() -> Response:
+    return Response(
+        content=service.prometheus_metrics(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
+@app.get("/api/v1/observability/latency")
+async def latency_observability() -> dict:
+    return service.observability_snapshot()
+
+
+@app.post("/api/v1/telemetry/display-latency")
+async def display_latency(payload: DisplayLatencyRequest) -> dict:
+    accepted = service.record_frontend_display_latency(
+        [model_dump_aliases(sample) for sample in payload.samples]
+    )
+    return {"accepted": accepted}
 
 
 def bearer_token(authorization: Optional[str]) -> str:

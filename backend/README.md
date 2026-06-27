@@ -294,6 +294,47 @@ Current metrics:
 Metric event `confidence` is a normalized rule-strength score. It is not a
 prediction and it is not trading advice.
 
+## Observability
+
+The backend exports Prometheus text metrics at:
+
+```text
+/metrics
+```
+
+A JSON diagnostic view for humans and screenshots is available at:
+
+```text
+/api/v1/observability/latency
+```
+
+The latency series are labeled by `exchange`, `instrument_id`, `channel`,
+`timeframe`, and `stage`. Important stages include:
+
+- `exchange_to_backend`: exchange trade timestamp to backend WebSocket receive
+- `backend_queue`: backend receive to trade consumer processing
+- `backend_to_frontend`: backend snapshot generation to browser receive
+- `frontend_render`: browser receive to post-render telemetry sample
+- `backend_to_display`: backend receive to browser display for market ticks
+- `exchange_to_display`: exchange trade timestamp to browser display
+- `data_to_display`: candle or metrics data timestamp to browser display
+- `backend_compute`: backend metrics calculation duration
+- `data_freshness`: chart or metrics data lag at snapshot generation
+
+`docker compose up --build` also starts Prometheus and Grafana. Grafana is
+provisioned with the `Tickframe Latency and Market Observability` dashboard at:
+
+```text
+http://127.0.0.1:3000/d/tickframe-latency/tickframe-latency
+```
+
+The dashboard separates Binance and Bybit, keeps instrument labels intact, and
+shows latest prices alongside latency/freshness so customer review screenshots
+can explain both data movement and visible market state. Browser display
+latency uses frontend telemetry timestamps, so public deployments should keep
+server clocks synchronized and note that browser clock skew can affect
+end-to-end display measurements.
+
 ## Storage lifecycle
 
 - `raw_trades`: 6-hour chunks, retained for 72 hours

@@ -110,6 +110,7 @@ export interface CandleStreamResponse {
   source: "provisional";
   generatedAt: number;
   revision: number;
+  chartLatency?: CandlesResponse["chartLatency"];
   candles: Candle[];
 }
 
@@ -303,6 +304,28 @@ export interface HealthResponse {
     failedMarkets: Record<string, string>;
     lastError: string | null;
   };
+  observability?: {
+    latencySeries: number;
+    latestMarkets: number;
+    latestDisplays: number;
+    frontendSamples: number;
+    prometheusPath: string;
+    latencyApiPath: string;
+  };
+}
+
+export interface DisplayTelemetrySample {
+  channel: "markets" | "stable_candles" | "provisional_candles" | "metrics" | "stats";
+  exchange: Exchange;
+  instrumentId: string;
+  timeframe?: Timeframe;
+  price?: string | null;
+  exchangeTimestamp?: number | null;
+  backendReceivedAt?: number | null;
+  backendGeneratedAt?: number | null;
+  dataTimestamp?: number | null;
+  frontendReceivedAt: number;
+  displayedAt: number;
 }
 
 export interface DisplayCandle {

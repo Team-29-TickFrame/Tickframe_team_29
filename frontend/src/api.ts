@@ -2,6 +2,7 @@ import type {
   AuthResponse,
   CandlesResponse,
   CurrentUserResponse,
+  DisplayTelemetrySample,
   Exchange,
   HealthResponse,
   InstrumentsResponse,
@@ -59,6 +60,16 @@ export function fetchMarkets(signal?: AbortSignal) {
 
 export function fetchHealth(signal?: AbortSignal) {
   return request<HealthResponse>("/health", { signal });
+}
+
+export function postDisplayTelemetry(samples: DisplayTelemetrySample[]) {
+  if (samples.length === 0) {
+    return Promise.resolve({ accepted: 0 });
+  }
+  return request<{ accepted: number }>("/api/v1/telemetry/display-latency", {
+    method: "POST",
+    body: { samples },
+  });
 }
 
 export function register(

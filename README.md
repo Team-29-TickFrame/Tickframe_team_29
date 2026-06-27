@@ -22,6 +22,7 @@ synthetic price or candle.
   events
 - REST history plus a live market WebSocket
 - Persisted metric history plus pushed metric snapshots for the terminal
+- Prometheus latency metrics and a provisioned Grafana observability dashboard
 - React and TypeScript terminal with exchange, instrument, and timeframe controls
 - TimescaleDB persistence and Docker Compose deployment
 
@@ -59,11 +60,15 @@ Open:
 - Frontend: <http://127.0.0.1:4173>
 - API docs: <http://127.0.0.1:8000/docs>
 - Health: <http://127.0.0.1:8000/health>
+- Prometheus: <http://127.0.0.1:9090>
+- Grafana: <http://127.0.0.1:3000/d/tickframe-latency/tickframe-latency>
 
 Useful API checks:
 
 - Candles: <http://127.0.0.1:8000/api/v1/candles?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=100>
 - Metrics: <http://127.0.0.1:8000/api/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&limit=300>
+- Prometheus metrics: <http://127.0.0.1:8000/metrics>
+- Latency snapshot: <http://127.0.0.1:8000/api/v1/observability/latency>
 - Experimental ML pattern: <http://127.0.0.1:8000/api/v1/patterns/ml?exchange=binance&instrumentId=BTC-USDT&timeframe=1m>
 - Metrics stream: `ws://127.0.0.1:8000/ws/v1/metrics?exchange=binance&instrumentId=BTC-USDT&timeframe=1m&window=24h`
 - Stable candle stream: `ws://127.0.0.1:8000/ws/v1/candles/stable?exchange=binance&instrumentId=BTC-USDT&timeframe=1s&limit=20`
@@ -136,6 +141,20 @@ Metric points, metric events, and latest metric summaries are persisted in
 TimescaleDB. The REST metrics endpoint remains available for initial loads and
 fallbacks, while `/ws/v1/metrics` pushes fresh backend-owned summaries after
 new or recovered candle windows are recomputed.
+
+Latency observability is exported from the backend at `/metrics` for
+Prometheus and at `/api/v1/observability/latency` as JSON. The Compose stack
+provisions Grafana with a Tickframe dashboard that covers exchange-to-backend
+latency, browser display latency, latest prices, trade freshness, metrics
+compute time, collector state, and internal queues. Frontend display telemetry
+is sent after the dashboard receives and renders market, candle, and metrics
+updates, so the end-to-end series measure the path toward the user's screen
+instead of only the backend receive time.
+
+Display latency depends on browser and server clocks being reasonably aligned.
+Local Docker runs share the host clock closely; public deployments should keep
+the server synchronized with NTP and treat browser-clock skew as a measurement
+limitation.
 
 The chart loads its initial history through REST, then listens to
 `/ws/v1/candles/stable` for event-driven stable candle updates and

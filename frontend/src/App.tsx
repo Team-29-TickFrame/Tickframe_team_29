@@ -19,6 +19,7 @@ import {
   logout,
   marketWebSocketUrl,
   metricsWebSocketUrl,
+  postDisplayTelemetry,
   register,
   stableCandleWebSocketUrl,
 } from "./api";
@@ -30,6 +31,7 @@ import type {
   CandleStreamResponse,
   CandlesResponse,
   DisplayCandle,
+  DisplayTelemetrySample,
   Exchange,
   HealthResponse,
   HistorySource,
@@ -430,6 +432,95 @@ function marketKey(market: Market): string {
   return `${market.exchange}:${market.instrumentId}`;
 }
 
+type PendingDisplayTelemetrySample = Omit<
+  DisplayTelemetrySample,
+  "displayedAt"
+>;
+
+const displayTelemetryLastSentAt = new Map<string, number>();
+const DISPLAY_TELEMETRY_MIN_INTERVAL_MS = 1_000;
+
+function scheduleDisplayTelemetry(
+  key: string,
+  samples: PendingDisplayTelemetrySample[],
+) {
+  if (samples.length === 0) return;
+  const now = Date.now();
+  const previous = displayTelemetryLastSentAt.get(key) ?? 0;
+  if (now - previous < DISPLAY_TELEMETRY_MIN_INTERVAL_MS) return;
+  displayTelemetryLastSentAt.set(key, now);
+
+  const send = () => {
+    const displayedAt = Date.now();
+    void postDisplayTelemetry(
+      samples.map((sample) => ({ ...sample, displayedAt })),
+    ).catch(() => undefined);
+  };
+
+  if (document.visibilityState === "hidden") {
+    window.setTimeout(send, 0);
+    return;
+  }
+  window.requestAnimationFrame(() => window.requestAnimationFrame(send));
+}
+
+function marketDisplaySamples(
+  snapshot: MarketsResponse,
+  frontendReceivedAt: number,
+): PendingDisplayTelemetrySample[] {
+  return snapshot.markets.map((market) => ({
+    channel: "markets",
+    exchange: market.exchange,
+    instrumentId: market.instrumentId,
+    price: market.price,
+    exchangeTimestamp: market.exchangeTimestamp,
+    backendReceivedAt: market.receivedTimestamp,
+    backendGeneratedAt: snapshot.generatedAt,
+    frontendReceivedAt,
+  }));
+}
+
+function candleDisplaySample(
+  channel: "stable_candles" | "provisional_candles",
+  snapshot: CandlesResponse | CandleStreamResponse,
+  frontendReceivedAt: number,
+): PendingDisplayTelemetrySample | null {
+  const latest = snapshot.candles.at(-1);
+  if (!latest) return null;
+  return {
+    channel,
+    exchange: snapshot.exchange,
+    instrumentId: snapshot.instrumentId,
+    timeframe: snapshot.timeframe,
+    price: latest.close,
+    backendGeneratedAt:
+      snapshot.chartLatency?.generatedAt ??
+      ("generatedAt" in snapshot ? snapshot.generatedAt : null),
+    dataTimestamp: snapshot.chartLatency?.dataTo ?? latest.closeTime,
+    frontendReceivedAt,
+  };
+}
+
+function metricsDisplaySample(
+  channel: "metrics" | "stats",
+  snapshot: MetricsResponse,
+  frontendReceivedAt: number,
+): PendingDisplayTelemetrySample {
+  return {
+    channel,
+    exchange: snapshot.exchange,
+    instrumentId: snapshot.instrumentId,
+    timeframe: snapshot.timeframe,
+    price:
+      snapshot.latest?.close === null || snapshot.latest?.close === undefined
+        ? null
+        : String(snapshot.latest.close),
+    backendGeneratedAt: snapshot.metricsLatency.generatedAt,
+    dataTimestamp: snapshot.metricsLatency.dataTo,
+    frontendReceivedAt,
+  };
+}
+
 function useMarketFeed() {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -448,10 +539,15 @@ function useMarketFeed() {
       fetchHealth(controller.signal),
     ])
       .then(([instrumentData, marketData, healthData]) => {
+        const frontendReceivedAt = Date.now();
         setInstruments(instrumentData.instruments);
         setMarkets(marketData.markets);
         setHealth(healthData);
         setError(null);
+        scheduleDisplayTelemetry(
+          "markets:initial",
+          marketDisplaySamples(marketData, frontendReceivedAt),
+        );
       })
       .catch((requestError: Error) => {
         if (requestError.name !== "AbortError") {
@@ -480,8 +576,13 @@ function useMarketFeed() {
 
       socket.addEventListener("message", (event) => {
         try {
+          const frontendReceivedAt = Date.now();
           const snapshot = JSON.parse(event.data) as MarketsResponse;
           setMarkets(snapshot.markets);
+          scheduleDisplayTelemetry(
+            "markets:stream",
+            marketDisplaySamples(snapshot, frontendReceivedAt),
+          );
         } catch {
           setError("A malformed market snapshot was ignored.");
         }
@@ -577,6 +678,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           { timeframe, limit: HISTORY_PAGE_SIZE },
           initialController.signal,
         );
+        const frontendReceivedAt = Date.now();
         if (!active) return;
         setCandleData({
           scope,
@@ -586,6 +688,14 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           latency: response.chartLatency,
         });
         setCandleError(null);
+        const sample = candleDisplaySample(
+          "stable_candles",
+          response,
+          frontendReceivedAt,
+        );
+        if (sample) {
+          scheduleDisplayTelemetry(`stable:${scope}:initial`, [sample]);
+        }
       } catch (requestError) {
         if (!active || (requestError as Error).name === "AbortError") return;
         setCandleError("Candle history is temporarily unavailable.");
@@ -621,6 +731,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     socket.addEventListener("message", (event) => {
       if (closed) return;
       try {
+        const frontendReceivedAt = Date.now();
         const snapshot = JSON.parse(event.data) as CandlesResponse;
         setCandleData((current) =>
           current.scope === scope
@@ -633,6 +744,14 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             : current,
         );
         setCandleError(null);
+        const sample = candleDisplaySample(
+          "stable_candles",
+          snapshot,
+          frontendReceivedAt,
+        );
+        if (sample) {
+          scheduleDisplayTelemetry(`stable:${scope}:stream`, [sample]);
+        }
       } catch {
         setCandleError("A malformed stable candle snapshot was ignored.");
       }
@@ -655,9 +774,18 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     socket.addEventListener("message", (event) => {
       if (closed) return;
       try {
+        const frontendReceivedAt = Date.now();
         const snapshot = JSON.parse(event.data) as CandleStreamResponse;
         setProvisionalData({ scope, values: snapshot.candles });
         setCandleError(null);
+        const sample = candleDisplaySample(
+          "provisional_candles",
+          snapshot,
+          frontendReceivedAt,
+        );
+        if (sample) {
+          scheduleDisplayTelemetry(`provisional:${scope}:stream`, [sample]);
+        }
       } catch {
         setCandleError("A malformed live candle snapshot was ignored.");
       }
@@ -685,9 +813,13 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           { timeframe, limit: METRICS_LIMIT },
           controller.signal,
         );
+        const frontendReceivedAt = Date.now();
         if (!active) return;
         setMetricsData({ scope, value: response });
         setMetricsError(null);
+        scheduleDisplayTelemetry(`metrics:${scope}:rest`, [
+          metricsDisplaySample("metrics", response, frontendReceivedAt),
+        ]);
       } catch (requestError) {
         if (!active || (requestError as Error).name === "AbortError") return;
         setMetricsError("Metrics are temporarily unavailable.");
@@ -732,9 +864,13 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           },
           controller.signal,
         );
+        const frontendReceivedAt = Date.now();
         if (!active) return;
         setStatsData({ scope, value: response });
         setStatsError(null);
+        scheduleDisplayTelemetry(`stats:${scope}:rest`, [
+          metricsDisplaySample("stats", response, frontendReceivedAt),
+        ]);
       } catch (requestError) {
         if (!active || (requestError as Error).name === "AbortError") return;
         setStatsError("24h statistics are temporarily unavailable.");
@@ -767,10 +903,14 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     socket.addEventListener("message", (event) => {
       if (closed) return;
       try {
+        const frontendReceivedAt = Date.now();
         const snapshot = JSON.parse(event.data) as MetricsResponse;
         setMetricsData({ scope, value: snapshot });
         setMetricsLoading(false);
         setMetricsError(null);
+        scheduleDisplayTelemetry(`metrics:${scope}:stream`, [
+          metricsDisplaySample("metrics", snapshot, frontendReceivedAt),
+        ]);
       } catch {
         setMetricsError("A malformed metrics snapshot was ignored.");
       }
@@ -792,10 +932,14 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     socket.addEventListener("message", (event) => {
       if (closed) return;
       try {
+        const frontendReceivedAt = Date.now();
         const snapshot = JSON.parse(event.data) as MetricsResponse;
         setStatsData({ scope, value: snapshot });
         setStatsLoading(false);
         setStatsError(null);
+        scheduleDisplayTelemetry(`stats:${scope}:stream`, [
+          metricsDisplaySample("stats", snapshot, frontendReceivedAt),
+        ]);
       } catch {
         setStatsError("A malformed 24h statistics snapshot was ignored.");
       }

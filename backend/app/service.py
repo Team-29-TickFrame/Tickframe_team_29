@@ -2,7 +2,7 @@ import asyncio
 import os
 import time
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import asyncpg
 
@@ -27,6 +27,7 @@ from .history import (
 )
 from .metrics import compute_metrics, compute_return_correlation
 from .models import Trade
+from .observability import LatencyObservability, service_prometheus_text
 from .store import LiveStore
 
 
@@ -51,6 +52,7 @@ class MarketDataService:
         self.config = config
         self.store = LiveStore(config)
         self.database = DatabaseWriter()
+        self.observability = LatencyObservability()
         self.aggregator = CandleAggregator(
             allowed_lateness_ms=config.allowed_lateness_ms
         )
@@ -323,7 +325,7 @@ class MarketDataService:
             if page.candles and page.has_more
             else None
         )
-        return {
+        response = {
             "exchange": exchange,
             "instrumentId": instrument_id,
             "timeframe": timeframe,
@@ -346,6 +348,8 @@ class MarketDataService:
             },
             "candles": page.candles,
         }
+        self.observability.observe_chart_snapshot("candles_rest", response)
+        return response
 
     async def metrics_snapshot(
         self,
@@ -438,15 +442,32 @@ class MarketDataService:
                 for bucket, bucket_candles in sorted(grouped.items())
             ]
 
-        return {
+        data_to = (
+            max(int(candle["closeTime"]) for candle in values)
+            if values
+            else now_ms
+        )
+        response = {
             "exchange": exchange,
             "instrumentId": instrument_id,
             "timeframe": timeframe,
             "source": "provisional",
             "generatedAt": now_ms,
             "revision": self.store.revision,
+            "chartLatency": {
+                "generatedAt": now_ms,
+                "dataTo": data_to,
+                "effectiveLagMs": max(0, now_ms - data_to),
+                "stableDelayMs": 0,
+                "allowedLatenessMs": self.config.allowed_lateness_ms,
+            },
             "candles": values[-2:],
         }
+        self.observability.observe_chart_snapshot(
+            "provisional_candles_ws",
+            response,
+        )
+        return response
 
     async def stable_candle_snapshot(
         self,
@@ -478,7 +499,7 @@ class MarketDataService:
             if page.candles and page.has_more
             else None
         )
-        return {
+        response = {
             "exchange": exchange,
             "instrumentId": instrument_id,
             "timeframe": timeframe,
@@ -498,6 +519,8 @@ class MarketDataService:
             },
             "candles": page.candles,
         }
+        self.observability.observe_chart_snapshot("stable_candles_ws", response)
+        return response
 
     @staticmethod
     def _aggregate_provisional_bucket(
@@ -620,6 +643,7 @@ class MarketDataService:
                 "windowName": window_name,
             },
         }
+        self.observability.observe_metrics_snapshot(response)
         return {
             "response": response,
             "marketType": self.config.market_type,
@@ -693,6 +717,8 @@ class MarketDataService:
         while True:
             trade = await self.trade_queue.get()
             try:
+                processed_at = unix_ms()
+                self.observability.observe_trade(trade, processed_at)
                 await self.store.apply_trade(trade)
                 revised = self.aggregator.add_trade(
                     trade,
@@ -882,7 +908,40 @@ class MarketDataService:
             )
         return streams
 
-    def health(self) -> Dict[str, object]:
+    def record_frontend_display_latency(
+        self,
+        samples: Sequence[Mapping[str, object]],
+    ) -> int:
+        valid_samples: List[Mapping[str, object]] = []
+        for sample in samples:
+            exchange = str(sample.get("exchange") or "")
+            instrument_id = str(sample.get("instrumentId") or "")
+            instrument = self.config.instrument_by_id(instrument_id)
+            if (
+                exchange not in self.config.exchanges
+                or instrument is None
+                or exchange not in instrument.symbols
+            ):
+                continue
+            valid_samples.append(sample)
+        return self.observability.observe_frontend_display(
+            valid_samples,
+            unix_ms(),
+        )
+
+    def observability_snapshot(self) -> Dict[str, object]:
+        return self.observability.snapshot(unix_ms())
+
+    def prometheus_metrics(self) -> str:
+        health = self.health(include_observability=False)
+        return self.observability.prometheus_text(unix_ms()) + service_prometheus_text(
+            collectors=health["collectors"],
+            pipeline=health["pipeline"],
+            metrics=health["metrics"],
+            database=health["database"],
+        )
+
+    def health(self, include_observability: bool = True) -> Dict[str, object]:
         collectors = {
             name: collector.health()
             for name, collector in self.collectors.items()
@@ -890,7 +949,7 @@ class MarketDataService:
         connected_count = sum(
             1 for collector in self.collectors.values() if collector.connected
         )
-        return {
+        payload: Dict[str, object] = {
             "status": (
                 "ok"
                 if connected_count == len(self.collectors)
@@ -931,6 +990,9 @@ class MarketDataService:
             "database": self.database.health(),
             "recovery": dict(self.recovery_status),
         }
+        if include_observability:
+            payload["observability"] = self.observability.health_summary()
+        return payload
 
     async def _cross_pair_correlations(
         self,
