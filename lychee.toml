@@ -19,4 +19,6 @@ verbose = "info"
 # Add excluded URLs only when they are authenticated, rate-limited,
 # unstable, or otherwise unsuitable for automated checking.
 exclude = [
+  "^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
+  "^wss?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
 ]
