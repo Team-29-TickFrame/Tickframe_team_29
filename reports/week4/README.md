@@ -99,7 +99,7 @@ and Testability (`QR-003`).
 | CI configuration | [`.github/workflows/quality.yml`](../../.github/workflows/quality.yml) | Backend lint/format/tests/coverage, frontend typecheck/build, and datetime-safety additional QA |
 | Link-check configuration | [`.github/workflows/links.yml`](../../.github/workflows/links.yml), [`github/workflows/links.yml`](../../github/workflows/links.yml), and [`lychee.toml`](../../lychee.toml) | Lychee checks repository Markdown links |
 | Link-check exclusions | [`docs/link-check-exclusions.md`](../../docs/link-check-exclusions.md) | Documents local URL exclusions for Lychee |
-| Branch protection or rules evidence | ![Main protection rule](../images/main_protection_rule.png) | exists |
+| Branch protection or rules evidence | located in the folder images | exists |
 | Additional QA check | `ruff check --select DTZ backend/app ml/pattern_recognition` | Passing locally on 2026-06-28; runs in the Quality workflow |
 
 The additional QA check protects timestamp handling by detecting naive datetime
