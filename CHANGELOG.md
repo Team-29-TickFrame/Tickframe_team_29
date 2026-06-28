@@ -40,6 +40,7 @@ project uses [Semantic Versioning](https://semver.org/).
   traceability, maintained testing documentation, and CI quality gates.
 - Week 4 customer UAT, customer review summary, reflection, retrospective, and
   Assignment 4 public report evidence.
+- Public sanitized Assignment 4 demo video link for issue #111.
 
 ### Changed
 - Product documentation and repository workflow are aligned with the current
