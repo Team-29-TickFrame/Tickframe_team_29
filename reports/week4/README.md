@@ -1,8 +1,8 @@
 # Week 4 Report
 
-Tickframe is a real-time crypto market analytics product for inspecting live
-Binance and Bybit data, chart history, market metrics, pattern observations,
-and operational latency/status signals.
+## Project
+
+**Tickframe** is a real-time cryptocurrency market analytics platform that provides live Binance and Bybit market monitoring, historical chart visualization, latency diagnostics, and experimental ML-based pattern recognition.
 
 This report is the public Assignment 4 submission index. Private recordings,
 exact timecodes, credentials, university emails, and customer-identifying
@@ -51,6 +51,10 @@ Access and run evidence:
 - Current product is runnable through Docker Compose; public deployment access
   details that contain credentials or private host information must be supplied
   only through Moodle/private submission.
+
+## Product Status
+
+The Assignment 4 Sprint produced a stable MVP v2 increment that satisfies the Sprint Goal and incorporates customer feedback together with quality improvements, automated testing, CI quality gates, and deployment evidence.
 
 ## Customer Feedback Response
 
@@ -126,7 +130,8 @@ and link current run instructions.
 | UAT scenarios and execution summary | [`docs/user-acceptance-tests.md`](../../docs/user-acceptance-tests.md) |
 | Public sanitized UAT result | UAT-001, UAT-002, and UAT-003 passed on 2026-06-27 |
 | Customer review summary | [`reports/week4/customer-review-summary.md`](customer-review-summary.md) |
-| Public transcript or notes | No public transcript is committed; private recording/timecode evidence is Moodle-only |
+| Public transcript | [`reports/week4/customer-review-transcript.md`](customer-review-transcript.md) |
+The customer permitted publication of a sanitized English transcript. The transcript is available in the public repository, while the original meeting recording and exact timecodes remain private and are submitted only through Moodle.
 
 ## Reflection, Retro, and LLM Use
 
@@ -155,11 +160,18 @@ contains instructor-only information. Product Backlog, Sprint Backlog, deployed
 product, or runnable artifact screenshots should be added there when public
 links may not be inspectable by graders.
 
-## Current Product Status and Next Steps
+## Current Product Status
 
-Tickframe has a runnable Docker Compose product foundation with live exchange
-collectors, persisted candles and metrics, real-time analytics UI,
-observability, and an experimental ML pattern baseline.
+The Tickframe MVP v2 is fully functional and provides:
+
+- Live Binance and Bybit market monitoring
+- Historical candle and metric storage
+- Real-time dashboards
+- Latency monitoring
+- Experimental ML pattern recognition
+- Automated testing and CI quality gates
+
+The current increment has successfully passed customer review and UAT.
 
 Next steps:
 
@@ -168,5 +180,4 @@ Next steps:
 - Publish `v1.1.0` from protected `main`.
 - Keep the public sanitized demo video link available as part of the `v1.1.0`
   release evidence.
-- Submit private Sprint Review/UAT recording links, timecodes, credentials, and
-  rehearsed presentation video through Moodle only.
+- Submit private Sprint Review and UAT recording links, exact timecodes, credentials, and instructor-only evidence through Moodle. The sanitized customer review transcript is available in the public repository.
