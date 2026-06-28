@@ -20,7 +20,9 @@ def synthetic_candles(label: str, seed: int = 7) -> list[dict]:
 
 class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_non_one_minute_timeframe_does_not_call_history_service(self) -> None:
-        with patch("backend.app.main.service.candle_history", new=AsyncMock()) as history:
+        with patch(
+            "backend.app.main.service.candle_history", new=AsyncMock()
+        ) as history:
             result = await ml_patterns(
                 exchange="binance",
                 instrument_id="BTC-USDT",

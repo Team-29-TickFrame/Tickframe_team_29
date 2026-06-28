@@ -36,9 +36,7 @@ def main() -> None:
             continue
         percent = float(entry["summary"]["percent_covered"])
         if percent < MINIMUM_COVERAGE:
-            failures.append(
-                f"{module}: {percent:.2f}% < {MINIMUM_COVERAGE:.2f}%"
-            )
+            failures.append(f"{module}: {percent:.2f}% < {MINIMUM_COVERAGE:.2f}%")
 
     if failures:
         print("Critical module coverage check failed:")

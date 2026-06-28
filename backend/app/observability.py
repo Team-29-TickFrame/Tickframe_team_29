@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from math import isfinite
 from threading import RLock
-from typing import Any, Deque, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Deque, Dict, Iterable, Mapping, Optional, Tuple
 
 from .models import Trade
 
@@ -103,9 +103,7 @@ class LatestDisplay:
 class LatencyObservability:
     def __init__(self) -> None:
         self._lock = RLock()
-        self._latency: Dict[LatencyKey, RollingLatency] = defaultdict(
-            RollingLatency
-        )
+        self._latency: Dict[LatencyKey, RollingLatency] = defaultdict(RollingLatency)
         self._latest_markets: Dict[MarketKey, LatestMarket] = {}
         self._latest_displays: Dict[DisplayKey, LatestDisplay] = {}
         self._frontend_samples_total = 0
@@ -217,38 +215,35 @@ class LatencyObservability:
                 instrument_id = _label_value(sample.get("instrumentId"))
                 timeframe = _label_value(sample.get("timeframe"))
                 displayed_at_ms = _int_or_none(sample.get("displayedAt"))
-                if not channel or not exchange or not instrument_id or displayed_at_ms is None:
+                if (
+                    not channel
+                    or not exchange
+                    or not instrument_id
+                    or displayed_at_ms is None
+                ):
                     continue
 
-                frontend_received_at_ms = _int_or_none(
-                    sample.get("frontendReceivedAt")
-                )
-                backend_generated_at_ms = _int_or_none(
-                    sample.get("backendGeneratedAt")
-                )
-                backend_received_at_ms = _int_or_none(
-                    sample.get("backendReceivedAt")
-                )
-                exchange_timestamp_ms = _int_or_none(
-                    sample.get("exchangeTimestamp")
-                )
+                frontend_received_at_ms = _int_or_none(sample.get("frontendReceivedAt"))
+                backend_generated_at_ms = _int_or_none(sample.get("backendGeneratedAt"))
+                backend_received_at_ms = _int_or_none(sample.get("backendReceivedAt"))
+                exchange_timestamp_ms = _int_or_none(sample.get("exchangeTimestamp"))
                 data_timestamp_ms = _int_or_none(sample.get("dataTimestamp"))
                 price = _finite_float(sample.get("price"))
                 data_anchor_ms = data_timestamp_ms or exchange_timestamp_ms
 
-                self._latest_displays[
-                    (channel, exchange, instrument_id, timeframe)
-                ] = LatestDisplay(
-                    channel=channel,
-                    exchange=exchange,
-                    instrument_id=instrument_id,
-                    timeframe=timeframe,
-                    price=price,
-                    data_timestamp_ms=data_anchor_ms,
-                    backend_generated_at_ms=backend_generated_at_ms,
-                    frontend_received_at_ms=frontend_received_at_ms,
-                    displayed_at_ms=displayed_at_ms,
-                    accepted_at_ms=accepted_at_ms,
+                self._latest_displays[(channel, exchange, instrument_id, timeframe)] = (
+                    LatestDisplay(
+                        channel=channel,
+                        exchange=exchange,
+                        instrument_id=instrument_id,
+                        timeframe=timeframe,
+                        price=price,
+                        data_timestamp_ms=data_anchor_ms,
+                        backend_generated_at_ms=backend_generated_at_ms,
+                        frontend_received_at_ms=frontend_received_at_ms,
+                        displayed_at_ms=displayed_at_ms,
+                        accepted_at_ms=accepted_at_ms,
+                    )
                 )
 
                 if price is not None and channel == "markets":
@@ -264,7 +259,9 @@ class LatencyObservability:
                     exchange=exchange,
                     instrument_id=instrument_id,
                     timeframe=timeframe,
-                    value_ms=_delta_ms(frontend_received_at_ms, backend_generated_at_ms),
+                    value_ms=_delta_ms(
+                        frontend_received_at_ms, backend_generated_at_ms
+                    ),
                 )
                 self._observe_locked(
                     stage="frontend_render",
@@ -400,12 +397,9 @@ class LatencyObservability:
                 f"{stats.count}"
             )
             lines.append(
-                f"tickframe_latency_ms_sum{_labels(labels)} "
-                f"{_number(stats.total_ms)}"
+                f"tickframe_latency_ms_sum{_labels(labels)} {_number(stats.total_ms)}"
             )
-            lines.append(
-                f"tickframe_latency_ms_count{_labels(labels)} {stats.count}"
-            )
+            lines.append(f"tickframe_latency_ms_count{_labels(labels)} {stats.count}")
 
         lines.extend(
             [
@@ -663,8 +657,7 @@ def _labels(values: Mapping[str, object]) -> str:
     if not values:
         return ""
     payload = ",".join(
-        f'{key}="{_escape_label(value)}"'
-        for key, value in sorted(values.items())
+        f'{key}="{_escape_label(value)}"' for key, value in sorted(values.items())
     )
     return f"{{{payload}}}"
 

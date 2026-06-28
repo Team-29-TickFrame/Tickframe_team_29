@@ -67,9 +67,7 @@ def normalize_email(email: str) -> str:
 
 def validate_password(password: str) -> None:
     if len(password) < MIN_PASSWORD_LENGTH:
-        raise ValueError(
-            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
-        )
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
 
 
 def hash_password(password: str) -> str:

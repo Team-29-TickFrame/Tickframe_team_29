@@ -5,7 +5,11 @@ import time
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
-from ml.pattern_recognition import PATTERN_MODEL_VERSION, SUPPORTED_TIMEFRAME, WINDOW_SIZE
+from ml.pattern_recognition import (
+    PATTERN_MODEL_VERSION,
+    SUPPORTED_TIMEFRAME,
+    WINDOW_SIZE,
+)
 from ml.pattern_recognition.features import extract_features
 from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
 
@@ -30,7 +34,12 @@ class PatternMLDetector:
             Path(configured_model)
             if configured_model
             else model_path
-            or root / "ml" / "pattern_recognition" / "runs" / "baseline-v0" / "model.json"
+            or root
+            / "ml"
+            / "pattern_recognition"
+            / "runs"
+            / "baseline-v0"
+            / "model.json"
         )
         self.confidence_threshold = _confidence_threshold(confidence_threshold)
         self._model: Optional[GaussianNaiveBayesClassifier] = None
@@ -85,8 +94,7 @@ class PatternMLDetector:
         closed = [
             candle
             for candle in candles
-            if _has_complete_ohlcv(candle)
-            and str(candle.get("status")) != "incomplete"
+            if _has_complete_ohlcv(candle) and str(candle.get("status")) != "incomplete"
         ][-WINDOW_SIZE:]
         if len(closed) < WINDOW_SIZE:
             return {
@@ -170,7 +178,9 @@ class PatternMLDetector:
 
 
 def _has_complete_ohlcv(candle: Dict[str, object]) -> bool:
-    return all(candle.get(field) is not None for field in ("open", "high", "low", "close"))
+    return all(
+        candle.get(field) is not None for field in ("open", "high", "low", "close")
+    )
 
 
 def _confidence_threshold(default: float) -> float:

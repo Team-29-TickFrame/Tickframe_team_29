@@ -86,7 +86,7 @@ class LiveStore:
             market["ageMs"] = age_ms
             if received_at is None:
                 market["status"] = "waiting"
-            elif age_ms > 10_000:
+            elif age_ms >= 10_000:
                 market["status"] = "stale"
             else:
                 market["status"] = "live"

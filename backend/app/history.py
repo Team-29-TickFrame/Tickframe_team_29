@@ -100,11 +100,12 @@ def _aggregate_bucket(
     priced = [
         candle
         for candle in candles
-        if all(candle.get(field) is not None for field in ("open", "high", "low", "close"))
+        if all(
+            candle.get(field) is not None for field in ("open", "high", "low", "close")
+        )
     ]
-    incomplete = (
-        len(candles) < expected_count
-        or any(candle.get("status") == "incomplete" for candle in candles)
+    incomplete = len(candles) < expected_count or any(
+        candle.get("status") == "incomplete" for candle in candles
     )
     recovered = any(candle.get("status") == "recovered" for candle in candles)
     trade_count = sum(int(candle["tradeCount"]) for candle in candles)

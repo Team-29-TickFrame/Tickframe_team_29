@@ -12,7 +12,7 @@ This document defines maintained quality requirements for Tickframe using ISO/IE
 
 **Traceability:** US-03, US-05, US-13, PB-08, PB-14
 
-**Linked quality requirement tests:** [QRT-001] (quality-requirement-tests.md#qrt-001-market-data-update-latency)
+**Linked quality requirement tests:** [QRT-001](quality-requirement-tests.md#qrt-001-market-data-update-latency)
 
 ## QR-002: Exchange data failure visibility
 
@@ -24,7 +24,7 @@ This document defines maintained quality requirements for Tickframe using ISO/IE
 
 **Traceability:** US-10, PB-10
 
-**Linked quality requirement tests:** [QRT-002] (quality-requirement-tests.md#qrt-002-exchange-data-failure-visibility)
+**Linked quality requirement tests:** [QRT-002](quality-requirement-tests.md#qrt-002-exchange-data-failure-visibility)
 
 ## QR-003: Critical module test coverage
 
@@ -36,4 +36,4 @@ This document defines maintained quality requirements for Tickframe using ISO/IE
 
 **Traceability:** PB-11, PB-12, PB-13, PB-14, docs/testing.md
 
-**Linked quality requirement tests:** [QRT-003] (quality-requirement-tests.md#qrt-003-critical-module-test-coverage)
+**Linked quality requirement tests:** [QRT-003](quality-requirement-tests.md#qrt-003-critical-module-test-coverage)

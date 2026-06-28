@@ -68,10 +68,7 @@ class GaussianNaiveBayesClassifier:
         )
 
     def predict_proba_one(self, features: Sequence[float]) -> Dict[str, float]:
-        log_scores = {
-            label: self._log_score(label, features)
-            for label in self.labels
-        }
+        log_scores = {label: self._log_score(label, features) for label in self.labels}
         return _softmax(log_scores)
 
     def save(self, path: Path) -> None:
@@ -86,8 +83,7 @@ class GaussianNaiveBayesClassifier:
         model = cls()
         model.labels = list(payload["labels"])
         model.class_priors = {
-            str(label): float(value)
-            for label, value in payload["classPriors"].items()
+            str(label): float(value) for label, value in payload["classPriors"].items()
         }
         model.means = {
             str(label): [float(item) for item in values]
@@ -133,10 +129,7 @@ def evaluate_predictions(
     if len(expected) != len(predicted):
         raise ValueError("expected and predicted must have the same length.")
 
-    confusion = {
-        label: {other: 0 for other in labels}
-        for label in labels
-    }
+    confusion = {label: {other: 0 for other in labels} for label in labels}
     for actual, guess in zip(expected, predicted):
         confusion[actual][guess] += 1
 
@@ -146,8 +139,12 @@ def evaluate_predictions(
 
     for label in labels:
         true_positive = confusion[label][label]
-        false_positive = sum(confusion[other][label] for other in labels if other != label)
-        false_negative = sum(confusion[label][other] for other in labels if other != label)
+        false_positive = sum(
+            confusion[other][label] for other in labels if other != label
+        )
+        false_negative = sum(
+            confusion[label][other] for other in labels if other != label
+        )
         precision = _safe_ratio(true_positive, true_positive + false_positive)
         recall = _safe_ratio(true_positive, true_positive + false_negative)
         f1 = _safe_ratio(2 * precision * recall, precision + recall)
@@ -168,10 +165,7 @@ def evaluate_predictions(
 
 def _column_means(rows: Sequence[Sequence[float]]) -> List[float]:
     columns = len(rows[0])
-    return [
-        sum(row[index] for row in rows) / len(rows)
-        for index in range(columns)
-    ]
+    return [sum(row[index] for row in rows) / len(rows) for index in range(columns)]
 
 
 def _column_variances(
@@ -190,14 +184,10 @@ def _column_variances(
 def _softmax(log_scores: Dict[str, float]) -> Dict[str, float]:
     max_score = max(log_scores.values())
     exp_scores = {
-        label: math.exp(score - max_score)
-        for label, score in log_scores.items()
+        label: math.exp(score - max_score) for label, score in log_scores.items()
     }
     total = sum(exp_scores.values())
-    return {
-        label: value / total
-        for label, value in exp_scores.items()
-    }
+    return {label: value / total for label, value in exp_scores.items()}
 
 
 def _safe_ratio(numerator: float, denominator: float) -> float:

@@ -4,6 +4,7 @@ Revision ID: 0004_auth
 Revises: 0003_historical_candles
 Create Date: 2026-06-20
 """
+
 from typing import Sequence, Union
 
 from alembic import op

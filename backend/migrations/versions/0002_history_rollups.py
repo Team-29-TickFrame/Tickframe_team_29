@@ -4,6 +4,7 @@ Revision ID: 0002_history_rollups
 Revises: 0001_market_data
 Create Date: 2026-06-15
 """
+
 from typing import Sequence, Union
 
 from alembic import op
