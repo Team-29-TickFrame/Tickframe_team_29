@@ -152,13 +152,11 @@ The customer permitted publication of a sanitized English transcript. The transc
 
 ## Screenshots and Public Evidence
 
-Screenshots for Sprint milestone, latest protected-default-branch CI run,
-branch protection/rules evidence, coverage/test report, additional QA result,
-SemVer release, and an example reviewed issue-linked PR should be stored under
-[`reports/week4/images/`](images/) or submitted privately when the screenshot
-contains instructor-only information. Product Backlog, Sprint Backlog, deployed
-product, or runnable artifact screenshots should be added there when public
-links may not be inspectable by graders.
+### Release
+![Tickframe Dashboard](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/reports/week4/images/Release.jpeg?raw=true)
+
+### Product Screenshot
+![Tickframe Dashboard](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/reports/week4/images/Product%20Screenshot.jpg?raw=true)
 
 ## Current Product Status
 
