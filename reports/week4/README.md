@@ -87,7 +87,7 @@ and Testability (`QR-003`).
 | Unit tests | [`backend/tests`](../../backend/tests) | 69 tests passing locally on 2026-06-28 |
 | Integration tests | [`backend/tests/test_service_history.py`](../../backend/tests/test_service_history.py), [`backend/tests/test_database_history.py`](../../backend/tests/test_database_history.py), [`backend/tests/test_api_patterns.py`](../../backend/tests/test_api_patterns.py) | Passing locally on 2026-06-28 |
 | Automated QRTs | [`docs/quality-requirement-tests.md`](../../docs/quality-requirement-tests.md) and [`backend/tests/test_quality_requirements.py`](../../backend/tests/test_quality_requirements.py) | Passing locally through backend tests and coverage gate |
-| Critical-module coverage | [`docs/testing.md`](../../docs/testing.md#critical-modules-and-coverage-status) | All 10 critical modules pass the 30% gate; global measured coverage is 65% |
+| Critical-module coverage | [`docs/testing.md`](../../docs/testing.md#critical-modules-and-coverage-status) | All 10 critical modules pass the 30% gate; global measured coverage is 66% |
 | Quality CI pipeline | [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) | Runs on pull requests, pushes to `main`, and manual dispatch |
 | Latest protected-branch quality run | [Quality workflow runs](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) | Must be green after the release-evidence PR merges |
 | Link-check CI pipeline | [Links workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml) | Runs on Markdown/link-check changes in pull requests and pushes to `main` |

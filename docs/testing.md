@@ -26,7 +26,7 @@ Latest local verification: 2026-06-28 using
 | [`ml/pattern_recognition/model.py`](../ml/pattern_recognition/model.py) | Contains the baseline model logic used by the product pattern endpoint. | 30% | 59% | Local coverage run and [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) |
 
 The global measured coverage for `backend.app` and `ml.pattern_recognition` is
-65%. Global coverage is lower than some critical modules because migration,
+66%. Global coverage is lower than some critical modules because migration,
 database-adapter, deployment, and training-script paths are tested less heavily
 than the core analytics, history, observability, and model-serving logic.
 
