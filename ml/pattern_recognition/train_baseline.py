@@ -14,9 +14,7 @@ from .model import GaussianNaiveBayesClassifier, evaluate_predictions
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Train the first maintained synthetic 1m chart-pattern baseline."
-        )
+        description=("Train the first maintained synthetic 1m chart-pattern baseline.")
     )
     parser.add_argument(
         "--config",
@@ -150,7 +148,9 @@ def main() -> None:
     )
 
 
-def resolve_config(config: Dict[str, object], args: argparse.Namespace) -> Dict[str, object]:
+def resolve_config(
+    config: Dict[str, object], args: argparse.Namespace
+) -> Dict[str, object]:
     resolved = dict(config)
     if args.output_dir is not None:
         resolved["outputDir"] = args.output_dir
@@ -202,7 +202,9 @@ def write_json(path: Path, payload: object) -> None:
     )
 
 
-def model_card(*, metrics: Dict[str, object], dataset_manifest: Dict[str, object]) -> str:
+def model_card(
+    *, metrics: Dict[str, object], dataset_manifest: Dict[str, object]
+) -> str:
     return f"""# Pattern Baseline v0 Model Card
 
 ## Purpose

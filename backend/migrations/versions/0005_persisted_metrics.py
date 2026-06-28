@@ -4,6 +4,7 @@ Revision ID: 0005_persisted_metrics
 Revises: 0004_auth
 Create Date: 2026-06-26
 """
+
 from typing import Sequence, Union
 
 from alembic import op

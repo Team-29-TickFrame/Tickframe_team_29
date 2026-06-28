@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | Unit tests | Critical product logic: aggregation, metrics, history helpers, auth, config, exchange parsers, historical candle parsers, observability latency snapshots/Prometheus export, and ML detector behavior | `coverage run --source=backend.app,ml.pattern_recognition -m unittest discover -s backend/tests` | github quality actions |qithub quality actions |
 | Integration tests | Important interactions between product components: service history fallback, service metrics snapshots, database-history conversion helpers, exchange subscription handling, and the ML API function using history plus detector logic | `coverage run --source=backend.app,ml.pattern_recognition -m unittest discover -s backend/tests` | github quality actions | github quality actions |
-| Automated QRTs | Assignment 4 quality requirements and quality requirement tests | Same CI checks and test commands once linked from `docs/quality-requirement-tests.md` | Pending QRT traceability document | `docs/quality-requirement-tests.md` must link the relevant automated checks |
+| Automated QRTs | QR-001 latency, QR-002 failure visibility, and QR-003 critical-module testability | `coverage run --source=backend.app,ml.pattern_recognition -m unittest discover -s backend/tests` and `python backend/scripts/check_critical_coverage.py coverage.json` | Must pass in `Quality` CI before merge/submission | [`docs/quality-requirement-tests.md`](quality-requirement-tests.md) and [`backend/tests/test_quality_requirements.py`](../backend/tests/test_quality_requirements.py) |
 | Critical-module coverage | All critical modules listed above | `python backend/scripts/check_critical_coverage.py coverage.json` | Must pass in `Quality` CI before merge/submission | [`backend/scripts/check_critical_coverage.py`](../backend/scripts/check_critical_coverage.py) and latest `Quality` workflow run |
 
 
@@ -77,4 +77,3 @@ For now, all the gates remain active:
 - automated QRTs introduced in `docs/quality-requirement-tests.md`;
 - Definition of Done requirements for passing relevant CI checks, tests,
   coverage gates, and preserved evidence.
-

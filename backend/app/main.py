@@ -103,9 +103,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="Tickframe Market Data API",
     version="0.3.0",
-    description=(
-        "Canonical Spot trades and historical OHLCV from Binance and Bybit."
-    ),
+    description=("Canonical Spot trades and historical OHLCV from Binance and Bybit."),
     lifespan=lifespan,
 )
 

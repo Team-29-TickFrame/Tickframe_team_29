@@ -127,7 +127,9 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
     )
 
 
-def websocket_urls_for(exchange_name: str, values: Dict[str, object]) -> Tuple[str, ...]:
+def websocket_urls_for(
+    exchange_name: str, values: Dict[str, object]
+) -> Tuple[str, ...]:
     env_name = f"TICKFRAME_{exchange_name.upper()}_WS_URLS"
     configured = os.getenv(env_name)
     if configured:

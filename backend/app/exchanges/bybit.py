@@ -155,9 +155,9 @@ class BybitCollector(ExchangeCollector):
         return self.websocket_urls[self._websocket_url_index % len(self.websocket_urls)]
 
     def _rotate_websocket_url(self) -> None:
-        self._websocket_url_index = (
-            self._websocket_url_index + 1
-        ) % len(self.websocket_urls)
+        self._websocket_url_index = (self._websocket_url_index + 1) % len(
+            self.websocket_urls
+        )
 
     def is_instrument_active(self, instrument_id: str) -> bool:
         topic = self._topic_by_instrument_id.get(instrument_id)

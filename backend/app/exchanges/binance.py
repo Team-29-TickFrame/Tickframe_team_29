@@ -93,6 +93,6 @@ class BinanceCollector(ExchangeCollector):
         return self.websocket_urls[self._websocket_url_index % len(self.websocket_urls)]
 
     def _rotate_websocket_url(self) -> None:
-        self._websocket_url_index = (
-            self._websocket_url_index + 1
-        ) % len(self.websocket_urls)
+        self._websocket_url_index = (self._websocket_url_index + 1) % len(
+            self.websocket_urls
+        )

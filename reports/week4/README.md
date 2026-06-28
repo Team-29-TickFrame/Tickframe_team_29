@@ -10,6 +10,7 @@
 | CI configuration | [`.github/workflows/quality.yml`](../../.github/workflows/quality.yml) | Backend lint/format/tests/coverage, frontend typecheck/build, Gitleaks secret scan |
 | Link-check configuration | [`.github/workflows/links.yml`](../../.github/workflows/links.yml) and [`lychee.toml`](../../lychee.toml) | Lychee checks repository Markdown links |
 | Testing documentation | [`docs/testing.md`](../../docs/testing.md) | Maintained testing status and quality-gate summary |
+| Quality requirement tests | [`docs/quality-requirement-tests.md`](../../docs/quality-requirement-tests.md) | QRT-001, QRT-002, and QRT-003 traceability and CI evidence locations |
 | Link-check exclusions | [`docs/link-check-exclusions.md`](../../docs/link-check-exclusions.md) | Documents local URL exclusions for Lychee |
 
 
@@ -27,7 +28,7 @@ For now, all quality gated will be continued later:
 - Frontend build verification with `npm run build`.
 - Gitleaks secret scanning as the Assignment 4 additional QA check.
 - Lychee Markdown link checking for repository documentation.
-- Automated quality requirement tests linked from `docs/quality-requirement-tests.md` once the QRT traceability document is finalized.
+- Automated quality requirement tests linked from [`docs/quality-requirement-tests.md`](../../docs/quality-requirement-tests.md).
 - Definition of Done evidence requirements for passing CI checks, tests, coverage gates, and preserved verification evidence.
 
 If later work changes the product stack, critical modules, quality

@@ -40,9 +40,7 @@ class DatabaseWriter:
     ) -> None:
         self.database_url = database_url or os.getenv("DATABASE_URL")
         self.batch_size = batch_size
-        self.queue: "asyncio.Queue[DatabaseEvent]" = asyncio.Queue(
-            maxsize=queue_size
-        )
+        self.queue: "asyncio.Queue[DatabaseEvent]" = asyncio.Queue(maxsize=queue_size)
         self.engine: Optional[AsyncEngine] = None
         self.connected = False
         self.last_error: Optional[str] = None
@@ -121,9 +119,7 @@ class DatabaseWriter:
             "from_ms": from_ms,
             "to_ms": to_ms,
             "fetch_limit": limit + 1,
-            "source_fetch_limit": (
-                (limit + 2) * TIMEFRAME_SECONDS[timeframe]
-            ),
+            "source_fetch_limit": ((limit + 2) * TIMEFRAME_SECONDS[timeframe]),
         }
         try:
             async with self.engine.connect() as connection:
@@ -143,10 +139,7 @@ class DatabaseWriter:
 
         history_source = self._history_page_source(rows)
         return HistoryPage(
-            candles=[
-                self._history_row_to_api(row, timeframe)
-                for row in rows
-            ],
+            candles=[self._history_row_to_api(row, timeframe) for row in rows],
             has_more=has_more,
             source=history_source,
         )
@@ -666,17 +659,13 @@ class DatabaseWriter:
             "vwap_deviation_pct": point.get("vwapDeviationPct"),
             "realized_volatility_pct": point.get("realizedVolatilityPct"),
             "parkinson_volatility_pct": point.get("parkinsonVolatilityPct"),
-            "garman_klass_volatility_pct": point.get(
-                "garmanKlassVolatilityPct"
-            ),
+            "garman_klass_volatility_pct": point.get("garmanKlassVolatilityPct"),
             "rsi": point.get("rsi"),
             "short_momentum_pct": point.get("shortMomentumPct"),
             "momentum_pct": point.get("momentumPct"),
             "mean_reversion_z_score": point.get("meanReversionZScore"),
             "distance_to_mean_pct": point.get("distanceToMeanPct"),
-            "price_volume_divergence_pct": point.get(
-                "priceVolumeDivergencePct"
-            ),
+            "price_volume_divergence_pct": point.get("priceVolumeDivergencePct"),
             "volume_spike_ratio": point.get("volumeSpikeRatio"),
             "base_volume": point.get("baseVolume"),
             "trade_count": int(point.get("tradeCount", 0)),
@@ -738,9 +727,7 @@ class DatabaseWriter:
             "latest": json.dumps(response["latest"]),
             "windows": json.dumps(response["windows"]),
             "events": json.dumps(response["events"]),
-            "cross_pair_correlations": json.dumps(
-                response["crossPairCorrelations"]
-            ),
+            "cross_pair_correlations": json.dumps(response["crossPairCorrelations"]),
             "calculated_at_ms": int(snapshot["calculatedAt"]),
             "compute_duration_ms": int(snapshot["computeDurationMs"]),
         }
@@ -1106,10 +1093,7 @@ class DatabaseWriter:
         previous_close: Optional[Decimal],
     ) -> HistoryPage:
         bucket_ms = timeframe_ms(timeframe)
-        rows_by_open = {
-            _datetime_ms(row["open_time"]): row
-            for row in rows
-        }
+        rows_by_open = {_datetime_ms(row["open_time"]): row for row in rows}
         candles: List[Dict[str, Any]] = []
         carry_close = previous_close
 

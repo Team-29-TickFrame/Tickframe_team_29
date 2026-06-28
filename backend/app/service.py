@@ -2,7 +2,7 @@ import asyncio
 import os
 import time
 from decimal import Decimal
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import asyncpg
 
@@ -57,9 +57,7 @@ class MarketDataService:
             allowed_lateness_ms=config.allowed_lateness_ms
         )
         self.trade_queue: "asyncio.Queue[Trade]" = asyncio.Queue(maxsize=200_000)
-        self.metric_queue: "asyncio.Queue[MetricScope]" = asyncio.Queue(
-            maxsize=10_000
-        )
+        self.metric_queue: "asyncio.Queue[MetricScope]" = asyncio.Queue(maxsize=10_000)
         self.collectors: Dict[str, ExchangeCollector] = {
             "binance": BinanceCollector(
                 config,
@@ -216,8 +214,10 @@ class MarketDataService:
                 try:
                     await asyncio.wait_for(
                         self._stream_condition.wait_for(
-                            lambda: self.metric_scope_revisions.get(scope, -1)
-                            != last_revision
+                            lambda: (
+                                self.metric_scope_revisions.get(scope, -1)
+                                != last_revision
+                            )
                         ),
                         timeout=timeout,
                     )
@@ -272,8 +272,7 @@ class MarketDataService:
             stable_to = (stable_to // bucket_ms) * bucket_ms
             retention_floor = max(
                 0,
-                now_ms
-                - int(self.config.raw_trade_retention_hours * 60 * 60 * 1000),
+                now_ms - int(self.config.raw_trade_retention_hours * 60 * 60 * 1000),
             )
             raw_from = max(
                 resolved_from,
@@ -281,13 +280,8 @@ class MarketDataService:
                 stable_to - ((limit + 1) * bucket_ms),
             )
             raw_from = (raw_from // bucket_ms) * bucket_ms
-            if (
-                stable_to > raw_from
-                and (
-                    page is None
-                    or page.source == "timescaledb"
-                    or not page.candles
-                )
+            if stable_to > raw_from and (
+                page is None or page.source == "timescaledb" or not page.candles
             ):
                 try:
                     raw_page = await self.database.raw_trade_candle_history(
@@ -321,9 +315,7 @@ class MarketDataService:
             )
 
         next_before = (
-            page.candles[0]["openTime"]
-            if page.candles and page.has_more
-            else None
+            page.candles[0]["openTime"] if page.candles and page.has_more else None
         )
         response = {
             "exchange": exchange,
@@ -402,8 +394,7 @@ class MarketDataService:
         provisional_candles = [
             candle.to_api()
             for candle in self.aggregator.provisional()
-            if candle.exchange == exchange
-            and candle.instrument_id == instrument_id
+            if candle.exchange == exchange and candle.instrument_id == instrument_id
         ]
         live_seconds = [
             {
@@ -413,8 +404,7 @@ class MarketDataService:
                 else candle.get("status"),
             }
             for candle in [*base_candles, *provisional_candles]
-            if int(candle["openTime"]) >= from_ms
-            and int(candle["openTime"]) < to_ms
+            if int(candle["openTime"]) >= from_ms and int(candle["openTime"]) < to_ms
         ]
 
         if timeframe == "1s":
@@ -443,9 +433,7 @@ class MarketDataService:
             ]
 
         data_to = (
-            max(int(candle["closeTime"]) for candle in values)
-            if values
-            else now_ms
+            max(int(candle["closeTime"]) for candle in values) if values else now_ms
         )
         response = {
             "exchange": exchange,
@@ -495,9 +483,7 @@ class MarketDataService:
             limit=limit,
         )
         next_before = (
-            page.candles[0]["openTime"]
-            if page.candles and page.has_more
-            else None
+            page.candles[0]["openTime"] if page.candles and page.has_more else None
         )
         response = {
             "exchange": exchange,
@@ -542,15 +528,9 @@ class MarketDataService:
         first = priced[0] if priced else None
         last = priced[-1] if priced else None
         high = (
-            max(Decimal(str(candle["high"])) for candle in priced)
-            if priced
-            else None
+            max(Decimal(str(candle["high"])) for candle in priced) if priced else None
         )
-        low = (
-            min(Decimal(str(candle["low"])) for candle in priced)
-            if priced
-            else None
-        )
+        low = min(Decimal(str(candle["low"])) for candle in priced) if priced else None
         base_volume = sum(
             (Decimal(str(candle["baseVolume"])) for candle in candles),
             Decimal("0"),
@@ -943,18 +923,13 @@ class MarketDataService:
 
     def health(self, include_observability: bool = True) -> Dict[str, object]:
         collectors = {
-            name: collector.health()
-            for name, collector in self.collectors.items()
+            name: collector.health() for name, collector in self.collectors.items()
         }
         connected_count = sum(
             1 for collector in self.collectors.values() if collector.connected
         )
         payload: Dict[str, object] = {
-            "status": (
-                "ok"
-                if connected_count == len(self.collectors)
-                else "degraded"
-            ),
+            "status": ("ok" if connected_count == len(self.collectors) else "degraded"),
             "configVersion": self.config.config_version,
             "collectors": collectors,
             "pipeline": {
@@ -1152,8 +1127,7 @@ class MarketDataService:
                         if (
                             exchange == "binance"
                             and self.binance_second_backfill_hours > 0
-                            and historical_second_end_ms
-                            > historical_second_start_ms
+                            and historical_second_end_ms > historical_second_start_ms
                         ):
                             try:
                                 total_inserted_seconds += await backfill_market(
@@ -1174,9 +1148,9 @@ class MarketDataService:
                                     "insertedHistoricalSecondCandles"
                                 ] = total_inserted_seconds
                             except Exception as error:
-                                failed_markets[
-                                    f"binance-1s-backfill:{market_key}"
-                                ] = str(error)
+                                failed_markets[f"binance-1s-backfill:{market_key}"] = (
+                                    str(error)
+                                )
                         if (
                             self.second_repair_hours > 0
                             and second_end_ms > second_start_ms
@@ -1192,13 +1166,11 @@ class MarketDataService:
                                     to_ms=second_end_ms,
                                 )
                                 total_repaired += repaired_count
-                                self.recovery_status[
-                                    "repairedSecondCandles"
-                                ] = total_repaired
+                                self.recovery_status["repairedSecondCandles"] = (
+                                    total_repaired
+                                )
                             except Exception as error:
-                                failed_markets[
-                                    f"1s-repair:{market_key}"
-                                ] = str(error)
+                                failed_markets[f"1s-repair:{market_key}"] = str(error)
                         try:
                             total_inserted += await backfill_market(
                                 pool=pool,

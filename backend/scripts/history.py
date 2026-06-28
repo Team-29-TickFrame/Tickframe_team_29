@@ -68,7 +68,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--days", type=float, default=DEFAULT_DAYS)
     parser.add_argument("--timeframe", choices=sorted(INTERVAL_MS), default="1m")
-    parser.add_argument("--exchange", choices=("all", "binance", "bybit"), default="all")
+    parser.add_argument(
+        "--exchange", choices=("all", "binance", "bybit"), default="all"
+    )
     parser.add_argument("--instrument", default="all")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
     parser.add_argument("--batch-size", type=int, default=10000)
@@ -155,10 +157,7 @@ async def main() -> None:
                     f"reason={repr(error)}"
                 )
                 failures.append(failure)
-                print(
-                    "error "
-                    f"{failure}"
-                )
+                print(f"error {failure}")
                 return 0
 
     tasks = [
@@ -174,9 +173,7 @@ async def main() -> None:
             await pool.close()
 
     total_candles = sum(results)
-    print(
-        f"done total_candles={total_candles} failed_markets={len(failures)}"
-    )
+    print(f"done total_candles={total_candles} failed_markets={len(failures)}")
     if failures and not args.allow_failures:
         raise SystemExit(1)
 
@@ -226,9 +223,7 @@ async def backfill_market(
         )
 
         candles = [
-            candle
-            for candle in candles
-            if cursor <= candle.open_time_ms < end_ms
+            candle for candle in candles if cursor <= candle.open_time_ms < end_ms
         ]
 
         if not candles:
@@ -383,9 +378,7 @@ async def fetch_bybit(
     max_retries: int,
 ) -> List[HistoricalCandle]:
     if timeframe == "1s":
-        raise ValueError(
-            "Bybit Spot REST kline endpoint does not support 1s interval"
-        )
+        raise ValueError("Bybit Spot REST kline endpoint does not support 1s interval")
     query = {
         "category": "spot",
         "symbol": symbol,

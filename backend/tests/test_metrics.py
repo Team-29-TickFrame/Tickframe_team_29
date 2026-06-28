@@ -20,8 +20,10 @@ def candle(
     open_value = open_price if open_price is not None else close
     high_value = high if high is not None else close
     low_value = low if low is not None else close
-    quote = quote_volume if quote_volume is not None else str(
-        Decimal(close) * Decimal(volume)
+    quote = (
+        quote_volume
+        if quote_volume is not None
+        else str(Decimal(close) * Decimal(volume))
     )
     return {
         "exchange": "binance",
@@ -68,10 +70,7 @@ class MetricsTests(unittest.TestCase):
 
     def test_rsi_momentum_and_realized_volatility_use_rolling_windows(self) -> None:
         result = compute_metrics(
-            [
-                candle(second, close=str(100 + second))
-                for second in range(21)
-            ],
+            [candle(second, close=str(100 + second)) for second in range(21)],
             timeframe="1s",
         )
 
@@ -104,10 +103,7 @@ class MetricsTests(unittest.TestCase):
         self.assertIsNotNone(latest["distanceToMeanPct"])
 
     def test_volume_spike_produces_metric_event(self) -> None:
-        values = [
-            candle(second, close="100", volume="1")
-            for second in range(20)
-        ]
+        values = [candle(second, close="100", volume="1") for second in range(20)]
         values.append(candle(20, close="100", volume="5"))
 
         result = compute_metrics(values, timeframe="1s")
@@ -133,8 +129,18 @@ class MetricsTests(unittest.TestCase):
 
     def test_double_top_pattern_generates_event(self) -> None:
         closes = [
-            "100", "103", "107", "104", "101", "104", "107.2",
-            "103", "99", "98", "97", "96",
+            "100",
+            "103",
+            "107",
+            "104",
+            "101",
+            "104",
+            "107.2",
+            "103",
+            "99",
+            "98",
+            "97",
+            "96",
         ]
 
         result = compute_metrics(
@@ -147,10 +153,34 @@ class MetricsTests(unittest.TestCase):
 
     def test_bullish_rsi_divergence_generates_event(self) -> None:
         closes = [
-            "100", "99", "98", "97", "96", "95", "94", "93",
-            "92", "91", "90", "89", "88", "87", "86", "92",
-            "96", "99", "97", "95", "93", "91", "89", "87",
-            "85.5", "87", "89", "92",
+            "100",
+            "99",
+            "98",
+            "97",
+            "96",
+            "95",
+            "94",
+            "93",
+            "92",
+            "91",
+            "90",
+            "89",
+            "88",
+            "87",
+            "86",
+            "92",
+            "96",
+            "99",
+            "97",
+            "95",
+            "93",
+            "91",
+            "89",
+            "87",
+            "85.5",
+            "87",
+            "89",
+            "92",
         ]
 
         result = compute_metrics(
@@ -163,8 +193,7 @@ class MetricsTests(unittest.TestCase):
 
     def test_price_volume_divergence_generates_event(self) -> None:
         values = [
-            candle(second, close=str(100 + second), volume="10")
-            for second in range(15)
+            candle(second, close=str(100 + second), volume="10") for second in range(15)
         ]
         values.extend(
             [

@@ -31,7 +31,9 @@ FEATURE_NAMES = [
 ]
 
 RESAMPLED_CLOSE_POINTS = 16
-FEATURE_NAMES.extend(f"close_shape_{index:02d}" for index in range(RESAMPLED_CLOSE_POINTS))
+FEATURE_NAMES.extend(
+    f"close_shape_{index:02d}" for index in range(RESAMPLED_CLOSE_POINTS)
+)
 
 
 def extract_features(candles: Sequence[Dict[str, object]]) -> List[float]:
@@ -97,7 +99,9 @@ def extract_features(candles: Sequence[Dict[str, object]]) -> List[float]:
     return [_finite(value) for value in features]
 
 
-def feature_matrix(examples: Iterable[Sequence[Dict[str, object]]]) -> List[List[float]]:
+def feature_matrix(
+    examples: Iterable[Sequence[Dict[str, object]]],
+) -> List[List[float]]:
     return [extract_features(candles) for candles in examples]
 
 
@@ -115,23 +119,27 @@ def _pct_change(start: float, end: float) -> float:
 
 def _pct_returns(values: Sequence[float]) -> List[float]:
     return [
-        _pct_change(left, right)
-        for left, right in zip(values, values[1:])
-        if left > 0
+        _pct_change(left, right) for left, right in zip(values, values[1:]) if left > 0
     ]
 
 
-def _pivot_indices(values: Sequence[float], *, pivot_type: str, radius: int = 2) -> List[int]:
+def _pivot_indices(
+    values: Sequence[float], *, pivot_type: str, radius: int = 2
+) -> List[int]:
     pivots: List[int] = []
     for index in range(radius, len(values) - radius):
-        left = values[index - radius:index]
-        right = values[index + 1:index + radius + 1]
+        left = values[index - radius : index]
+        right = values[index + 1 : index + radius + 1]
         center = values[index]
         if pivot_type == "high":
-            if all(center > value for value in left) and all(center >= value for value in right):
+            if all(center > value for value in left) and all(
+                center >= value for value in right
+            ):
                 pivots.append(index)
         else:
-            if all(center < value for value in left) and all(center <= value for value in right):
+            if all(center < value for value in left) and all(
+                center <= value for value in right
+            ):
                 pivots.append(index)
     return pivots
 
@@ -156,7 +164,7 @@ def _double_extreme_features(
         if average <= 0:
             continue
         similarity = abs(left_value - right_value) / average * 100.0
-        between = middle_values[left + 1:right]
+        between = middle_values[left + 1 : right]
         if not between:
             continue
         if mode == "top":
@@ -172,8 +180,8 @@ def _double_extreme_features(
 def _head_and_shoulders_features(highs: Sequence[float]) -> tuple[float, float]:
     third = len(highs) // 3
     left = max(highs[:third])
-    head = max(highs[third:third * 2])
-    right = max(highs[third * 2:])
+    head = max(highs[third : third * 2])
+    right = max(highs[third * 2 :])
     shoulders = (left + right) / 2.0
     if shoulders <= 0:
         return 0.0, 100.0
@@ -182,7 +190,9 @@ def _head_and_shoulders_features(highs: Sequence[float]) -> tuple[float, float]:
     return head_height, shoulder_similarity
 
 
-def _triangle_features(highs: Sequence[float], lows: Sequence[float]) -> tuple[float, float, float]:
+def _triangle_features(
+    highs: Sequence[float], lows: Sequence[float]
+) -> tuple[float, float, float]:
     span = max(1, len(highs) - 1)
     upper_slope = _pct_change(highs[0], highs[-1]) / span * 100.0
     lower_slope = _pct_change(lows[0], lows[-1]) / span * 100.0

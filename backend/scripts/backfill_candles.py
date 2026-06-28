@@ -65,7 +65,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--days", type=float, default=DEFAULT_DAYS)
     parser.add_argument("--timeframe", choices=sorted(INTERVAL_MS), default="1m")
-    parser.add_argument("--exchange", choices=("all", "binance", "bybit"), default="all")
+    parser.add_argument(
+        "--exchange", choices=("all", "binance", "bybit"), default="all"
+    )
     parser.add_argument("--instrument", default="all")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
     parser.add_argument("--batch-size", type=int, default=1000)
@@ -88,11 +90,7 @@ async def main() -> None:
     interval_ms = INTERVAL_MS[args.timeframe]
     end_ms = align_closed_end_ms(args.until_ms, interval_ms)
     start_ms = end_ms - int(args.days * 24 * 60 * 60 * 1000)
-    exchanges = (
-        list(config.exchanges)
-        if args.exchange == "all"
-        else [args.exchange]
-    )
+    exchanges = list(config.exchanges) if args.exchange == "all" else [args.exchange]
     instruments = select_instruments(config.instruments, args.instrument)
 
     if not args.dry_run and not args.database_url:
@@ -189,9 +187,7 @@ async def backfill_market(
             continue
 
         candles = [
-            candle
-            for candle in candles
-            if cursor <= candle.open_time_ms < end_ms
+            candle for candle in candles if cursor <= candle.open_time_ms < end_ms
         ]
         if not candles:
             cursor += limit * interval_ms
@@ -340,9 +336,7 @@ async def fetch_bybit(
     max_retries: int,
 ) -> List[HistoricalCandle]:
     if timeframe == "1s":
-        raise ValueError(
-            "Bybit Spot REST kline endpoint does not support 1s interval"
-        )
+        raise ValueError("Bybit Spot REST kline endpoint does not support 1s interval")
     query = {
         "category": "spot",
         "symbol": symbol,
@@ -597,8 +591,7 @@ def select_instruments(
     selected = [
         instrument
         for instrument in values
-        if instrument.instrument_id == requested
-        or instrument.base == requested
+        if instrument.instrument_id == requested or instrument.base == requested
     ]
     if not selected:
         raise SystemExit(f"Unknown instrument: {requested}")

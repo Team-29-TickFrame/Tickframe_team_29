@@ -37,10 +37,7 @@ def compute_metrics(
     closes = [_decimal_or_none(candle.get("close")) for candle in ordered]
     highs = [_decimal_or_none(candle.get("high")) for candle in ordered]
     lows = [_decimal_or_none(candle.get("low")) for candle in ordered]
-    volumes = [
-        _decimal_or_zero(candle.get("baseVolume"))
-        for candle in ordered
-    ]
+    volumes = [_decimal_or_zero(candle.get("baseVolume")) for candle in ordered]
 
     cumulative_base = Decimal("0")
     cumulative_quote = Decimal("0")
@@ -60,11 +57,7 @@ def compute_metrics(
         log_return = _log_return(previous_close, close)
         log_returns.append(log_return)
 
-        vwap = (
-            cumulative_quote / cumulative_base
-            if cumulative_base > 0
-            else None
-        )
+        vwap = cumulative_quote / cumulative_base if cumulative_base > 0 else None
         realized_volatility = _realized_volatility(
             log_returns,
             index,
@@ -114,9 +107,7 @@ def compute_metrics(
                 "vwapDeviationPct": _round_or_none(vwap_deviation),
                 "realizedVolatilityPct": _round_or_none(realized_volatility),
                 "parkinsonVolatilityPct": _round_or_none(parkinson_volatility),
-                "garmanKlassVolatilityPct": _round_or_none(
-                    garman_klass_volatility
-                ),
+                "garmanKlassVolatilityPct": _round_or_none(garman_klass_volatility),
                 "rsi": _round_or_none(rsi),
                 "shortMomentumPct": _round_or_none(short_momentum),
                 "momentumPct": _round_or_none(momentum),
@@ -126,9 +117,7 @@ def compute_metrics(
                 "distanceToMeanPct": _round_or_none(
                     mean_reversion["distance_pct"] if mean_reversion else None
                 ),
-                "priceVolumeDivergencePct": _round_or_none(
-                    price_volume_divergence
-                ),
+                "priceVolumeDivergencePct": _round_or_none(price_volume_divergence),
                 "volumeSpikeRatio": _round_or_none(volume_spike),
                 "baseVolume": _float_or_none(volume),
                 "tradeCount": int(candle.get("tradeCount", 0)),
@@ -275,9 +264,7 @@ def metric_events(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                     value=mean_reversion,
                     threshold=MEAN_REVERSION_Z_THRESHOLD,
                     confidence=min(0.98, 0.52 + abs(mean_reversion) / 8),
-                    description=(
-                        f"Close is stretched {direction} its rolling mean."
-                    ),
+                    description=(f"Close is stretched {direction} its rolling mean."),
                 )
             )
 
@@ -458,8 +445,8 @@ def _pivot_indices(
         center = values[index]
         if center is None:
             continue
-        left = values[index - PIVOT_RADIUS:index]
-        right = values[index + 1:index + PIVOT_RADIUS + 1]
+        left = values[index - PIVOT_RADIUS : index]
+        right = values[index + 1 : index + PIVOT_RADIUS + 1]
         if any(value is None for value in [*left, *right]):
             continue
         if pivot_type == "high":
@@ -497,7 +484,7 @@ def _latest_double_pattern(
 
         middle = [
             value
-            for value in middle_values[left_index + 1:right_index]
+            for value in middle_values[left_index + 1 : right_index]
             if value is not None
         ]
         if not middle:
@@ -745,7 +732,7 @@ def _realized_volatility(
 ) -> Optional[float]:
     if index < window:
         return None
-    values = log_returns[index - window + 1:index + 1]
+    values = log_returns[index - window + 1 : index + 1]
     if any(value is None for value in values):
         return None
     return math.sqrt(sum(float(value) ** 2 for value in values)) * 100
@@ -759,8 +746,8 @@ def _parkinson_volatility(
 ) -> Optional[float]:
     if index + 1 < window:
         return None
-    high_window = highs[index - window + 1:index + 1]
-    low_window = lows[index - window + 1:index + 1]
+    high_window = highs[index - window + 1 : index + 1]
+    low_window = lows[index - window + 1 : index + 1]
     terms: List[float] = []
     for high, low in zip(high_window, low_window):
         if high is None or low is None or high <= 0 or low <= 0:
@@ -784,10 +771,10 @@ def _garman_klass_volatility(
         return None
     values: List[float] = []
     for open_, high, low, close in zip(
-        opens[index - window + 1:index + 1],
-        highs[index - window + 1:index + 1],
-        lows[index - window + 1:index + 1],
-        closes[index - window + 1:index + 1],
+        opens[index - window + 1 : index + 1],
+        highs[index - window + 1 : index + 1],
+        lows[index - window + 1 : index + 1],
+        closes[index - window + 1 : index + 1],
     ):
         if None in (open_, high, low, close):
             return None
@@ -799,10 +786,7 @@ def _garman_klass_volatility(
             return None
         high_low = math.log(float(high / low))
         close_open = math.log(float(close / open_))
-        values.append(
-            0.5 * high_low ** 2
-            - (2 * math.log(2) - 1) * close_open ** 2
-        )
+        values.append(0.5 * high_low**2 - (2 * math.log(2) - 1) * close_open**2)
     if not values:
         return None
     variance = sum(values) / len(values)
@@ -816,7 +800,7 @@ def _rsi(
 ) -> Optional[float]:
     if index < period:
         return None
-    values = closes[index - period:index + 1]
+    values = closes[index - period : index + 1]
     if any(value is None for value in values):
         return None
 
@@ -863,7 +847,7 @@ def _mean_reversion(
     current = closes[index]
     if current is None:
         return None
-    values = closes[index - window + 1:index + 1]
+    values = closes[index - window + 1 : index + 1]
     if any(value is None for value in values):
         return None
     numeric_values = [float(value) for value in values if value is not None]
@@ -922,7 +906,7 @@ def _volume_spike_ratio(
 ) -> Optional[float]:
     if index < window:
         return None
-    baseline_values = volumes[index - window:index]
+    baseline_values = volumes[index - window : index]
     baseline = sum(baseline_values, Decimal("0")) / Decimal(window)
     if baseline <= 0:
         return None
