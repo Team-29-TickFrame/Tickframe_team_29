@@ -31,7 +31,7 @@ jobs:
       - name: Check Markdown links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --root-dir "${{ github.workspace }}" --verbose --no-progress './**/*.md'
+          args: --config lychee.toml --root-dir "${{ github.workspace }}" --verbose --no-progress './**/*.md'
           format: markdown
           output: lychee-report.md
           fail: true

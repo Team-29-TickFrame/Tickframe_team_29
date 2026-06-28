@@ -22,3 +22,8 @@ exclude = [
   "^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
   "^wss?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
 ]
+
+# Generated dependency folders are not repository documentation.
+exclude_path = [
+  "(^|/)node_modules/",
+]
