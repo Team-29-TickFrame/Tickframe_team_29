@@ -19,13 +19,11 @@ verbose = "info"
 # Add excluded URLs only when they are authenticated, rate-limited,
 # unstable, or otherwise unsuitable for automated checking.
 exclude = [
+  "^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
+  "^wss?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
 ]
 
 # Generated dependency folders are not repository documentation.
 exclude_path = [
   "(^|/)node_modules/",
 ]
-
-# Local demo endpoints are only reachable when the Tickframe stack is running.
-# Keep public external links checked while skipping localhost/127.0.0.1 in CI.
-exclude_loopback = true
