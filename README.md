@@ -10,7 +10,7 @@ synthetic price or candle.
 
 
 ## VM deployment
-http://10.93.26.194:4173/
+http://10.93.26.194:4173/    
 
 ## Current Scope
 
