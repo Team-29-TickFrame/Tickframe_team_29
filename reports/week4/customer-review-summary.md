@@ -14,8 +14,7 @@
   Moodle/instructor submission.
 - No private recording link, exact timecode, credential, or
   customer-identifying detail is included in the public repository.
-- A public sanitized transcript is not committed in this repository; this
-  public summary preserves the inspectable decisions and feedback.
+
 
 Private recording links, exact timecodes, credentials, and customer-identifying details must not be committed to the public repository.
 

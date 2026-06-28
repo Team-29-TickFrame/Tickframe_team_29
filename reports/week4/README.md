@@ -114,7 +114,7 @@ with documented equivalent-or-stronger checks.
 
 | Item | Evidence |
 |---|---|
-| Assignment 4 SemVer release | Planned mapped release: `v1.1.0` from protected `main` after the release PR is merged |
+| Assignment 4 SemVer release |[Release v1.1.0](https://github.com/Team-29-TickFrame/Tickframe_team_29/releases/tag/v1.1.0)|
 | Release PBI | [#103](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/103) |
 | Changelog release section | [`CHANGELOG.md`](../../CHANGELOG.md#110---2026-06-28) |
 | Public sanitized demo video | [Assignment 4 public sanitized demo video](https://drive.google.com/file/d/1ahjdhVmqtTwQGNlQL4ws52GUQzI3yl7o/view?usp=sharing) for [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) |
@@ -170,12 +170,3 @@ The Tickframe MVP v2 is fully functional and provides:
 - Automated testing and CI quality gates
 
 The current increment has successfully passed customer review and UAT.
-
-Next steps:
-
-- Merge the release-evidence PR after review and confirm the protected
-  default-branch Quality run is green.
-- Publish `v1.1.0` from protected `main`.
-- Keep the public sanitized demo video link available as part of the `v1.1.0`
-  release evidence.
-- Submit private Sprint Review and UAT recording links, exact timecodes, credentials, and instructor-only evidence through Moodle. The sanitized customer review transcript is available in the public repository.
