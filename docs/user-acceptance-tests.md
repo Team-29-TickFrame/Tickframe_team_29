@@ -10,9 +10,9 @@ Private recording links, exact timecodes, credentials, and customer-identifying 
 
 | ID | Scenario | Status | Related scope | Last execution |
 |---|---|---|---|---|
-| UAT-001 | Open the product and inspect the main dashboard | Active | MVP v2 / Sprint 2 | Pending Week 4 customer session |
-| UAT-002 | Inspect market metrics and analytics output | Active | MVP v2 / Sprint 2 | Pending Week 4 customer session |
-| UAT-003 | Check latency or system health information | Active | MVP v2 / Sprint 2 | Pending Week 4 customer session |
+| UAT-001 | Open the product and inspect the main dashboard | Active | MVP v2 / Sprint 2 | Passed on 2026-06-27 |
+| UAT-002 | Inspect market metrics and analytics output | Active | MVP v2 / Sprint 2 | Passed on 2026-06-27 |
+| UAT-003 | Check latency or system health information | Active | MVP v2 / Sprint 2 | Passed on 2026-06-27 |
 
 ## UAT-001: Open the product and inspect the main dashboard
 
@@ -32,7 +32,7 @@ The customer can open the product and understand the main dashboard without deve
 ### Execution history
 | Date | Executor | Result | Notes |
 |---|---|---|---|
-| Week 4 customer session | Customer | Pending | To be executed during customer review/UAT call |
+| 2026-06-27 | Customer/stakeholder with team guidance | Passed | The main Tickframe Analytics dashboard opened successfully and was understandable during the demonstration. |
 
 ## UAT-002: Inspect market metrics and analytics output
 
@@ -52,7 +52,7 @@ The customer can inspect the analytics output and provide feedback on usefulness
 ### Execution history
 | Date | Executor | Result | Notes |
 |---|---|---|---|
-| Week 4 customer session | Customer | Pending | To be executed during customer review/UAT call |
+| 2026-06-27 | Customer/stakeholder with team guidance | Passed | Market data, chart output, ML pattern panel, and metric events were demonstrated successfully. The customer/stakeholder approved the flow. |
 
 ## UAT-003: Check real-time data availability
 

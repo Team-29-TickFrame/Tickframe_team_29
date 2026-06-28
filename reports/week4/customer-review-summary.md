@@ -8,11 +8,14 @@
 - Sprint: Sprint 2
 - MVP version: MVP v2
 
-## Permission Decisions
+## Permission and Privacy Decisions
 
-- Recording permission before recording started: To be confirmed before the session
-- Public sanitized transcript permission: To be confirmed before or during the session
-- Private instructor sharing permission: To be confirmed before or during the session
+- The customer session recording and exact timecodes are private evidence for
+  Moodle/instructor submission.
+- No private recording link, exact timecode, credential, or
+  customer-identifying detail is included in the public repository.
+- A public sanitized transcript is not committed in this repository; this
+  public summary preserves the inspectable decisions and feedback.
 
 Private recording links, exact timecodes, credentials, and customer-identifying details must not be committed to the public repository.
 
@@ -49,8 +52,6 @@ The customer/stakeholder approved the demonstrated Sprint 2 increment and UAT fl
 ## Resulting Backlog Updates
 
 No new public follow-up PBI was required based on the approved UAT scenarios. The team will continue maintaining real-time data visibility, analytics clarity, and quality gates in later Sprint work.
-
-## Risks and Follow-Up Actions
 
 ## Risks and Follow-Up Actions
 

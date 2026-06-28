@@ -15,16 +15,16 @@ Tickframe. The QRT set verifies the quality requirements in
 
 ## Sprint Scope and Quality Model
 
-- **Sprint scope:** Sprint 2 / MVP v2, PB-29 / issue #107, Assignment 4 Part 4.
-- **Selected quality model:** ISO/IEC 25010.
-- **Selected sub-characteristics:** Time behaviour, Fault tolerance, and
+- Sprint scope: Sprint 2 / MVP v2, PB-29 / issue #107, Assignment 4 Part 4.
+- Selected quality model: ISO/IEC 25010.
+- Selected sub-characteristics: Time behaviour, Fault tolerance, and
   Testability.
-- **Automated CI entry point:** the
+- Automated CI entry point: the
   [`Quality` workflow](../.github/workflows/quality.yml) runs
   `coverage run --source=backend.app,ml.pattern_recognition -m unittest discover -s backend/tests`,
   then generates `coverage.json` and runs
   `python backend/scripts/check_critical_coverage.py coverage.json`.
-- **Evidence location:** latest protected-branch or pull-request run of the
+- Evidence location: latest protected-branch or pull-request run of the
   [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml),
   with the `backend-coverage` artifact when coverage evidence is needed.
 

@@ -50,10 +50,10 @@ workflow for team delivery.
   - [US-10](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/38)
   - [US-11](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/39)
   - [US-12](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/40)
-  - [PB-21] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/96)
-  - [PB-22] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/97)
-  - [PB-23] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/98)
-  - [PB-24] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/99)
+  - [PB-21](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/96)
+  - [PB-22](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/97)
+  - [PB-23](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/98)
+  - [PB-24](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/99)
   - Sprint 2 customer feedback PBIs
   - Sprint 2 deployment and release PBIs
   - Sprint 2 testing, UAT, and reporting PBIs
