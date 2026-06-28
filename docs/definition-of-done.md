@@ -25,7 +25,7 @@ Tickframe work may be marked `Done` only when all of the following are true:
     * backend automated tests and coverage checks;
     * automated Quality Requirement Tests;
     * critical-module coverage validation;
-    * additional QA checks, including Gitleaks secret scanning.
+    * additional QA checks, including Ruff datetime-safety check.
 
 Additional team rules:
 
