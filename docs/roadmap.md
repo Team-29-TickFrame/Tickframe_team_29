@@ -50,3 +50,25 @@ workflow for team delivery.
   - [US-10](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/38)
   - [US-11](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/39)
   - [US-12](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/40)
+  - [PB-21] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/96)
+  - [PB-22] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/97)
+  - [PB-23] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/98)
+  - [PB-24] (https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/99)
+  - Sprint 2 customer feedback PBIs
+  - Sprint 2 deployment and release PBIs
+  - Sprint 2 testing, UAT, and reporting PBIs
+    
+## Sprint 3 (Planned)
+
+- Milestone: To be created
+- Dates: TBD
+- Sprint Goal: Expand analytical capabilities while maintaining established quality and automation standards.
+- Focus: Advanced market analytics, anomaly detection improvements, architecture documentation, and continued quality automation.
+- Expected outcome: More advanced market intelligence features supported by maintainable architecture, automated verification, and documented quality guarantees.
+
+## Roadmap Notes
+
+- Sprint milestones are used as the authoritative Sprint planning containers.
+- SemVer releases are tracked separately from Sprint milestones.
+- Quality requirements, quality requirement tests, CI quality gates, coverage requirements, and Definition of Done rules introduced in Assignment 4 remain active project assets and continue to apply in future Sprints.
+- Sprint contents may evolve based on customer feedback, Sprint Review outcomes, backlog refinement, quality risks, and implementation findings.  
