@@ -59,7 +59,7 @@ Access and run evidence:
 | MVP v1 review needed clearer live-data availability and deployment evidence. | [#92](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/92), [#93](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/93) | Done in Sprint 2 | Reduced chart latency, added latency diagnostics, and exposed observability metrics/dashboard evidence. |
 | Customer/stakeholder needed the analytics flow to remain understandable during review. | [#100](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/100), [#101](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/101) | Done in Sprint 2 | Executed and summarized UAT/customer review evidence with sanitized public results. |
 | Pattern detection direction remained important but needed a safer foundation. | [#94](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/94) | Done in Sprint 2 | Added a synthetic baseline training pipeline and safe experimental ML endpoint behavior. |
-| Public sanitized demo video is required for Assignment 4 release evidence. | [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) | Tracked separately | Demo video will be added later by the owner of #111 and is not included in this release-evidence PR. |
+| Public sanitized demo video is required for Assignment 4 release evidence. | [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) | Done in Sprint 2 | Added the public sanitized demo link to this report and the mapped `v1.1.0` release evidence. |
 
 No additional public follow-up PBI was required from the three passed UAT
 scenarios. Private access details, recordings, and timecodes are Moodle-only.
@@ -113,7 +113,7 @@ with documented equivalent-or-stronger checks.
 | Assignment 4 SemVer release | Planned mapped release: `v1.1.0` from protected `main` after the release PR is merged |
 | Release PBI | [#103](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/103) |
 | Changelog release section | [`CHANGELOG.md`](../../CHANGELOG.md#110---2026-06-28) |
-| Public sanitized demo video | Tracked separately by [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) |
+| Public sanitized demo video | [Assignment 4 public sanitized demo video](https://drive.google.com/file/d/1ahjdhVmqtTwQGNlQL4ws52GUQzI3yl7o/view?usp=sharing) for [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) |
 
 The final `v1.1.0` release description must identify the Assignment 4 Sprint
 increment, link [Sprint 2](https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/2),
@@ -166,7 +166,7 @@ Next steps:
 - Merge the release-evidence PR after review and confirm the protected
   default-branch Quality run is green.
 - Publish `v1.1.0` from protected `main`.
-- Add the public sanitized demo video link later through the separate #111
-  evidence flow.
+- Keep the public sanitized demo video link available as part of the `v1.1.0`
+  release evidence.
 - Submit private Sprint Review/UAT recording links, timecodes, credentials, and
   rehearsed presentation video through Moodle only.
