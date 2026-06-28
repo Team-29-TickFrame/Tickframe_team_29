@@ -4,11 +4,6 @@
 
 **Tickframe** is a real-time cryptocurrency market analytics platform that provides live Binance and Bybit market monitoring, historical chart visualization, latency diagnostics, and experimental ML-based pattern recognition.
 
-This report is the public Assignment 4 submission index. Private recordings,
-exact timecodes, credentials, university emails, and customer-identifying
-evidence are intentionally excluded from the public repository and must be
-submitted only through Moodle/private instructor channels.
-
 ## Sprint Scope
 
 | Item | Evidence |
@@ -66,8 +61,6 @@ The Assignment 4 Sprint produced a stable MVP v2 increment that satisfies the Sp
 | Pattern detection direction remained important but needed a safer foundation. | [#94](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/94) | Done in Sprint 2 | Added a synthetic baseline training pipeline and safe experimental ML endpoint behavior. |
 | Public sanitized demo video is required for Assignment 4 release evidence. | [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) | Done in Sprint 2 | Added the public sanitized demo link to this report and the mapped `v1.1.0` release evidence. |
 
-No additional public follow-up PBI was required from the three passed UAT
-scenarios. Private access details, recordings, and timecodes are Moodle-only.
 
 ## Maintained Project Assets
 
@@ -89,27 +82,21 @@ and Testability (`QR-003`).
 
 | Evidence item | Link or location | Status |
 |---|---|---|
-| Unit tests | [`backend/tests`](../../backend/tests) | 69 tests passing locally on 2026-06-28 |
-| Integration tests | [`backend/tests/test_service_history.py`](../../backend/tests/test_service_history.py), [`backend/tests/test_database_history.py`](../../backend/tests/test_database_history.py), [`backend/tests/test_api_patterns.py`](../../backend/tests/test_api_patterns.py) | Passing locally on 2026-06-28 |
-| Automated QRTs | [`docs/quality-requirement-tests.md`](../../docs/quality-requirement-tests.md) and [`backend/tests/test_quality_requirements.py`](../../backend/tests/test_quality_requirements.py) | Passing locally through backend tests and coverage gate |
-| Critical-module coverage | [`docs/testing.md`](../../docs/testing.md#critical-modules-and-coverage-status) | All 10 critical modules pass the 30% gate; global measured coverage is 66% |
-| Quality CI pipeline | [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) | Runs on pull requests, pushes to `main`, and manual dispatch |
-| Latest protected-branch quality run | [Quality workflow runs](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) | Must be green after the release-evidence PR merges |
-| Link-check CI pipeline | [Links workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml) | Runs on Markdown/link-check changes in pull requests and pushes to `main` |
-| CI configuration | [`.github/workflows/quality.yml`](../../.github/workflows/quality.yml) | Backend lint/format/tests/coverage, frontend typecheck/build, and datetime-safety additional QA |
-| Link-check configuration | [`.github/workflows/links.yml`](../../.github/workflows/links.yml), [`github/workflows/links.yml`](../../github/workflows/links.yml), and [`lychee.toml`](../../lychee.toml) | Lychee checks repository Markdown links |
-| Link-check exclusions | [`docs/link-check-exclusions.md`](../../docs/link-check-exclusions.md) | Documents local URL exclusions for Lychee |
-| Branch protection or rules evidence | located in the folder images | exists |
-| Additional QA check | `ruff check --select DTZ backend/app ml/pattern_recognition` | Passing locally on 2026-06-28; runs in the Quality workflow |
+| Unit tests | [`backend/tests`](../../backend/tests) | ![Backend tests and coverage](images/backend-tests-coverage.png) |
+| Integration tests | [`backend/tests/test_service_history.py`](../../backend/tests/test_service_history.py), [`backend/tests/test_database_history.py`](../../backend/tests/test_database_history.py), [`backend/tests/test_api_patterns.py`](../../backend/tests/test_api_patterns.py) |![Backend tests and coverage](images/backend-tests-coverage.png)|
+| Automated QRTs | [`docs/quality-requirement-tests.md`](../../docs/quality-requirement-tests.md) and [`backend/tests/test_quality_requirements.py`](../../backend/tests/test_quality_requirements.py) | ![Backend tests and coverage](images/backend-tests-coverage.png) |
+| Critical-module coverage | [`docs/testing.md`](../../docs/testing.md#critical-modules-and-coverage-status) | ![Backend tests and coverage](images/backend-tests-coverage.png) |
+| Quality CI pipeline | [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) |![Latest Quality CI run](images/ci-run.png)|
+| Latest protected-branch quality run | [Quality workflow runs](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) |![Latest Quality CI run](images/ci-run.png)|
+| Link-check CI pipeline | [Links workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml) | ![Latest Lychee run](images/latest-lychee-run.png) |
+| CI configuration | [`.github/workflows/quality.yml`](../../.github/workflows/quality.yml) |![Latest Quality CI run](images/ci-run.png)|
+| Link-check configuration | [`.github/workflows/links.yml`](../../.github/workflows/links.yml), [`github/workflows/links.yml`](../../github/workflows/links.yml), and [`lychee.toml`](../../lychee.toml) | [`lychee.toml`](../../lychee.toml) |
+| Link-check exclusions | [`docs/link-check-exclusions.md`](../../docs/link-check-exclusions.md) |  [`docs/link-check-exclusions.md`](../../docs/link-check-exclusions.md)|
+| Branch protection or rules evidence |  ![Main branch protection rule](images/main_protection_rule.png)| ![Main branch protection rule](images/main_protection_rule.png) |
+| Additional QA check | `ruff check --select DTZ backend/app ml/pattern_recognition` | ![Additional QA check](images/additional-qa.png)
+ |
 
-The additional QA check protects timestamp handling by detecting naive datetime
-anti-patterns in backend and ML source. This risk matters because Tickframe's
-latency, history windows, observability evidence, and market-data correctness
-depend on consistent time handling.
 
-The Assignment 4 tests, CI checks, QRTs, coverage gate, and Definition of Done
-remain active project assets. Later work must keep them passing or replace them
-with documented equivalent-or-stronger checks.
 
 ## Release Evidence
 
@@ -120,9 +107,6 @@ with documented equivalent-or-stronger checks.
 | Changelog release section | [`CHANGELOG.md`](../../CHANGELOG.md#110---2026-06-28) |
 | Public sanitized demo video | [Assignment 4 public sanitized demo video](https://drive.google.com/file/d/1ahjdhVmqtTwQGNlQL4ws52GUQzI3yl7o/view?usp=sharing) for [#111](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/111) |
 
-The final `v1.1.0` release description must identify the Assignment 4 Sprint
-increment, link [Sprint 2](https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/2),
-and link current run instructions.
 
 ## UAT and Customer Review
 
@@ -132,7 +116,6 @@ and link current run instructions.
 | Public sanitized UAT result | UAT-001, UAT-002, and UAT-003 passed on 2026-06-27 |
 | Customer review summary | [`reports/week4/customer-review-summary.md`](customer-review-summary.md) |
 | Public transcript | [`reports/week4/customer-review-transcript.md`](customer-review-transcript.md) |
-The customer permitted publication of a sanitized English transcript. The transcript is available in the public repository, while the original meeting recording and exact timecodes remain private and are submitted only through Moodle.
 
 ## Reflection, Retro, and LLM Use
 
