@@ -42,6 +42,7 @@ policy. Old second candles are compressed automatically.
 
 - Current user-story index: [docs/user-stories.md](docs/user-stories.md)
 - Current roadmap: [docs/roadmap.md](docs/roadmap.md)
+- Hosted documentation site: <https://team-29-tickframe.github.io/Tickframe_team_29/>
 - Definition of Done: [docs/definition-of-done.md](docs/definition-of-done.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Issue forms: [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/)
