@@ -1,0 +1,71 @@
+name: Documentation Site
+
+on:
+  pull_request:
+    paths:
+      - "docs-site/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs-site.yml"
+      - "README.md"
+      - "reports/week5/README.md"
+      - "docs/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs-site/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs-site.yml"
+      - "README.md"
+      - "reports/week5/README.md"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build documentation site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install MkDocs
+        run: python -m pip install "mkdocs==1.6.1"
+
+      - name: Build site
+        run: mkdocs build --strict --site-dir _site
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy documentation site
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
