@@ -14,7 +14,8 @@ project uses [Semantic Versioning](https://semver.org/).
 - No entries yet.
 
 ### Fixed
-- No entries yet.
+- Stopped subscribing to unavailable Binance `TONUSDT` and renamed the Bybit
+  market to canonical `GRAM-USDT` for issue #178.
 
 ### Removed
 - No entries yet.

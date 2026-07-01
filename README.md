@@ -11,7 +11,8 @@ synthetic price or candle.
 
 ## Current Scope
 
-- 10 USDT instruments: BTC, ETH, SOL, XRP, AVAX, TON, TRX, BONK, PENGU, FLOKI
+- 10 canonical USDT instruments: BTC, ETH, SOL, XRP, AVAX, GRAM, TRX, BONK,
+  PENGU, FLOKI; exchange support is explicit per instrument
 - Public Binance and Bybit WebSocket collectors
 - Event-time `1s` OHLCV with gaps and late-trade revisions
 - TimescaleDB history with stable delayed `1s`, `5s`, `15s` raw-trade
@@ -115,6 +116,11 @@ TICKFRAME_BINANCE_1S_BACKFILL_HOURS=24h
 TICKFRAME_SECOND_REPAIR_HOURS=72h
 TICKFRAME_STABLE_CHART_DELAY_MS=2000
 ```
+
+The maintained market config may omit an exchange symbol when that venue has no
+active Spot market. For example, the canonical `GRAM-USDT` instrument currently
+uses Bybit's `GRAMUSDT` Spot symbol and does not subscribe to Binance while
+Binance reports the old `TONUSDT` market as unavailable.
 
 After backend startup or exchange reconnection, Tickframe automatically
 backfills recent public `1m` OHLCV into `historical_candles` so chart windows do

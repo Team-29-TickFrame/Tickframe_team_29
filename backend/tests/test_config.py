@@ -9,9 +9,13 @@ class ConfigTests(unittest.TestCase):
     def test_exchange_support_matrix_is_explicit(self) -> None:
         config = load_config()
 
-        self.assertTrue(config.supports_instrument("binance", "TON-USDT"))
-        self.assertTrue(config.supports_instrument("bybit", "TON-USDT"))
+        self.assertFalse(config.supports_instrument("binance", "GRAM-USDT"))
+        self.assertTrue(config.supports_instrument("bybit", "GRAM-USDT"))
         self.assertTrue(config.supports_instrument("bybit", "BTC-USDT"))
+        self.assertEqual(
+            config.instrument_by_exchange_symbol("bybit", "GRAMUSDT").instrument_id,
+            "GRAM-USDT",
+        )
 
     def test_default_websocket_endpoint_fallbacks_are_configured(self) -> None:
         with temporary_env(

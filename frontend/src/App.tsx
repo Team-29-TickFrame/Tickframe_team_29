@@ -135,7 +135,6 @@ const COIN_LOGO_SYMBOLS = new Set([
   "SOL",
   "XRP",
   "AVAX",
-  "TON",
   "TRX",
   "BONK",
   "PENGU",
