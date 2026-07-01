@@ -46,6 +46,7 @@ policy. Old second candles are compressed automatically.
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Issue forms: [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/)
 - PR template: [.github/pull_request_template.md](.github/pull_request_template.md)
+- Development process and configuration management: [docs/development-process.md](docs/development-process.md)
 
 ## Run the Complete Product
 
