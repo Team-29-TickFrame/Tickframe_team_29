@@ -5,7 +5,7 @@
   "timeframe": "1m",
   "windowSize": 96,
   "datasetPath": "data/ml/pattern_recognition/binance-public-spot-1m/prepared/features.jsonl",
-  "maxExamplesPerClass": 3000,
+  "maxExamplesPerClass": 10000,
   "testFraction": 0.2,
   "confidenceThreshold": 0.65,
   "symbols": [

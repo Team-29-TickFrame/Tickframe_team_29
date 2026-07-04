@@ -74,6 +74,7 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["candleCount"], WINDOW_SIZE)
         self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
         self.assertIsNotNone(result["prediction"])
+        self.assertIn("ruleBased", result)
 
 
 if __name__ == "__main__":

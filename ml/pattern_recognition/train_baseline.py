@@ -199,14 +199,13 @@ def load_balanced_dataset(
 ) -> List[FeatureExample]:
     loaded = load_feature_dataset(path, labels=labels)
     by_label: Dict[str, List[FeatureExample]] = {}
-    for example in sorted(loaded, key=lambda item: (item.label, item.open_time)):
-        label_examples = by_label.setdefault(example.label, [])
-        if len(label_examples) < max_examples_per_class:
-            label_examples.append(example)
+    for example in loaded:
+        by_label.setdefault(example.label, []).append(example)
 
     examples: List[FeatureExample] = []
     for label in labels:
-        examples.extend(by_label.get(label, []))
+        ordered = sorted(by_label.get(label, []), key=lambda item: item.open_time)
+        examples.extend(evenly_sample(ordered, max_examples_per_class))
     if not examples:
         raise ValueError(f"No examples were loaded from {path}.")
     return examples
@@ -229,6 +228,26 @@ def chronological_stratified_split(
         train.extend(ordered[:-test_count])
         test.extend(ordered[-test_count:])
     return train, test
+
+
+def evenly_sample(
+    examples: Sequence[FeatureExample], limit: int
+) -> List[FeatureExample]:
+    if len(examples) <= limit:
+        return list(examples)
+    if limit <= 1:
+        return [examples[-1]]
+
+    last_index = len(examples) - 1
+    selected: List[FeatureExample] = []
+    seen_indices = set()
+    for index in range(limit):
+        source_index = round(index * last_index / (limit - 1))
+        if source_index in seen_indices:
+            continue
+        selected.append(examples[source_index])
+        seen_indices.add(source_index)
+    return selected
 
 
 def write_json(path: Path, payload: object) -> None:

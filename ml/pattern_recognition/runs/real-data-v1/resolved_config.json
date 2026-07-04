@@ -17,7 +17,7 @@
     "double_bottom",
     "none"
   ],
-  "maxExamplesPerClass": 3000,
+  "maxExamplesPerClass": 10000,
   "outputDir": "ml/pattern_recognition/runs/real-data-v1",
   "seed": 42,
   "symbols": [

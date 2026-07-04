@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.app.pattern_ml import PatternMLDetector
-from ml.pattern_recognition import WINDOW_SIZE
+from ml.pattern_recognition import PATTERN_MODEL_VERSION, WINDOW_SIZE
 from ml.pattern_recognition.features import FEATURE_NAMES, extract_features
 from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
 
@@ -118,6 +118,8 @@ class PatternMLDetectorTests(unittest.TestCase):
         self.assertEqual(result["candleCount"], WINDOW_SIZE)
         self.assertEqual(result["dataFrom"], 0)
         self.assertEqual(result["dataTo"], WINDOW_SIZE * 60_000)
+        self.assertEqual(result["ruleBased"]["label"], "double_top")
+        self.assertGreater(len(result["ruleBased"]["anchors"]), 0)
 
     def test_model_unavailable_is_non_crashing_status(self) -> None:
         detector = PatternMLDetector(model_path=Path("missing-model.json"))
@@ -155,6 +157,13 @@ class PatternMLDetectorTests(unittest.TestCase):
 
 
 class PatternMLArtifactTests(unittest.TestCase):
+    def test_default_real_data_model_artifact_loads(self) -> None:
+        detector = PatternMLDetector()
+
+        self.assertIn("real-data-v1", str(detector.model_path))
+        self.assertIsNotNone(detector._load_model())
+        self.assertIsNone(detector._load_error)
+
     def test_detector_accepts_absolute_model_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temporary_model = Path(directory) / "model.json"
@@ -171,6 +180,7 @@ class PatternMLArtifactTests(unittest.TestCase):
 
         self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
         self.assertIsNotNone(result["prediction"])
+        self.assertEqual(result["modelVersion"], PATTERN_MODEL_VERSION)
 
 
 def _interpolate(points: list[tuple[float, float]], length: int) -> list[float]:

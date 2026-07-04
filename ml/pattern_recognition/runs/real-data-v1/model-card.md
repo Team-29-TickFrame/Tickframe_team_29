@@ -28,15 +28,15 @@ learned from weak-labeled real Binance public market data.
 
 - Dataset version: `binance-public-spot-1m-weak-labels-v1`
 - Dataset path: `data/ml/pattern_recognition/binance-public-spot-1m/prepared/features.jsonl`
-- Generated at: `2026-07-03T10:55:29.841673+00:00`
-- Total examples: `18000`
-- Train examples: `14400`
-- Test examples: `3600`
+- Generated at: `2026-07-04T14:33:50.493885+00:00`
+- Total examples: `49506`
+- Train examples: `39605`
+- Test examples: `9901`
 
 ## Evaluation
 
-- Accuracy: `0.503611`
-- Macro F1: `0.431362`
+- Accuracy: `0.338956`
+- Macro F1: `0.30026`
 
 See `metrics.json` and `confusion_matrix.json` for the full evaluation output.
 

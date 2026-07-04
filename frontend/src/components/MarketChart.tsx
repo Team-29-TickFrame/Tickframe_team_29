@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -58,6 +58,10 @@ export default function MarketChart({
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const [visibleLogicalRange, setVisibleLogicalRange] = useState<{
+    from: number;
+    to: number;
+  } | null>(null);
   const lastScopeRef = useRef<string | null>(null);
   const resetPendingRef = useRef(true);
   const previousRangeRef = useRef<{
@@ -73,6 +77,10 @@ export default function MarketChart({
   });
   const latestPrice = candles.at(-1)?.close ?? 0;
   const precision = useMemo(() => pricePrecision(latestPrice), [latestPrice]);
+  const patternOverlay = useMemo(
+    () => patternOverlayGeometry(candles, visibleLogicalRange),
+    [candles, visibleLogicalRange],
+  );
 
   useEffect(() => {
     historyStateRef.current = {
@@ -182,6 +190,7 @@ export default function MarketChart({
     volumeSeriesRef.current = volumeSeries;
 
     const handleVisibleRange = (range: { from: number; to: number } | null) => {
+      setVisibleLogicalRange(range);
       if (!range || range.from > 15) return;
       const state = historyStateRef.current;
       if (state.hasMore && !state.historyLoading) {
@@ -299,6 +308,7 @@ export default function MarketChart({
     }
     renderedTimesRef.current = nextTimes;
     renderedSignaturesRef.current = nextSignatures;
+    setVisibleLogicalRange(chart.timeScale().getVisibleLogicalRange());
 
     if (resetPendingRef.current && candles.length > 0) {
       resetPendingRef.current = false;
@@ -319,6 +329,19 @@ export default function MarketChart({
   return (
     <div className="chart-stage">
       <div ref={containerRef} className="chart-canvas" />
+      {patternOverlay && (
+        <div className="chart-pattern-overlay" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line
+              className="pattern-start-line"
+              x1={patternOverlay.startX}
+              x2={patternOverlay.startX}
+              y1="0"
+              y2="100"
+            />
+          </svg>
+        </div>
+      )}
       <button
         className="chart-reset"
         type="button"
@@ -353,4 +376,28 @@ export default function MarketChart({
       )}
     </div>
   );
+}
+
+function patternOverlayGeometry(
+  candles: DisplayCandle[],
+  visibleRange: { from: number; to: number } | null,
+): { startX: number } | null {
+  if (candles.length < 96 || !visibleRange) {
+    return null;
+  }
+
+  const visibleSpan = Math.max(0.000001, visibleRange.to - visibleRange.from);
+  const startIndex = candles.length - 96;
+  const patternBoundaryIndex = startIndex - 0.5;
+  return {
+    startX: clamp(
+      ((patternBoundaryIndex - visibleRange.from) / visibleSpan) * 100,
+      -4,
+      104,
+    ),
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
