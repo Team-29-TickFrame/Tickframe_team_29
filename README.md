@@ -205,17 +205,20 @@ python3 -m unittest discover -s backend/tests
 ## ML Training Pipeline
 
 The first maintained pattern-recognition experiment lives in
-[ml/pattern_recognition](ml/pattern_recognition). It trains a synthetic `1m`
-baseline for 96-candle windows and saves reproducible model artifacts.
+[ml/pattern_recognition](ml/pattern_recognition). It prepares Binance Public
+Data `1m` candles, weak-labels 96-candle windows with rule-based chart-pattern
+detectors, and saves reproducible model artifacts.
 
 ```bash
+python -m ml.pattern_recognition.prepare_binance_dataset --config ml/pattern_recognition/config.json
 python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json
 ```
 
-The training pipeline itself is offline. The saved baseline artifact is exposed
-through the experimental `/api/v1/patterns/ml` endpoint and the dashboard ML
-pattern panel for the `1m` timeframe only. Other timeframes remain unsupported
-until separate training and validation artifacts exist for them.
+The training step itself is offline after the Binance dataset has been prepared.
+The saved baseline artifact is exposed through the experimental
+`/api/v1/patterns/ml` endpoint and the dashboard ML pattern panel for the `1m`
+timeframe only. Other timeframes remain unsupported until separate training and
+validation artifacts exist for them.
 
 ## Deployment
 

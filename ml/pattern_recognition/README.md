@@ -1,12 +1,11 @@
 # Tickframe Pattern Recognition Pipeline
 
-This folder contains the first maintained training pipeline for Tickframe ML
-chart-pattern recognition. It is intentionally offline and is not integrated
-into the live backend/frontend yet.
+This folder contains the maintained offline training pipeline for Tickframe ML
+chart-pattern recognition on real Binance public market data.
 
 ## Scope
 
-- Dataset type: synthetic OHLCV windows
+- Dataset type: Binance public spot `1m` OHLCV
 - Timeframe: `1m` only
 - Window size: `96` closed candles
 - Intended live cadence: recalculate after each newly closed `1m` candle
@@ -22,28 +21,50 @@ The current product should treat the model as available only for `1m`. Other
 timeframes are intentionally unsupported until separate training and validation
 artifacts exist.
 
+## Dataset Preparation
+
+The prepared dataset is built from Binance Public Data monthly spot kline
+archives. Each configured symbol is downloaded from its first available monthly
+archive, normalized into the Tickframe candle shape, scanned with rule-based
+weak-label detectors, and converted into feature rows.
+
+From the repository root:
+
+```bash
+python -m ml.pattern_recognition.prepare_binance_dataset --config ml/pattern_recognition/config.json
+```
+
+Local raw and prepared data are written under:
+
+```text
+data/ml/pattern_recognition/binance-public-spot-1m/
+```
+
+This directory is intentionally gitignored because it can become large.
+
 ## Model
 
 The baseline model is a dependency-free Gaussian Naive Bayes classifier. The
-pipeline converts each 96-candle window into handcrafted OHLCV shape features,
-then learns per-class feature means and variances.
-
-This is a small baseline, not a production-quality market model. Its purpose is
-to make the ML workflow reproducible:
+pipeline trains on handcrafted OHLCV shape features generated from real
+weak-labeled windows:
 
 ```text
-synthetic candles -> features -> train classifier -> evaluate -> save artifacts
+Binance public klines -> weak labels -> features -> train classifier -> evaluate -> save artifacts
 ```
+
+Weak labels are not treated as ground truth. They are reproducible candidate
+labels based on classical chart-pattern definitions and should be followed by
+manual review, cross-exchange validation, and backtesting.
 
 ## Run
 
-From the repository root:
+Prepare data first, then train:
 
 ```bash
 python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json
 ```
 
-Fast smoke check:
+Fast smoke check after preparing data:
 
 ```bash
 python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json --smoke
@@ -52,7 +73,7 @@ python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/
 The default output directory is:
 
 ```text
-ml/pattern_recognition/runs/baseline-v0/
+ml/pattern_recognition/runs/real-data-v1/
 ```
 
 Generated artifacts:
@@ -60,7 +81,7 @@ Generated artifacts:
 - `model.json` - trained classifier parameters
 - `metrics.json` - accuracy, macro F1, and per-class metrics
 - `confusion_matrix.json` - label-vs-prediction table
-- `dataset_manifest.json` - dataset version, seed, class counts, split sizes
+- `dataset_manifest.json` - dataset path, class counts, and split sizes
 - `resolved_config.json` - exact config used for the run
 - `sample_predictions.json` - small prediction sample for inspection
 - `model-card.md` - human-readable model summary and limitations

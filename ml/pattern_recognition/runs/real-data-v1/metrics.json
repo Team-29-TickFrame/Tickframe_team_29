@@ -1,0 +1,51 @@
+{
+  "accuracy": 0.503611,
+  "confidenceThreshold": 0.65,
+  "dataset": "binance-public-spot-1m-weak-labels-v1",
+  "experiment": "pattern-real-data-v1",
+  "featureCount": 38,
+  "generatedAt": "2026-07-03T10:55:29.841673+00:00",
+  "intendedInferenceCadence": "after_each_closed_1m_candle",
+  "macroF1": 0.431362,
+  "modelType": "GaussianNaiveBayesClassifier",
+  "modelVersion": "pattern-real-data-v1",
+  "perClass": {
+    "double_bottom": {
+      "f1": 0.093583,
+      "precision": 0.236486,
+      "recall": 0.058333
+    },
+    "double_top": {
+      "f1": 0.271768,
+      "precision": 0.651899,
+      "recall": 0.171667
+    },
+    "flag": {
+      "f1": 0.345013,
+      "precision": 0.901408,
+      "recall": 0.213333
+    },
+    "head_and_shoulders": {
+      "f1": 0.591083,
+      "precision": 0.478351,
+      "recall": 0.773333
+    },
+    "none": {
+      "f1": 0.6975,
+      "precision": 0.558,
+      "recall": 0.93
+    },
+    "triangle": {
+      "f1": 0.589226,
+      "precision": 0.444162,
+      "recall": 0.875
+    }
+  },
+  "supportedTimeframes": [
+    "1m"
+  ],
+  "testExamples": 3600,
+  "timeframe": "1m",
+  "trainExamples": 14400,
+  "windowSize": 96
+}

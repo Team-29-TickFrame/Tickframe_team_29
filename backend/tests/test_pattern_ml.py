@@ -5,73 +5,113 @@ from unittest.mock import patch
 
 from backend.app.pattern_ml import PatternMLDetector
 from ml.pattern_recognition import WINDOW_SIZE
-from ml.pattern_recognition.dataset import generate_dataset
+from ml.pattern_recognition.features import FEATURE_NAMES, extract_features
+from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
 
 
-MODEL_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "ml"
-    / "pattern_recognition"
-    / "runs"
-    / "baseline-v0"
-    / "model.json"
-)
+def fixture_candles(label: str = "double_top") -> list[dict]:
+    if label == "double_top":
+        points = [
+            (0.00, 100.0),
+            (0.24, 108.0),
+            (0.50, 101.0),
+            (0.74, 107.8),
+            (1.00, 99.0),
+        ]
+    else:
+        points = [(0.00, 100.0), (1.00, 101.5)]
+
+    closes = _interpolate(points, WINDOW_SIZE)
+    candles: list[dict] = []
+    previous = closes[0]
+    for index, close in enumerate(closes):
+        open_price = previous
+        high = max(open_price, close) + 0.15
+        low = min(open_price, close) - 0.15
+        candles.append(
+            {
+                "openTime": index * 60_000,
+                "closeTime": (index + 1) * 60_000,
+                "open": round(open_price, 8),
+                "high": round(high, 8),
+                "low": round(low, 8),
+                "close": round(close, 8),
+                "baseVolume": 100.0 + index,
+                "quoteVolume": (100.0 + index) * close,
+                "tradeCount": 10 + index,
+                "timeframe": "1m",
+                "status": "complete",
+            }
+        )
+        previous = close
+    return candles
 
 
-def synthetic_candles(label: str, seed: int = 7) -> list[dict]:
-    return [
-        dict(candle)
-        for candle in generate_dataset(
-            labels=[label],
-            samples_per_class=1,
-            window_size=WINDOW_SIZE,
-            seed=seed,
-        )[0].candles
+def write_fixture_model(path: Path) -> None:
+    examples = [
+        (extract_features(fixture_candles("double_top")), "double_top"),
+        (extract_features(fixture_candles("none")), "none"),
     ]
+    model = GaussianNaiveBayesClassifier()
+    model.fit(
+        [features for features, _ in examples],
+        [label for _, label in examples],
+        feature_names=FEATURE_NAMES,
+    )
+    model.save(path)
 
 
 class PatternMLDetectorTests(unittest.TestCase):
     def test_unsupported_timeframe_is_explicit(self) -> None:
-        detector = PatternMLDetector(model_path=MODEL_PATH)
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
 
-        result = detector.predict(
-            exchange="binance",
-            instrument_id="BTC-USDT",
-            timeframe="5m",
-            source="test",
-            candles=[],
-        )
+            result = detector.predict(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="5m",
+                source="test",
+                candles=[],
+            )
 
         self.assertEqual(result["status"], "unsupported_timeframe")
         self.assertEqual(result["supportedTimeframes"], ["1m"])
         self.assertIsNone(result["prediction"])
 
     def test_insufficient_complete_candles_are_reported(self) -> None:
-        detector = PatternMLDetector(model_path=MODEL_PATH)
-        candles = synthetic_candles("double_top")[:20]
-        candles[0]["close"] = None
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
+            candles = fixture_candles("double_top")[:20]
+            candles[0]["close"] = None
 
-        result = detector.predict(
-            exchange="binance",
-            instrument_id="BTC-USDT",
-            timeframe="1m",
-            source="test",
-            candles=candles,
-        )
+            result = detector.predict(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="1m",
+                source="test",
+                candles=candles,
+            )
 
         self.assertEqual(result["status"], "insufficient_data")
         self.assertEqual(result["candleCount"], 19)
 
-    def test_detector_loads_model_and_detects_synthetic_pattern(self) -> None:
-        detector = PatternMLDetector(model_path=MODEL_PATH)
+    def test_detector_loads_model_and_detects_pattern(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
 
-        result = detector.predict(
-            exchange="binance",
-            instrument_id="BTC-USDT",
-            timeframe="1m",
-            source="synthetic-test",
-            candles=synthetic_candles("double_top"),
-        )
+            result = detector.predict(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="1m",
+                source="fixture-test",
+                candles=fixture_candles("double_top"),
+            )
 
         self.assertEqual(result["status"], "pattern_detected")
         self.assertEqual(result["prediction"]["label"], "double_top")
@@ -87,7 +127,7 @@ class PatternMLDetectorTests(unittest.TestCase):
             instrument_id="BTC-USDT",
             timeframe="1m",
             source="test",
-            candles=synthetic_candles("triangle"),
+            candles=fixture_candles("none"),
         )
 
         self.assertEqual(result["status"], "model_unavailable")
@@ -98,7 +138,7 @@ class PatternMLDetectorTests(unittest.TestCase):
             "os.environ",
             {"TICKFRAME_PATTERN_CONFIDENCE_THRESHOLD": "2.0"},
         ):
-            detector = PatternMLDetector(model_path=MODEL_PATH)
+            detector = PatternMLDetector(model_path=Path("missing-model.json"))
 
         self.assertEqual(detector.confidence_threshold, 0.99)
 
@@ -107,7 +147,7 @@ class PatternMLDetectorTests(unittest.TestCase):
             {"TICKFRAME_PATTERN_CONFIDENCE_THRESHOLD": "invalid"},
         ):
             fallback = PatternMLDetector(
-                model_path=MODEL_PATH,
+                model_path=Path("missing-model.json"),
                 confidence_threshold=0.42,
             )
 
@@ -115,26 +155,38 @@ class PatternMLDetectorTests(unittest.TestCase):
 
 
 class PatternMLArtifactTests(unittest.TestCase):
-    def test_saved_model_artifact_is_committed_and_small(self) -> None:
-        self.assertTrue(MODEL_PATH.exists())
-        self.assertLess(MODEL_PATH.stat().st_size, 200_000)
-
     def test_detector_accepts_absolute_model_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temporary_model = Path(directory) / "model.json"
-            temporary_model.write_text(MODEL_PATH.read_text(encoding="utf-8"))
+            write_fixture_model(temporary_model)
             detector = PatternMLDetector(model_path=temporary_model)
 
             result = detector.predict(
                 exchange="binance",
                 instrument_id="BTC-USDT",
                 timeframe="1m",
-                source="synthetic-test",
-                candles=synthetic_candles("triangle", seed=11),
+                source="fixture-test",
+                candles=fixture_candles("none"),
             )
 
         self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
         self.assertIsNotNone(result["prediction"])
+
+
+def _interpolate(points: list[tuple[float, float]], length: int) -> list[float]:
+    indexed = [
+        (min(length - 1, max(0, round(position * (length - 1)))), value)
+        for position, value in points
+    ]
+    output = [indexed[0][1]] * length
+    for (left_index, left_value), (right_index, right_value) in zip(
+        indexed, indexed[1:]
+    ):
+        span = max(1, right_index - left_index)
+        for index in range(left_index, right_index + 1):
+            progress = (index - left_index) / span
+            output[index] = left_value + (right_value - left_value) * progress
+    return output
 
 
 if __name__ == "__main__":

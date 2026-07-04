@@ -1,0 +1,182 @@
+[
+  {
+    "closeTime": 1629518579999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629512820000,
+    "predicted": "none",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 0.00039,
+      "none": 0.985716,
+      "triangle": 0.013894
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1629620219999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629614460000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 0.999997,
+      "none": 0.0,
+      "triangle": 3e-06
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1629765299999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629759540000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1629767459999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629761700000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1629768179999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629762420000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1629768899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629763140000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1629793739999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629787980000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 6e-06,
+      "head_and_shoulders": 0.999994,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1630000739999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629994980000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1630001459999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629995700000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1630002179999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629996420000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1630002899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629997140000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 0.0,
+      "head_and_shoulders": 1.0,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1630003619999,
+    "expected": "head_and_shoulders",
+    "openTime": 1629997860000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.0,
+      "double_top": 0.0,
+      "flag": 1e-06,
+      "head_and_shoulders": 0.999999,
+      "none": 0.0,
+      "triangle": 0.0
+    },
+    "symbol": "SOLUSDT"
+  }
+]

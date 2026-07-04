@@ -38,7 +38,7 @@ class PatternMLDetector:
             / "ml"
             / "pattern_recognition"
             / "runs"
-            / "baseline-v0"
+            / "real-data-v1"
             / "model.json"
         )
         self.confidence_threshold = _confidence_threshold(confidence_threshold)
@@ -140,7 +140,7 @@ class PatternMLDetector:
         return {
             "status": status,
             "message": (
-                "Synthetic-trained baseline matched a chart pattern."
+                "Real-data baseline matched a chart pattern."
                 if status == "pattern_detected"
                 else "No reliable ML pattern is above the configured threshold."
             ),
