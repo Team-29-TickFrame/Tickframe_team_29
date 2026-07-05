@@ -59,6 +59,7 @@ const TIMEFRAMES: Timeframe[] = [
   "1h",
 ];
 const HISTORY_PAGE_SIZE = 1500;
+const INITIAL_CHART_READY_CANDLES = 240;
 const METRICS_LIMIT = 300;
 const STATS_TIMEFRAME: Timeframe = "1m";
 const STATS_LIMIT = 24 * 60;
@@ -112,6 +113,38 @@ type AlertMetricId =
   | "priceVolumeDivergencePct";
 type AlertCondition = "above" | "below" | "crosses_above" | "crosses_below";
 type AlertSeverity = "medium" | "high";
+type MainPanelId = "chart" | "metrics";
+type SidePanelId = "ml" | "alerts" | "signals";
+type WorkspacePanelGroup = "main" | "side";
+type WorkspaceResizeHandleId =
+  | "main-split"
+  | "rail-width"
+  | "side-middle"
+  | "side-top";
+
+type WorkspaceDragPayload =
+  | { group: "main"; id: MainPanelId }
+  | { group: "side"; id: SidePanelId };
+
+interface WorkspaceDragStart {
+  payload: WorkspaceDragPayload;
+  pointerId: number;
+  startX: number;
+  startY: number;
+}
+
+interface WorkspaceDragMotion {
+  x: number;
+  y: number;
+}
+
+interface WorkspaceResizeStart {
+  handle: WorkspaceResizeHandleId;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startLayout: DashboardLayout;
+}
 
 interface UserAlert {
   id: string;
@@ -139,6 +172,15 @@ interface AlertDraft {
   once: boolean;
 }
 
+interface DashboardLayout {
+  rightColumnWidth: number;
+  topPanelHeight: number;
+  sideTopPanelHeight: number;
+  sideMiddlePanelHeight: number;
+  mainOrder: MainPanelId[];
+  sideOrder: SidePanelId[];
+}
+
 interface AlertToast {
   id: string;
   title: string;
@@ -158,6 +200,7 @@ interface AlertPreset {
 }
 
 const USER_ALERTS_STORAGE_KEY = "tickframe.userAlerts.v1";
+const DASHBOARD_LAYOUT_STORAGE_KEY = "tickframe.dashboardLayout.v3";
 const ALERT_TOAST_TTL_MS = 8_000;
 const ALERT_TOAST_EXIT_MS = 260;
 const ALERT_BEEP_DATA_URI =
@@ -239,6 +282,61 @@ const DEFAULT_ALERT_DRAFT: AlertDraft = {
   once: false,
 };
 
+const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
+  rightColumnWidth: 390,
+  topPanelHeight: 570,
+  sideTopPanelHeight: 300,
+  sideMiddlePanelHeight: 320,
+  mainOrder: ["chart", "metrics"],
+  sideOrder: ["ml", "alerts", "signals"],
+};
+
+const MAIN_PANEL_IDS: MainPanelId[] = ["chart", "metrics"];
+const SIDE_PANEL_IDS: SidePanelId[] = ["ml", "alerts", "signals"];
+const MAIN_PANEL_LABELS: Record<MainPanelId, string> = {
+  chart: "Chart",
+  metrics: "Metrics",
+};
+const SIDE_PANEL_LABELS: Record<SidePanelId, string> = {
+  ml: "ML pattern",
+  alerts: "Alerts",
+  signals: "Signals",
+};
+const DASHBOARD_LAYOUT_PRESETS: Array<{
+  id: string;
+  label: string;
+  layout: DashboardLayout;
+}> = [
+  {
+    id: "balanced",
+    label: "Balanced",
+    layout: DEFAULT_DASHBOARD_LAYOUT,
+  },
+  {
+    id: "chart",
+    label: "Chart focus",
+    layout: {
+      ...DEFAULT_DASHBOARD_LAYOUT,
+      rightColumnWidth: 320,
+      topPanelHeight: 720,
+      sideTopPanelHeight: 280,
+      sideMiddlePanelHeight: 300,
+    },
+  },
+  {
+    id: "signals",
+    label: "Signals first",
+    layout: {
+      ...DEFAULT_DASHBOARD_LAYOUT,
+      rightColumnWidth: 430,
+      topPanelHeight: 560,
+      sideTopPanelHeight: 280,
+      sideMiddlePanelHeight: 380,
+      sideOrder: ["signals", "alerts", "ml"],
+    },
+  },
+];
+
 function TickframeLogo({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -309,6 +407,174 @@ function CoinLogo({
         draggable={false}
       />
     </span>
+  );
+}
+
+function DashboardLayoutMenu({
+  open,
+  layout,
+  onToggle,
+  onPreset,
+  onReset,
+  onMainSlotChange,
+  onSideSlotChange,
+  onChartHeightChange,
+  onRailWidthChange,
+  onSideMiddleHeightChange,
+  onSideTopHeightChange,
+}: {
+  open: boolean;
+  layout: DashboardLayout;
+  onToggle: () => void;
+  onPreset: (layout: DashboardLayout) => void;
+  onReset: () => void;
+  onMainSlotChange: (slot: number, panel: MainPanelId) => void;
+  onSideSlotChange: (slot: number, panel: SidePanelId) => void;
+  onChartHeightChange: (value: number) => void;
+  onRailWidthChange: (value: number) => void;
+  onSideMiddleHeightChange: (value: number) => void;
+  onSideTopHeightChange: (value: number) => void;
+}) {
+  return (
+    <div className="layout-menu-wrap">
+      <button
+        className="layout-menu-trigger"
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        Layout
+      </button>
+      {open && (
+        <div className="layout-menu" role="dialog" aria-label="Dashboard layout">
+          <div className="layout-menu-head">
+            <span>Workspace</span>
+            <strong>Arrange dashboard</strong>
+          </div>
+
+          <div className="layout-presets">
+            {DASHBOARD_LAYOUT_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => onPreset(preset.layout)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="layout-fieldset">
+            <span>Main stack</span>
+            {layout.mainOrder.map((panel, index) => (
+              <label key={`main-${index}`}>
+                <small>{index === 0 ? "Top" : "Bottom"}</small>
+                <select
+                  value={panel}
+                  onChange={(event) =>
+                    onMainSlotChange(index, event.target.value as MainPanelId)
+                  }
+                >
+                  {MAIN_PANEL_IDS.map((item) => (
+                    <option key={item} value={item}>
+                      {MAIN_PANEL_LABELS[item]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+
+          <div className="layout-fieldset">
+            <span>Right rail</span>
+            {layout.sideOrder.map((panel, index) => (
+              <label key={`side-${index}`}>
+                <small>Slot {index + 1}</small>
+                <select
+                  value={panel}
+                  onChange={(event) =>
+                    onSideSlotChange(index, event.target.value as SidePanelId)
+                  }
+                >
+                  {SIDE_PANEL_IDS.map((item) => (
+                    <option key={item} value={item}>
+                      {SIDE_PANEL_LABELS[item]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+
+          <div className="layout-fieldset sliders">
+            <label>
+              <span>
+                Chart height
+                <b>{layout.topPanelHeight}px</b>
+              </span>
+              <input
+                type="range"
+                min="380"
+                max="980"
+                step="10"
+                value={layout.topPanelHeight}
+                onChange={(event) => onChartHeightChange(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>
+                Right rail
+                <b>{layout.rightColumnWidth}px</b>
+              </span>
+              <input
+                type="range"
+                min="300"
+                max="760"
+                step="10"
+                value={layout.rightColumnWidth}
+                onChange={(event) => onRailWidthChange(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>
+                Right top
+                <b>{layout.sideTopPanelHeight}px</b>
+              </span>
+              <input
+                type="range"
+                min="180"
+                max="680"
+                step="10"
+                value={layout.sideTopPanelHeight}
+                onChange={(event) =>
+                  onSideTopHeightChange(Number(event.target.value))
+                }
+              />
+            </label>
+            <label>
+              <span>
+                Right middle
+                <b>{layout.sideMiddlePanelHeight}px</b>
+              </span>
+              <input
+                type="range"
+                min="180"
+                max="760"
+                step="10"
+                value={layout.sideMiddlePanelHeight}
+                onChange={(event) =>
+                  onSideMiddleHeightChange(Number(event.target.value))
+                }
+              />
+            </label>
+          </div>
+
+          <button className="layout-reset-button" type="button" onClick={onReset}>
+            Reset layout
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -583,6 +849,191 @@ function createAlertId(prefix = "alert"): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function clampNumber(value: number, min: number, max: number, fallback = min): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}
+
+function orderedPanels<T extends string>(value: unknown, fallback: T[], allowed: T[]): T[] {
+  if (!Array.isArray(value)) return fallback;
+  const requested = value.filter((item): item is T => allowed.includes(item as T));
+  return [
+    ...requested,
+    ...fallback.filter((item) => !requested.includes(item)),
+  ].slice(0, fallback.length);
+}
+
+function reorderPanel<T extends string>(order: T[], dragged: T, target: T): T[] {
+  const from = order.indexOf(dragged);
+  const to = order.indexOf(target);
+  if (from < 0 || to < 0 || from === to) return order;
+  const next = [...order];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+function workspacePanelKey(payload: WorkspaceDragPayload): string {
+  return `${payload.group}:${payload.id}`;
+}
+
+function sameWorkspacePanel(
+  first: WorkspaceDragPayload | null,
+  second: WorkspaceDragPayload,
+): boolean {
+  return first?.group === second.group && first.id === second.id;
+}
+
+function workspacePanelPayloadFromKey(
+  key: string | undefined,
+): WorkspaceDragPayload | null {
+  if (!key) return null;
+  const [group, id] = key.split(":");
+  if (group === "main" && MAIN_PANEL_IDS.includes(id as MainPanelId)) {
+    return { group, id: id as MainPanelId };
+  }
+  if (group === "side" && SIDE_PANEL_IDS.includes(id as SidePanelId)) {
+    return { group, id: id as SidePanelId };
+  }
+  return null;
+}
+
+function getWorkspaceDropTarget(
+  source: WorkspaceDragPayload,
+  clientX: number,
+  clientY: number,
+): WorkspaceDragPayload | null {
+  if (typeof document === "undefined") return null;
+  for (const element of document.elementsFromPoint(clientX, clientY)) {
+    const panel = element.closest<HTMLElement>("[data-workspace-panel]");
+    const payload = workspacePanelPayloadFromKey(panel?.dataset.workspacePanel);
+    if (
+      payload &&
+      payload.group === source.group &&
+      !sameWorkspacePanel(payload, source)
+    ) {
+      return payload;
+    }
+  }
+  return null;
+}
+
+function WorkspaceHeaderDragZone({
+  label,
+  payload,
+  onPointerCancel,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+}: {
+  label: string;
+  payload: WorkspaceDragPayload;
+  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerDown: (
+    payload: WorkspaceDragPayload,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <div
+      aria-label={`Move ${label} panel`}
+      className="workspace-header-drag-zone"
+      onPointerCancel={onPointerCancel}
+      onPointerDown={(event) => onPointerDown(payload, event)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    />
+  );
+}
+
+function WorkspaceResizeHandle({
+  active = false,
+  handle,
+  label,
+  orientation,
+  onPointerCancel,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  style,
+}: {
+  active?: boolean;
+  handle: WorkspaceResizeHandleId;
+  label: string;
+  orientation: "horizontal" | "vertical";
+  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerDown: (
+    handle: WorkspaceResizeHandleId,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      aria-label={label}
+      aria-orientation={orientation}
+      className={`workspace-resize-handle ${orientation}${active ? " is-active" : ""}`}
+      onPointerCancel={onPointerCancel}
+      onPointerDown={(event) => onPointerDown(handle, event)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      role="separator"
+      style={style}
+    />
+  );
+}
+
+function safeStoredDashboardLayout(): DashboardLayout {
+  if (typeof window === "undefined") return DEFAULT_DASHBOARD_LAYOUT;
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
+    if (!raw) return DEFAULT_DASHBOARD_LAYOUT;
+    const parsed = JSON.parse(raw) as Partial<DashboardLayout>;
+    return {
+      rightColumnWidth: clampNumber(
+        Number(parsed.rightColumnWidth),
+        300,
+        760,
+        DEFAULT_DASHBOARD_LAYOUT.rightColumnWidth,
+      ),
+      topPanelHeight: clampNumber(
+        Number(parsed.topPanelHeight),
+        380,
+        980,
+        DEFAULT_DASHBOARD_LAYOUT.topPanelHeight,
+      ),
+      sideTopPanelHeight: clampNumber(
+        Number(parsed.sideTopPanelHeight),
+        180,
+        680,
+        DEFAULT_DASHBOARD_LAYOUT.sideTopPanelHeight,
+      ),
+      sideMiddlePanelHeight: clampNumber(
+        Number(parsed.sideMiddlePanelHeight),
+        180,
+        760,
+        DEFAULT_DASHBOARD_LAYOUT.sideMiddlePanelHeight,
+      ),
+      mainOrder: orderedPanels(
+        parsed.mainOrder,
+        DEFAULT_DASHBOARD_LAYOUT.mainOrder,
+        MAIN_PANEL_IDS,
+      ),
+      sideOrder: orderedPanels(
+        parsed.sideOrder,
+        DEFAULT_DASHBOARD_LAYOUT.sideOrder,
+        SIDE_PANEL_IDS,
+      ),
+    };
+  } catch {
+    return DEFAULT_DASHBOARD_LAYOUT;
+  }
+}
+
 function safeStoredAlerts(): UserAlert[] {
   if (typeof window === "undefined") return [];
   try {
@@ -844,7 +1295,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [instrumentId, setInstrumentId] = useState("BTC-USDT");
-  const [timeframe, setTimeframe] = useState<Timeframe>("5s");
+  const [timeframe, setTimeframe] = useState<Timeframe>("1m");
   const [candleData, setCandleData] = useState<{
     scope: string;
     values: Candle[];
@@ -892,10 +1343,27 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     {},
   );
   const [alertSoundReady, setAlertSoundReady] = useState(false);
+  const [dashboardLayout, setDashboardLayout] = useState<DashboardLayout>(
+    safeStoredDashboardLayout,
+  );
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+  const [workspaceDrag, setWorkspaceDrag] =
+    useState<WorkspaceDragPayload | null>(null);
+  const [workspaceDragMotion, setWorkspaceDragMotion] =
+    useState<WorkspaceDragMotion>({ x: 0, y: 0 });
+  const [workspaceDropTarget, setWorkspaceDropTarget] =
+    useState<WorkspaceDragPayload | null>(null);
+  const [workspaceResizeHandle, setWorkspaceResizeHandle] =
+    useState<WorkspaceResizeHandleId | null>(null);
   const historyLoadingRef = useRef(false);
   const alertAudioRef = useRef<AudioContext | null>(null);
   const previousAlertValuesRef = useRef<Record<string, number | null>>({});
   const toastDragStartRef = useRef<Record<string, number>>({});
+  const metricsPanelShellRef = useRef<HTMLDivElement | null>(null);
+  const workspaceDragStartRef = useRef<WorkspaceDragStart | null>(null);
+  const workspaceDropTargetRef = useRef<WorkspaceDragPayload | null>(null);
+  const workspaceDragSettleTimerRef = useRef<number | null>(null);
+  const workspaceResizeStartRef = useRef<WorkspaceResizeStart | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -903,6 +1371,36 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       JSON.stringify(userAlerts),
     );
   }, [userAlerts]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      DASHBOARD_LAYOUT_STORAGE_KEY,
+      JSON.stringify(dashboardLayout),
+    );
+  }, [dashboardLayout]);
+
+  useEffect(
+    () => () => {
+      if (workspaceDragSettleTimerRef.current !== null) {
+        window.clearTimeout(workspaceDragSettleTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const shell = metricsPanelShellRef.current;
+    if (!shell) return;
+    const resetMetricsScroll = () => {
+      shell.scrollTop = 0;
+      shell
+        .querySelector<HTMLElement>(".metrics-dashboard")
+        ?.scrollTo({ top: 0 });
+    };
+    resetMetricsScroll();
+    const frame = window.requestAnimationFrame(resetMetricsScroll);
+    return () => window.cancelAnimationFrame(frame);
+  }, [exchange, instrumentId]);
 
   const dismissAlertToast = useCallback((id: string) => {
     setDismissingToastIds((current) => {
@@ -985,6 +1483,365 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       clearAlertToastDrag(id);
     },
     [clearAlertToastDrag, dismissAlertToast],
+  );
+
+  const resetDashboardLayout = useCallback(() => {
+    setDashboardLayout(DEFAULT_DASHBOARD_LAYOUT);
+  }, []);
+
+  const applyDashboardLayoutPreset = useCallback((layout: DashboardLayout) => {
+    setDashboardLayout(layout);
+  }, []);
+
+  const setMainPanelSlot = useCallback((slot: number, panel: MainPanelId) => {
+    setDashboardLayout((current) => {
+      const order = [...current.mainOrder];
+      const existingIndex = order.indexOf(panel);
+      if (existingIndex < 0 || slot < 0 || slot >= order.length) return current;
+      [order[slot], order[existingIndex]] = [order[existingIndex], order[slot]];
+      return { ...current, mainOrder: order };
+    });
+  }, []);
+
+  const setSidePanelSlot = useCallback((slot: number, panel: SidePanelId) => {
+    setDashboardLayout((current) => {
+      const order = [...current.sideOrder];
+      const existingIndex = order.indexOf(panel);
+      if (existingIndex < 0 || slot < 0 || slot >= order.length) return current;
+      [order[slot], order[existingIndex]] = [order[existingIndex], order[slot]];
+      return { ...current, sideOrder: order };
+    });
+  }, []);
+
+  const setDashboardChartHeight = useCallback((value: number) => {
+    setDashboardLayout((current) => ({
+      ...current,
+      topPanelHeight: clampNumber(value, 380, 980, current.topPanelHeight),
+    }));
+  }, []);
+
+  const setDashboardRailWidth = useCallback((value: number) => {
+    setDashboardLayout((current) => ({
+      ...current,
+      rightColumnWidth: clampNumber(value, 300, 760, current.rightColumnWidth),
+    }));
+  }, []);
+
+  const setDashboardSideTopHeight = useCallback((value: number) => {
+    setDashboardLayout((current) => ({
+      ...current,
+      sideTopPanelHeight: clampNumber(
+        value,
+        180,
+        680,
+        current.sideTopPanelHeight,
+      ),
+    }));
+  }, []);
+
+  const setDashboardSideMiddleHeight = useCallback((value: number) => {
+    setDashboardLayout((current) => ({
+      ...current,
+      sideMiddlePanelHeight: clampNumber(
+        value,
+        180,
+        760,
+        current.sideMiddlePanelHeight,
+      ),
+    }));
+  }, []);
+
+  const startWorkspaceResize = useCallback(
+    (handle: WorkspaceResizeHandleId, event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      workspaceResizeStartRef.current = {
+        handle,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startLayout: dashboardLayout,
+      };
+      setWorkspaceResizeHandle(handle);
+      setLayoutMenuOpen(false);
+    },
+    [dashboardLayout],
+  );
+
+  const moveWorkspaceResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const resize = workspaceResizeStartRef.current;
+      if (!resize || resize.pointerId !== event.pointerId) return;
+      event.preventDefault();
+
+      const dx = event.clientX - resize.startX;
+      const dy = event.clientY - resize.startY;
+      setDashboardLayout((current) => {
+        if (resize.handle === "rail-width") {
+          return {
+            ...current,
+            rightColumnWidth: clampNumber(
+              resize.startLayout.rightColumnWidth - dx,
+              300,
+              760,
+              current.rightColumnWidth,
+            ),
+          };
+        }
+        if (resize.handle === "main-split") {
+          return {
+            ...current,
+            topPanelHeight: clampNumber(
+              resize.startLayout.topPanelHeight + dy,
+              380,
+              980,
+              current.topPanelHeight,
+            ),
+          };
+        }
+        if (resize.handle === "side-top") {
+          return {
+            ...current,
+            sideTopPanelHeight: clampNumber(
+              resize.startLayout.sideTopPanelHeight + dy,
+              180,
+              680,
+              current.sideTopPanelHeight,
+            ),
+          };
+        }
+        return {
+          ...current,
+          sideMiddlePanelHeight: clampNumber(
+            resize.startLayout.sideMiddlePanelHeight + dy,
+            180,
+            760,
+            current.sideMiddlePanelHeight,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
+  const finishWorkspaceResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const resize = workspaceResizeStartRef.current;
+      if (resize && event.currentTarget.hasPointerCapture(resize.pointerId)) {
+        event.currentTarget.releasePointerCapture(resize.pointerId);
+      }
+      workspaceResizeStartRef.current = null;
+      setWorkspaceResizeHandle(null);
+    },
+    [],
+  );
+
+  const workspaceResizeProps = useMemo(
+    () => ({
+      onPointerCancel: finishWorkspaceResize,
+      onPointerDown: startWorkspaceResize,
+      onPointerMove: moveWorkspaceResize,
+      onPointerUp: finishWorkspaceResize,
+    }),
+    [finishWorkspaceResize, moveWorkspaceResize, startWorkspaceResize],
+  );
+
+  const clearWorkspaceDragSettleTimer = useCallback(() => {
+    if (workspaceDragSettleTimerRef.current !== null) {
+      window.clearTimeout(workspaceDragSettleTimerRef.current);
+      workspaceDragSettleTimerRef.current = null;
+    }
+  }, []);
+
+  const clearWorkspaceDrag = useCallback(() => {
+    workspaceDragStartRef.current = null;
+    workspaceDropTargetRef.current = null;
+    setWorkspaceDrag(null);
+    setWorkspaceDragMotion({ x: 0, y: 0 });
+    setWorkspaceDropTarget(null);
+  }, []);
+
+  const startWorkspacePanelDrag = useCallback(
+    (
+      payload: WorkspaceDragPayload,
+      event: ReactPointerEvent<HTMLDivElement>,
+    ) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      clearWorkspaceDragSettleTimer();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      workspaceDragStartRef.current = {
+        payload,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+      };
+      workspaceDropTargetRef.current = null;
+      setLayoutMenuOpen(false);
+      setWorkspaceDrag(payload);
+      setWorkspaceDragMotion({ x: 0, y: 0 });
+      setWorkspaceDropTarget(null);
+    },
+    [clearWorkspaceDragSettleTimer],
+  );
+
+  const moveWorkspacePanelDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = workspaceDragStartRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      event.preventDefault();
+      setWorkspaceDragMotion({
+        x: event.clientX - drag.startX,
+        y: event.clientY - drag.startY,
+      });
+      const nextTarget = getWorkspaceDropTarget(
+        drag.payload,
+        event.clientX,
+        event.clientY,
+      );
+      workspaceDropTargetRef.current = nextTarget;
+      setWorkspaceDropTarget(nextTarget);
+    },
+    [],
+  );
+
+  const finishWorkspacePanelDrag = useCallback(
+    (event?: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = workspaceDragStartRef.current;
+      if (!drag) {
+        clearWorkspaceDrag();
+        return;
+      }
+
+      if (event) {
+        event.preventDefault();
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      const finalTarget = event
+        ? getWorkspaceDropTarget(drag.payload, event.clientX, event.clientY)
+        : workspaceDropTargetRef.current;
+      workspaceDropTargetRef.current = null;
+      setWorkspaceDropTarget(null);
+
+      if (
+        !finalTarget ||
+        finalTarget.group !== drag.payload.group ||
+        finalTarget.id === drag.payload.id
+      ) {
+        const releasedWithoutMove = event
+          ? Math.abs(event.clientX - drag.startX) +
+              Math.abs(event.clientY - drag.startY) <
+            3
+          : false;
+        if (releasedWithoutMove) {
+          clearWorkspaceDrag();
+          return;
+        }
+        clearWorkspaceDrag();
+        return;
+      }
+
+      setDashboardLayout((current) => {
+        if (drag.payload.group === "main" && finalTarget.group === "main") {
+          return {
+            ...current,
+            mainOrder: reorderPanel(
+              current.mainOrder,
+              drag.payload.id,
+              finalTarget.id,
+            ),
+          };
+        }
+        if (drag.payload.group === "side" && finalTarget.group === "side") {
+          return {
+            ...current,
+            sideOrder: reorderPanel(
+              current.sideOrder,
+              drag.payload.id,
+              finalTarget.id,
+            ),
+          };
+        }
+        return current;
+      });
+      clearWorkspaceDrag();
+    },
+    [clearWorkspaceDrag],
+  );
+
+  const cancelWorkspacePanelDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = workspaceDragStartRef.current;
+      if (drag && event.currentTarget.hasPointerCapture(drag.pointerId)) {
+        event.currentTarget.releasePointerCapture(drag.pointerId);
+      }
+      setWorkspaceDropTarget(null);
+      workspaceDropTargetRef.current = null;
+      clearWorkspaceDrag();
+    },
+    [clearWorkspaceDrag],
+  );
+
+  const workspacePanelStyle = useCallback(
+    (order: number, payload: WorkspaceDragPayload) => {
+      const style = { order: order * 2 } as CSSProperties & {
+        "--workspace-drag-x"?: string;
+        "--workspace-drag-y"?: string;
+      };
+      if (sameWorkspacePanel(workspaceDrag, payload)) {
+        style["--workspace-drag-x"] = `${workspaceDragMotion.x}px`;
+        style["--workspace-drag-y"] = `${workspaceDragMotion.y}px`;
+      }
+      return style;
+    },
+    [workspaceDrag, workspaceDragMotion],
+  );
+
+  const workspaceDragZoneProps = useMemo(
+    () => ({
+      onPointerCancel: cancelWorkspacePanelDrag,
+      onPointerDown: startWorkspacePanelDrag,
+      onPointerMove: moveWorkspacePanelDrag,
+      onPointerUp: finishWorkspacePanelDrag,
+    }),
+    [
+      cancelWorkspacePanelDrag,
+      finishWorkspacePanelDrag,
+      moveWorkspacePanelDrag,
+      startWorkspacePanelDrag,
+    ],
+  );
+
+  const workspacePanelClass = useCallback(
+    (payload: WorkspaceDragPayload) => {
+      const classes = ["workspace-panel"];
+      if (sameWorkspacePanel(workspaceDrag, payload)) classes.push("is-dragging");
+      if (sameWorkspacePanel(workspaceDropTarget, payload)) {
+        classes.push("is-drop-target");
+      }
+      return classes.join(" ");
+    },
+    [workspaceDrag, workspaceDropTarget],
+  );
+
+  const dashboardLayoutStyle = {
+    "--events-column-width": `${dashboardLayout.rightColumnWidth}px`,
+    "--side-middle-panel-height": `${dashboardLayout.sideMiddlePanelHeight}px`,
+    "--side-top-panel-height": `${dashboardLayout.sideTopPanelHeight}px`,
+    "--top-panel-height": `${dashboardLayout.topPanelHeight}px`,
+  } as CSSProperties;
+  const mainPanelOrder = useCallback(
+    (id: MainPanelId) => dashboardLayout.mainOrder.indexOf(id),
+    [dashboardLayout.mainOrder],
+  );
+  const sidePanelOrder = useCallback(
+    (id: SidePanelId) => dashboardLayout.sideOrder.indexOf(id),
+    [dashboardLayout.sideOrder],
   );
 
   const playAlertSound = useCallback(async () => {
@@ -1447,6 +2304,28 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     () => toDisplayCandles(chartCandles),
     [chartCandles],
   );
+  const chartHasInitialHistory =
+    displayCandles.length >= INITIAL_CHART_READY_CANDLES ||
+    (!candlesLoading && (displayCandles.length === 0 || !hasMoreHistory));
+  const chartBootstrapping = candlesLoading || !chartHasInitialHistory;
+
+  useEffect(() => {
+    if (
+      !candlesLoading &&
+      !historyLoading &&
+      hasMoreHistory &&
+      displayCandles.length > 0 &&
+      displayCandles.length < INITIAL_CHART_READY_CANDLES
+    ) {
+      void loadEarlier();
+    }
+  }, [
+    candlesLoading,
+    displayCandles.length,
+    hasMoreHistory,
+    historyLoading,
+    loadEarlier,
+  ]);
 
   const gapCount = candles.filter(
     (candle) => candle.status === "incomplete",
@@ -1839,32 +2718,71 @@ function Dashboard({ session, onLogout }: DashboardProps) {
         </section>
 
         {activeView === "dashboard" ? (
-        <section className="terminal-grid">
+        <section
+          className="terminal-grid"
+          style={dashboardLayoutStyle}
+        >
           <div className="market-stack">
-            <article className="chart-panel panel">
-              <div className="panel-head">
-                <div className="chart-title">
-                  <CoinLogo base={instrument?.base} className="coin-logo-sm" />
-                  <span className="eyebrow">PRICE / VOLUME</span>
-                  <strong>{instrumentId} - SPOT</strong>
+            <article
+              className={`chart-panel panel ${workspacePanelClass({
+                group: "main",
+                id: "chart",
+              })}`}
+              data-workspace-panel={workspacePanelKey({
+                group: "main",
+                id: "chart",
+              })}
+              style={workspacePanelStyle(mainPanelOrder("chart"), {
+                group: "main",
+                id: "chart",
+              })}
+            >
+              <div className="workspace-panel-shell">
+                <div className="panel-head">
+                <div className="panel-head-main">
+                  <div className="chart-title">
+                    <CoinLogo base={instrument?.base} className="coin-logo-sm" />
+                    <span className="eyebrow">PRICE / VOLUME</span>
+                    <strong>{instrumentId} - SPOT</strong>
+                  </div>
                 </div>
-                <div className="timeframe-tabs" aria-label="Timeframe">
-                  {TIMEFRAMES.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={timeframe === item ? "active" : ""}
-                      onClick={() => setTimeframe(item)}
-                    >
-                      {item}
-                    </button>
-                  ))}
+                <WorkspaceHeaderDragZone
+                  label="chart"
+                  payload={{ group: "main", id: "chart" }}
+                  {...workspaceDragZoneProps}
+                />
+                <div className="panel-head-actions" draggable={false}>
+                  <div className="timeframe-tabs" aria-label="Timeframe">
+                    {TIMEFRAMES.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        className={timeframe === item ? "active" : ""}
+                        onClick={() => setTimeframe(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                  <DashboardLayoutMenu
+                    open={layoutMenuOpen}
+                    layout={dashboardLayout}
+                    onToggle={() => setLayoutMenuOpen((open) => !open)}
+                    onPreset={applyDashboardLayoutPreset}
+                    onReset={resetDashboardLayout}
+                    onMainSlotChange={setMainPanelSlot}
+                    onSideSlotChange={setSidePanelSlot}
+                    onChartHeightChange={setDashboardChartHeight}
+                    onRailWidthChange={setDashboardRailWidth}
+                    onSideMiddleHeightChange={setDashboardSideMiddleHeight}
+                    onSideTopHeightChange={setDashboardSideTopHeight}
+                  />
                 </div>
               </div>
               <MarketChart
-                candles={displayCandles}
+                candles={chartBootstrapping ? [] : displayCandles}
                 scopeKey={candleScope}
-                loading={candlesLoading}
+                loading={chartBootstrapping}
                 historyLoading={historyLoading}
                 hasMore={hasMoreHistory}
                 onLoadEarlier={loadEarlier}
@@ -1885,20 +2803,53 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 <span>late window {formatAge(health?.chart.allowedLatenessMs)}</span>
                 <span>updated {formatClock(selectedMarket?.receivedTimestamp)}</span>
               </div>
+              </div>
             </article>
 
-            <article className="panel metrics-panel">
-              <div className="panel-head compact">
-                <div className="panel-title-with-logo">
-                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
-                  <div>
-                    <span className="eyebrow">METRICS ENGINE</span>
-                    <strong>{statsMetrics?.version ?? "calculating"}</strong>
+            <WorkspaceResizeHandle
+              active={workspaceResizeHandle === "main-split"}
+              handle="main-split"
+              label="Resize main panels"
+              orientation="horizontal"
+              style={{ order: 1 }}
+              {...workspaceResizeProps}
+            />
+
+            <article
+              className={`panel metrics-panel ${workspacePanelClass({
+                group: "main",
+                id: "metrics",
+              })}`}
+              data-workspace-panel={workspacePanelKey({
+                group: "main",
+                id: "metrics",
+              })}
+              style={workspacePanelStyle(mainPanelOrder("metrics"), {
+                group: "main",
+                id: "metrics",
+              })}
+            >
+              <div className="workspace-panel-shell" ref={metricsPanelShellRef}>
+                <div className="panel-head compact">
+                <div className="panel-head-main">
+                  <div className="panel-title-with-logo">
+                    <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                    <div>
+                      <span className="eyebrow">METRICS ENGINE</span>
+                      <strong>{statsMetrics?.version ?? "calculating"}</strong>
+                    </div>
                   </div>
                 </div>
-                <span className={`quality-badge ${statsLoading ? "warn" : "good"}`}>
-                  {statsLoading ? "CALC" : statsMetrics?.source.toUpperCase() ?? "WAIT"}
-                </span>
+                <WorkspaceHeaderDragZone
+                  label="metrics"
+                  payload={{ group: "main", id: "metrics" }}
+                  {...workspaceDragZoneProps}
+                />
+                <div className="panel-head-actions" draggable={false}>
+                  <span className={`quality-badge ${statsLoading ? "warn" : "good"}`}>
+                    {statsLoading ? "CALC" : statsMetrics?.source.toUpperCase() ?? "WAIT"}
+                  </span>
+                </div>
               </div>
               <div className="metrics-dashboard">
                 <div className="metric-window-strip">
@@ -2051,54 +3002,85 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                     </div>
                   </div>
                 </section>
-              </div>
-
-              <div className="correlation-list" aria-label="Cross-pair correlations">
-                {topCorrelations.length > 0 ? (
-                  topCorrelations.map((item) => (
-                    <div className="correlation-card" key={item.instrumentId}>
-                      <span className="correlation-asset">
-                        <CoinLogo base={item.base} className="coin-logo-xs" />
-                        {item.base}
-                      </span>
-                      <strong>{formatCorrelation(item.correlation)}</strong>
-                      <small>{item.sampleSize} returns</small>
+                <div className="correlation-list" aria-label="Cross-pair correlations">
+                  {topCorrelations.length > 0 ? (
+                    topCorrelations.map((item) => (
+                      <div className="correlation-card" key={item.instrumentId}>
+                        <span className="correlation-asset">
+                          <CoinLogo base={item.base} className="coin-logo-xs" />
+                          {item.base}
+                        </span>
+                        <strong>{formatCorrelation(item.correlation)}</strong>
+                        <small>{item.sampleSize} returns</small>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="correlation-empty">
+                      Correlations need overlapping return history.
                     </div>
-                  ))
-                ) : (
-                  <div className="correlation-empty">
-                    Correlations need overlapping return history.
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
               </div>
             </article>
           </div>
 
+          <WorkspaceResizeHandle
+            active={workspaceResizeHandle === "rail-width"}
+            handle="rail-width"
+            label="Resize right rail"
+            orientation="vertical"
+            {...workspaceResizeProps}
+          />
+
           <aside className="events-column">
-            <article className="panel ml-pattern-panel">
-              <div className="panel-head compact">
-                <div className="panel-title-with-logo">
-                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
-                  <div>
-                    <span className="eyebrow">ML PATTERN</span>
-                    <strong>{mlPattern?.modelVersion ?? "pattern-baseline-v0"}</strong>
+            <article
+              className={`panel ml-pattern-panel ${workspacePanelClass({
+                group: "side",
+                id: "ml",
+              })}`}
+              data-workspace-panel={workspacePanelKey({
+                group: "side",
+                id: "ml",
+              })}
+              style={workspacePanelStyle(sidePanelOrder("ml"), {
+                group: "side",
+                id: "ml",
+              })}
+            >
+              <div className="workspace-panel-shell">
+                <div className="panel-head compact">
+                <div className="panel-head-main">
+                  <div className="panel-title-with-logo">
+                    <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                    <div>
+                      <span className="eyebrow">ML PATTERN</span>
+                      <strong>{mlPattern?.modelVersion ?? "pattern-baseline-v0"}</strong>
+                    </div>
                   </div>
                 </div>
-                <span
-                  className={`quality-badge ${
-                    mlPatternLoading
-                      ? "warn"
-                      : mlPattern?.status === "pattern_detected"
-                        ? "good"
-                        : "neutral"
-                  }`}
-                >
-                  {mlPatternLoading
-                    ? "CALC"
-                    : timeframe === "1m"
-                      ? "ML ON"
-                      : "LOCKED"}
-                </span>
+                <WorkspaceHeaderDragZone
+                  label="ML pattern"
+                  payload={{ group: "side", id: "ml" }}
+                  {...workspaceDragZoneProps}
+                />
+                <div className="panel-head-actions" draggable={false}>
+                  <span
+                    className={`quality-badge ${
+                      mlPatternLoading
+                        ? "warn"
+                        : mlPattern?.status === "pattern_detected"
+                          ? "good"
+                          : "neutral"
+                    }`}
+                  >
+                    {mlPatternLoading
+                      ? "CALC"
+                      : timeframe === "1m"
+                        ? "ML ON"
+                        : "LOCKED"}
+                  </span>
+                </div>
               </div>
               <div className="ml-pattern-body">
                 <div className="ml-pattern-result">
@@ -2153,46 +3135,79 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </div>
                 )}
               </div>
+              </div>
             </article>
 
-            <article className="panel dashboard-alert-panel">
-              <div className="panel-head compact">
-                <div className="panel-title-with-logo">
-                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
-                  <div>
-                    <span className="eyebrow">ALERTS</span>
-                    <strong>
-                      {activeCurrentScopeAlerts.length
-                        ? `${activeCurrentScopeAlerts.length} watching`
-                        : "No active alerts"}
-                    </strong>
+            <WorkspaceResizeHandle
+              active={workspaceResizeHandle === "side-top"}
+              handle="side-top"
+              label="Resize top right panel"
+              orientation="horizontal"
+              style={{ order: 1 }}
+              {...workspaceResizeProps}
+            />
+
+            <article
+              className={`panel dashboard-alert-panel ${workspacePanelClass({
+                group: "side",
+                id: "alerts",
+              })}`}
+              data-workspace-panel={workspacePanelKey({
+                group: "side",
+                id: "alerts",
+              })}
+              style={workspacePanelStyle(sidePanelOrder("alerts"), {
+                group: "side",
+                id: "alerts",
+              })}
+            >
+              <div className="workspace-panel-shell">
+                <div className="panel-head compact">
+                <div className="panel-head-main">
+                  <div className="panel-title-with-logo">
+                    <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                    <div>
+                      <span className="eyebrow">ALERTS</span>
+                      <strong>
+                        {activeCurrentScopeAlerts.length
+                          ? `${activeCurrentScopeAlerts.length} watching`
+                          : "No active alerts"}
+                      </strong>
+                    </div>
                   </div>
                 </div>
-                <button
-                  className="alert-add-button"
-                  type="button"
-                  onClick={() => {
-                    if (dashboardAlertComposerOpen) {
-                      setDashboardAlertComposerOpen(false);
-                      return;
-                    }
-                    setAlertFormError(null);
-                    setAlertDraft({
-                      label: "Price above level",
-                      metric: "price",
-                      condition: "crosses_above",
-                      threshold:
-                        livePrice === null
-                          ? ""
-                          : livePrice.toFixed(livePrice >= 1 ? 2 : 6),
-                      cooldownSeconds: "120",
-                      once: false,
-                    });
-                    setDashboardAlertComposerOpen(true);
-                  }}
-                >
-                  {dashboardAlertComposerOpen ? "Close" : "Price level"}
-                </button>
+                <WorkspaceHeaderDragZone
+                  label="alerts"
+                  payload={{ group: "side", id: "alerts" }}
+                  {...workspaceDragZoneProps}
+                />
+                <div className="panel-head-actions" draggable={false}>
+                  <button
+                    className="alert-add-button"
+                    type="button"
+                    onClick={() => {
+                      if (dashboardAlertComposerOpen) {
+                        setDashboardAlertComposerOpen(false);
+                        return;
+                      }
+                      setAlertFormError(null);
+                      setAlertDraft({
+                        label: "Price above level",
+                        metric: "price",
+                        condition: "crosses_above",
+                        threshold:
+                          livePrice === null
+                            ? ""
+                            : livePrice.toFixed(livePrice >= 1 ? 2 : 6),
+                        cooldownSeconds: "120",
+                        once: false,
+                      });
+                      setDashboardAlertComposerOpen(true);
+                    }}
+                  >
+                    {dashboardAlertComposerOpen ? "Close" : "Price level"}
+                  </button>
+                </div>
               </div>
 
               {currentScopeAlerts.length > 0 ? (
@@ -2316,19 +3331,52 @@ function Dashboard({ session, onLogout }: DashboardProps) {
               {alertFormError && (
                 <p className="dashboard-alert-error">{alertFormError}</p>
               )}
+              </div>
             </article>
-            <article className="panel signal-panel">
-              <div className="panel-head compact">
-                <div className="panel-title-with-logo">
-                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
-                  <div>
-                    <span className="eyebrow">METRIC EVENTS</span>
-                    <strong>Signals without trade advice</strong>
+
+            <WorkspaceResizeHandle
+              active={workspaceResizeHandle === "side-middle"}
+              handle="side-middle"
+              label="Resize middle right panel"
+              orientation="horizontal"
+              style={{ order: 3 }}
+              {...workspaceResizeProps}
+            />
+            <article
+              className={`panel signal-panel ${workspacePanelClass({
+                group: "side",
+                id: "signals",
+              })}`}
+              data-workspace-panel={workspacePanelKey({
+                group: "side",
+                id: "signals",
+              })}
+              style={workspacePanelStyle(sidePanelOrder("signals"), {
+                group: "side",
+                id: "signals",
+              })}
+            >
+              <div className="workspace-panel-shell">
+                <div className="panel-head compact">
+                <div className="panel-head-main">
+                  <div className="panel-title-with-logo">
+                    <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                    <div>
+                      <span className="eyebrow">METRIC EVENTS</span>
+                      <strong>Signals without trade advice</strong>
+                    </div>
                   </div>
                 </div>
-                <span className={`quality-badge ${metricEvents.length ? "good" : "neutral"}`}>
-                  {metricEvents.length ? `${metricEvents.length} LIVE` : "QUIET"}
-                </span>
+                <WorkspaceHeaderDragZone
+                  label="signals"
+                  payload={{ group: "side", id: "signals" }}
+                  {...workspaceDragZoneProps}
+                />
+                <div className="panel-head-actions" draggable={false}>
+                  <span className={`quality-badge ${metricEvents.length ? "good" : "neutral"}`}>
+                    {metricEvents.length ? `${metricEvents.length} LIVE` : "QUIET"}
+                  </span>
+                </div>
               </div>
               {metricEvents.length > 0 ? (
                 <div className="signal-list">
@@ -2360,6 +3408,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </p>
                 </div>
               )}
+              </div>
             </article>
           </aside>
         </section>
