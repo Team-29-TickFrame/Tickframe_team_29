@@ -1,10 +1,5 @@
 ## Static View - Component Diagram
-
-Sources:
-[PlantUML](static-view/component-diagram.puml) and
-[Mermaid](static-view/component-diagram.mmd).
-
-It shows the main parts of the product and the simple "uses" relationships
+show parts of the product and the simple "uses" relationships
 between them.
 
 ### What The Static View Shows
