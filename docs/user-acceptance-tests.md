@@ -129,5 +129,5 @@ Private recording links and exact timecodes are not included in the public repos
 | UAT-001 | Passed (previous customer execution on 2026-06-27) | Previously approved in customer session. | No follow-up required from this scenario |
 | UAT-002 | Passed (previous customer execution on 2026-06-27) | Previously approved in customer session. | No follow-up required from this scenario |
 | UAT-003 | Passed (previous customer execution on 2026-06-27) | Previously approved in customer session. | No follow-up required from this scenario |
-| UAT-004 | Not executed with customer | Customer feedback unavailable in Week 5 because the session was not held. | TBD (next customer session) |
-| UAT-005 | Not executed with customer | Customer feedback unavailable in Week 5 because the session was not held. | TBD (next customer session) |
+| UAT-004 | Not executed with customer | Customer feedback unavailable in Week 5 because the session was not held. | Next customer session |
+| UAT-005 | Not executed with customer | Customer feedback unavailable in Week 5 because the session was not held. | Next customer session |

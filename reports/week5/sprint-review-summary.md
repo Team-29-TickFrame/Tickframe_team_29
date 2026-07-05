@@ -1,32 +1,39 @@
 # Sprint Review Summary
 
 ## Sprint Goal
-The Sprint Goal was to deliver the MVP v2 increment of TickFrame by implementing selected customer-requested improvements, documenting the system architecture, recording Architecture Decision Records (ADRs), improving development documentation, and extending quality assurance activities.
+
+The Sprint 3 goal was to prepare the MVP v2 increment and Week 5 evidence:
+customer-feedback traceability, architecture documentation, ADRs, development
+process documentation, quality evidence, and release documentation.
 
 ## Sprint Review Status
-The planned Sprint Review with the customer could not be conducted during this Sprint. The review was postponed because the major planned product changes were not completed in time after the team member responsible for their implementation became unexpectedly unavailable during the Sprint.
 
-The team decided to postpone the customer review instead of demonstrating an incomplete product increment.
+The planned Sprint Review with the customer did not take place during Week 5.
+No customer-executed review results are available in this public report.
 
-## Delivered Sprint Increment
-Although the customer review was postponed, the team completed significant Sprint work, including:
- • Architecture documentation with static, dynamic, and deployment views.
- • Architecture Decision Records (ADRs).
- • Improvements to development process documentation.
- • Continued testing, CI, and quality documentation updates.
- • Ongoing implementation work toward MVP v2.
+## Sprint Increment Shown
+
+No customer Sprint Review demonstration was completed in Week 5.
+
+Repository work completed or prepared during the Sprint includes:
+
+- Architecture documentation with static, dynamic, and deployment views.
+- ADRs under `docs/architecture/adr/`.
+- Development process and configuration-management documentation.
+- Testing, CI, quality, and Definition of Done documentation updates.
+- Product work toward browser alerts and MVP v2 scope.
 
 ## User Acceptance Testing
-Formal customer-executed User Acceptance Testing was not performed during this Sprint because the Sprint Review was postponed. UAT will be conducted together with the customer once the remaining MVP v2 functionality has been completed.
+
+Customer-executed Week 5 UAT was not performed. UAT-004 and UAT-005 remain
+prepared scenarios until a customer session is completed.
 
 ## Customer Feedback
-No new customer feedback was collected during this Sprint because the Sprint Review meeting did not take place. Previously collected customer feedback continues to guide the remaining MVP v2 implementation.
+
+No new Week 5 customer feedback was collected because the Sprint Review did not
+take place.
 
 ## Product Backlog Updates
-No backlog changes resulted directly from the Sprint Review. Existing backlog items remain valid and will be reprioritized after the postponed customer review and UAT session have been completed.
 
-## Next Steps
- • Conduct the postponed Sprint Review with the customer.
- • Execute User Acceptance Testing.
- • Collect new customer feedback.
- • Update the Product Backlog based on the review results.
+No backlog changes resulted from a Week 5 Sprint Review. Existing Sprint 3 and
+MVP v2 issues remain the public backlog evidence.
