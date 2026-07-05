@@ -5,6 +5,15 @@ Tickframe. The QRT set verifies the quality requirements in
 [`docs/quality-requirements.md`](quality-requirements.md) using the ISO/IEC
 25010 quality model selected for Sprint 2 / MVP v2.
 
+## Navigation
+
+- [Traceability summary](#traceability-summary)
+- [Sprint scope and quality model](#sprint-scope-and-quality-model)
+- [Assignment 5 / Sprint 3 continuity](#assignment-5--sprint-3-continuity)
+- [QRT-001: Market Data Update Latency](#qrt-001-market-data-update-latency)
+- [QRT-002: Exchange Data Failure Visibility](#qrt-002-exchange-data-failure-visibility)
+- [QRT-003: Critical Module Test Coverage](#qrt-003-critical-module-test-coverage)
+
 ## Traceability Summary
 
 | Quality requirement | ISO/IEC 25010 sub-characteristic | Automated QRT | Repository test or gate | CI execution |
@@ -27,6 +36,22 @@ Tickframe. The QRT set verifies the quality requirements in
 - Evidence location: latest protected-branch or pull-request run of the
   [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml),
   with the `backend-coverage` artifact when coverage evidence is needed.
+
+## Assignment 5 / Sprint 3 Continuity
+
+The Assignment 4 QRTs remain the maintained automated quality evidence for
+Assignment 5. The A5-P05 ADRs do not replace the QRTs; they explain why the
+same checks are still relevant for MVP v2:
+
+| QRT | Assignment 5 architecture relevance | Evidence to cite in Week 5 |
+|---|---|---|
+| [QRT-001](#qrt-001-market-data-update-latency) | Supports WebSocket-driven market updates, exchange-specific streams, TimescaleDB-backed history, and observability latency evidence. | Backend quality tests, [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml), and [ADR-003](architecture/adr/ADR-003-websocket-driven-market-updates.md). |
+| [QRT-002](#qrt-002-exchange-data-failure-visibility) | Supports independent exchange-source status and visible stale-data behavior. | Backend quality tests, [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml), [ADR-001](architecture/adr/ADR-001-independent-exchange-sources.md), and [ADR-004](architecture/adr/ADR-004-dockerized-local-deployment-and-observability.md). |
+| [QRT-003](#qrt-003-critical-module-test-coverage) | Supports the maintained testability gate for critical analytics, history, storage, exchange parsing, and ML modules. | `backend-coverage` artifact, `check_critical_coverage.py`, [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml), and [ADR-002](architecture/adr/ADR-002-timescaledb-time-series-storage.md). |
+
+If Sprint 3 product implementation changes the measured latency path, stale
+status behavior, critical-module list, or coverage threshold, the same PR
+should update this file and [`docs/testing.md`](testing.md).
 
 ## QRT-001: Market Data Update Latency
 

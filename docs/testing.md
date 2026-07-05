@@ -5,6 +5,32 @@ from Assignment 4. It records critical-module coverage, automated test status,
 quality requirement tests, CI gates, and the additional QA check that remains
 part of the Definition of Done for later work.
 
+## Navigation
+
+- [Assignment 5 / Sprint 3 evidence alignment](#assignment-5--sprint-3-evidence-alignment)
+- [Critical modules and coverage status](#critical-modules-and-coverage-status)
+- [Automated test status](#automated-test-status)
+- [CI and QA check status](#ci-and-qa-check-status)
+- [Additional QA check rationale](#additional-qa-check-rationale)
+- [CI links and protected branch evidence](#ci-links-and-protected-branch-evidence)
+- [Week 5 report-ready evidence notes](#week-5-report-ready-evidence-notes)
+- [Gates maintained after Assignment 4](#gates-maintained-after-assignment-4)
+
+## Assignment 5 / Sprint 3 Evidence Alignment
+
+Assignment 5 keeps the Assignment 4 quality gates active while adding Sprint 3
+process and architecture documentation. The A5-P05 ADRs do not introduce a new
+runtime component by themselves, but they make the quality rationale explicit
+for exchange separation, TimescaleDB storage, WebSocket-driven updates, and the
+Docker Compose / observability deployment model.
+
+| Sprint 3 architecture or process area | Related quality evidence | Current A5-P06 action |
+|---|---|---|
+| ADR traceability for exchange sources, storage, live updates, and observability | [`docs/architecture/README.md`](architecture/README.md), [`docs/quality-requirements.md`](quality-requirements.md), and [`docs/quality-requirement-tests.md`](quality-requirement-tests.md) | Keep QR and QRT links readable for Week 5 review evidence. |
+| Maintained CI quality gates | [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) and [Links workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml) | Confirm the Assignment 4 gates remain required before Sprint 3 merges. |
+| Definition of Done alignment | [`docs/definition-of-done.md`](definition-of-done.md) | Clarify that architecture, ADR, deployment, and documentation changes must update quality evidence when applicable. |
+| Week 5 report preparation | This document, QRTs, ADRs, and CI workflow links | Provide public, sanitized evidence notes without private recordings, credentials, or customer-identifying information. |
+
 ## Critical Modules and Coverage Status
 
 Latest local verification: 2026-06-28 using
@@ -65,7 +91,7 @@ than the core analytics, history, observability, and model-serving logic.
 | Quality CI pipeline | [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml) | Runs on pull requests, pushes to `main`, and manual dispatch. |
 | Markdown link-check pipeline | [Links workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml) | Runs on Markdown/link-check changes in pull requests and pushes to `main`. |
 | CI configuration | [`.github/workflows/quality.yml`](../.github/workflows/quality.yml) | Defines backend lint, formatting, tests, coverage, frontend typecheck/build, and additional QA. |
-| Link-check configuration | [`.github/workflows/links.yml`](../.github/workflows/links.yml), [`github/workflows/links.yml`](../github/workflows/links.yml), and [`lychee.toml`](../lychee.toml) | Defines Lychee link checking for repository Markdown. |
+| Link-check configuration | [`.github/workflows/links.yml`](../.github/workflows/links.yml) and [`lychee.toml`](../lychee.toml) | Defines Lychee link checking for repository Markdown. |
 | Branch protection or rules evidence | Week 4 report screenshots or GitHub branch settings | Public screenshots should be stored under `reports/week4/images/` when captured. |
 
 ## Manual Evidence That Does Not Count as QRT
@@ -73,6 +99,31 @@ than the core analytics, history, observability, and model-serving logic.
 | Evidence | Scope | Result | Follow-up PBI or issue |
 |---|---|---|---|
 | Customer UAT observation | End-user ability to open the dashboard, inspect analytics, and review real-time data availability. | Passed during the Week 4 customer session. | [`docs/user-acceptance-tests.md`](user-acceptance-tests.md) |
+
+## Week 5 Report-Ready Evidence Notes
+
+For Assignment 5 / Week 5 reporting, the following public evidence applies to
+MVP v2 quality and testing:
+
+- The maintained [Quality workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml)
+  remains the source for backend linting, backend formatting, backend tests,
+  coverage generation, critical-module coverage validation, frontend
+  typechecking, frontend build verification, and the Ruff datetime-safety QA
+  check.
+- The maintained [Links workflow](https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml)
+  remains the source for Markdown link health on repository documentation.
+- The automated QRT evidence remains in
+  [`docs/quality-requirement-tests.md`](quality-requirement-tests.md) and
+  [`backend/tests/test_quality_requirements.py`](../backend/tests/test_quality_requirements.py).
+- The architecture decisions added for Assignment 5 are linked from
+  [`docs/architecture/README.md`](architecture/README.md) and
+  [`docs/quality-requirements.md`](quality-requirements.md), so Week 5 review
+  notes can explain why each quality gate still matters for MVP v2.
+- If A5-P07 changes product code, critical modules, runtime configuration, or
+  deployment behavior, the implementing PR should add or update tests in that
+  PR and then refresh this evidence table if the scope changes.
+- No private recordings, credentials, customer-identifying details, or
+  university email addresses should be placed in this public testing document.
 
 ## Gates Maintained After Assignment 4
 

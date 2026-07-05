@@ -58,13 +58,38 @@ workflow for team delivery.
   - Sprint 2 deployment and release PBIs
   - Sprint 2 testing, UAT, and reporting PBIs
     
-## Sprint 3 (Planned)
+## Sprint 3
 
-- Milestone: To be created
-- Dates: TBD
-- Sprint Goal: Expand analytical capabilities while maintaining established quality and automation standards.
-- Focus: Advanced market analytics, anomaly detection improvements, architecture documentation, and continued quality automation.
-- Expected outcome: More advanced market intelligence features supported by maintainable architecture, automated verification, and documented quality guarantees.
+- Milestone: [Sprint 3](https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/3)
+- Dates: 2026-06-29 to 2026-07-06
+- Sprint Goal: deliver MVP v2 planning and execution scope with clear customer-feedback traceability, quality evidence, and release readiness.
+- Focus: customer-feedback response, maintained process/architecture docs, MVP v2 implementation increment, QA/UAT evidence, and Week 5 reporting package.
+- Total Story Points: 65
+- Planned items:
+  - [A5-P01](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/149)
+  - [A5-P02](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/150)
+  - [A5-P03](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/151)
+  - [A5-P04](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/152)
+  - [A5-P05](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/153)
+  - [A5-P06](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/154)
+  - [A5-P07](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/155)
+  - [A5-P08](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/156)
+  - [A5-P09](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/157)
+  - [A5-P10](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/158)
+  - [A5-P11](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/159)
+  - [A5-P12](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/160)
+  - [A5-P13](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/161)
+  - [A5-P14](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/162)
+  - [A5-S01](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/163)
+  - [A5-S02](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/164)
+  - [A5-C01](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/165)
+  - [A5-C02](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/166)
+  - [A5-C03](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/167)
+  - [A5-C04](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/168)
+- Scope rationale:
+  - Customer value: sprint scope prioritizes direct response to MVP v1 customer feedback and visible MVP v2 product improvements.
+  - Quality and maintainability: scope includes architecture/process docs, ADR alignment, QA/DoD evidence, and release-readiness work.
+  - Feasibility: tasks are sliced into inspectable Assignment 5 PBIs with explicit dependencies for controlled delivery within Sprint 3.
 
 ## Roadmap Notes
 

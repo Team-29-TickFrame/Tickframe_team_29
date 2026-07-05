@@ -8,13 +8,16 @@ project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- No entries yet.
+- User-configurable market alerts with metric presets, level-break rules,
+  browser-stored alert state, sound cues, and bottom-right toast notifications
+  for issue #166.
 
 ### Changed
 - No entries yet.
 
 ### Fixed
-- No entries yet.
+- Stopped subscribing to unavailable Binance `TONUSDT` and renamed the Bybit
+  market to canonical `GRAM-USDT` for issue #178.
 
 ### Removed
 - No entries yet.

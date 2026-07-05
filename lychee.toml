@@ -21,6 +21,7 @@ verbose = "info"
 exclude = [
   "^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
   "^wss?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/.*)?$",
+  "^https://team-29-tickframe\\.github\\.io/Tickframe_team_29(/.*)?$",
 ]
 
 # Generated dependency folders are not repository documentation.

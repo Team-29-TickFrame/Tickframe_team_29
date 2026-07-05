@@ -26,6 +26,7 @@ Tickframe work may be marked `Done` only when all of the following are true:
     * automated Quality Requirement Tests;
     * critical-module coverage validation;
     * additional QA checks, including Ruff datetime-safety check.
+17. Architecture, ADR, deployment, testing, and process-documentation changes are reflected in the maintained quality evidence when they affect quality requirements, QRTs, critical modules, runtime configuration, or CI gates.
 
 Additional team rules:
 
@@ -40,6 +41,16 @@ Additional team rules:
     * docs/quality-requirements.md;
     * docs/quality-requirement-tests.md;
     * docs/user-acceptance-tests.md.
+- Assignment 5 architecture and process documentation must stay aligned with:
+    * docs/architecture/README.md;
+    * docs/architecture/adr/;
+    * docs/development-process.md;
+    * docs/testing.md;
+    * docs/quality-requirements.md;
+    * docs/quality-requirement-tests.md.
+- Week 5 public report evidence may cite CI, testing, ADR, QRT, and Definition
+  of Done artifacts, but must not include private recordings, exact private
+  timecodes, credentials, university emails, or customer-identifying details.
 - CI quality gates introduced in Assignment 4 remain active project requirements for future development and must not be disabled or bypassed after Assignment 4.
 - If future project work changes the technology stack, quality requirements, critical modules, testing strategy, or CI configuration, this Definition of Done must be updated so that it continues to reflect the current project completion standard.
 - The latest protected-default-branch CI run must pass before a release or assignment submission unless a documented exception has been approved.

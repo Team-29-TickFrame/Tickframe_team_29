@@ -4,12 +4,21 @@ import {
   ColorType,
   CrosshairMode,
   HistogramSeries,
+  LineStyle,
   createChart,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { DisplayCandle } from "../types";
+
+export interface ChartAlertLine {
+  id: string;
+  label: string;
+  price: number;
+  tone: "above" | "below";
+}
 
 interface MarketChartProps {
   candles: DisplayCandle[];
@@ -18,6 +27,7 @@ interface MarketChartProps {
   historyLoading: boolean;
   hasMore: boolean;
   onLoadEarlier: () => void;
+  alertLines?: ChartAlertLine[];
 }
 
 const DEFAULT_VISIBLE_BARS = 120;
@@ -53,6 +63,7 @@ export default function MarketChart({
   historyLoading,
   hasMore,
   onLoadEarlier,
+  alertLines = [],
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -214,10 +225,37 @@ export default function MarketChart({
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      alertLineRefs.current = [];
       renderedTimesRef.current = [];
       renderedSignaturesRef.current = [];
     };
   }, []);
+
+  useEffect(() => {
+    const candleSeries = candleSeriesRef.current;
+    if (!candleSeries) return;
+
+    for (const line of alertLineRefs.current) {
+      candleSeries.removePriceLine(line);
+    }
+    alertLineRefs.current = alertLines.map((line) =>
+      candleSeries.createPriceLine({
+        id: line.id,
+        price: line.price,
+        color:
+          line.tone === "above"
+            ? "rgba(124, 77, 255, 0.88)"
+            : "rgba(255, 78, 103, 0.88)",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        lineVisible: true,
+        axisLabelVisible: true,
+        axisLabelColor: line.tone === "above" ? "#7c4dff" : "#ff4e67",
+        axisLabelTextColor: "#f4f6ff",
+        title: line.label,
+      }),
+    );
+  }, [alertLines]);
 
   useEffect(() => {
     const candleSeries = candleSeriesRef.current;
