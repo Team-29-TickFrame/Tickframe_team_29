@@ -14,6 +14,7 @@
 | User acceptance tests | [`docs/user-acceptance-tests.md`](../../docs/user-acceptance-tests.md) |
 | Week 5 customer feedback response | [`reports/week5/customer-feedback-response.md.`](./customer-feedback-response.md.) |
 | Week 5 LLM usage report | [`reports/week5/llm-report.md`](./llm-report.md) |
+| Week 5 reflection | [`reports/week5/reflection.md`](./reflection.md) |
 
 ## Hosted Documentation Notes
 
