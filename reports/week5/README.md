@@ -123,11 +123,6 @@ The hosted documentation site is deployed from the repository's maintained docum
 
 After the MVP v2 SemVer release is created, add the same hosted documentation URL to the release notes where practical.
 
-## Demo Video
-
-| Artifact | Link |
-|---|---|
-| Public Sanitized MVP v2 Demo | INSERT_VIDEO_LINK |
 
 ## Current Product Status
 
