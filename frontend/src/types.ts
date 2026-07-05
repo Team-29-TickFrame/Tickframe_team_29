@@ -227,6 +227,21 @@ export interface MlPatternResponse {
   dataFrom?: number | null;
   dataTo?: number | null;
   candleCount?: number;
+  ruleBased?: {
+    label: string;
+    score: number;
+    reason: string;
+    anchors: Array<{
+      name: string;
+      index: number;
+      openTime: number;
+      closeTime: number;
+      open: number | null;
+      high: number | null;
+      low: number | null;
+      close: number | null;
+    }>;
+  };
   experimental?: boolean;
 }
 

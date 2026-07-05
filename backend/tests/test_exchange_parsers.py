@@ -71,6 +71,37 @@ class ExchangeParserTests(unittest.TestCase):
         self.assertEqual(trade.side, "sell")
         self.assertEqual(trade.sequence, 42)
 
+    def test_bybit_gram_trade_is_normalized(self) -> None:
+        trades = parse_bybit_message(
+            {
+                "topic": "publicTrade.GRAMUSDT",
+                "type": "snapshot",
+                "ts": 1_700_000_000_010,
+                "data": [
+                    {
+                        "T": 1_700_000_000_000,
+                        "s": "GRAMUSDT",
+                        "S": "Buy",
+                        "v": "12.5",
+                        "p": "2.400",
+                        "i": "gram-trade-1",
+                        "seq": 84,
+                    }
+                ],
+            },
+            self.config,
+            received_timestamp_ms=1_700_000_000_025,
+        )
+
+        self.assertEqual(len(trades), 1)
+        trade = trades[0]
+        self.assertEqual(trade.exchange, "bybit")
+        self.assertEqual(trade.instrument_id, "GRAM-USDT")
+        self.assertEqual(trade.exchange_symbol, "GRAMUSDT")
+        self.assertEqual(trade.price, Decimal("2.400"))
+        self.assertEqual(trade.base_quantity, Decimal("12.5"))
+        self.assertEqual(trade.side, "buy")
+
 
 async def async_noop(*args: object) -> None:
     return None
@@ -104,7 +135,7 @@ class BybitCollectorTests(unittest.IsolatedAsyncioTestCase):
             all('"args": ["publicTrade.' in payload for payload in websocket.sent)
         )
         self.assertIn(
-            "publicTrade.TONUSDT",
+            "publicTrade.GRAMUSDT",
             self.collector._pending_subscriptions.values(),
         )
 
@@ -115,17 +146,17 @@ class BybitCollectorTests(unittest.IsolatedAsyncioTestCase):
         self.collector._handle_control_message(
             {
                 "success": False,
-                "ret_msg": "Invalid symbol :[publicTrade.TONUSDT]",
+                "ret_msg": "Invalid symbol :[publicTrade.GRAMUSDT]",
                 "req_id": "tickframe-bybit-6",
                 "op": "subscribe",
             }
         )
 
         self.assertEqual(
-            self.collector.rejected_topics["publicTrade.TONUSDT"],
-            "Invalid symbol :[publicTrade.TONUSDT]",
+            self.collector.rejected_topics["publicTrade.GRAMUSDT"],
+            "Invalid symbol :[publicTrade.GRAMUSDT]",
         )
-        self.assertFalse(self.collector.is_instrument_active("TON-USDT"))
+        self.assertFalse(self.collector.is_instrument_active("GRAM-USDT"))
 
 
 if __name__ == "__main__":

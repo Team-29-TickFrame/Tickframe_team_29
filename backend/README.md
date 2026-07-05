@@ -9,21 +9,23 @@ market measurements from the same candle history used by the chart.
 ## Initial market scope
 
 The versioned configuration in [`config/markets.yaml`](config/markets.yaml)
-contains ten instruments:
+contains ten canonical instruments:
 
 - BTC/USDT
 - ETH/USDT
 - SOL/USDT
 - XRP/USDT
 - AVAX/USDT
-- TON/USDT
+- GRAM/USDT
 - TRX/USDT
 - BONK/USDT
 - PENGU/USDT
 - FLOKI/USDT
 
-Each exchange remains a separate source. Tickframe never merges Binance and
-Bybit OHLCV into a synthetic candle.
+Each exchange remains a separate source. Exchange support is explicit per
+instrument, so a market can be active on Bybit but omitted from Binance when the
+Binance Spot symbol is unavailable. Tickframe never merges Binance and Bybit
+OHLCV into a synthetic candle.
 
 ## Data behavior
 

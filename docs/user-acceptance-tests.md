@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This document maintains end-user-facing UAT scenarios for Assignment 5. The scenarios are intended to be executed with the customer during the Week 5 customer session.
+This document maintains end-user-facing UAT scenarios for Assignment 5.  
+Week 5 customer-executed UAT was planned, but the customer session did not take place in this iteration.
 
 Private recording links, exact timecodes, credentials, and customer-identifying details must not be committed to the public repository.
 
@@ -13,8 +14,8 @@ Private recording links, exact timecodes, credentials, and customer-identifying 
 | UAT-001 | Open the product and inspect the main dashboard | Active | MVP v2 / Sprint 2 | Passed on 2026-06-27 |
 | UAT-002 | Inspect market metrics and analytics output | Active | MVP v2 / Sprint 2 | Passed on 2026-06-27 |
 | UAT-003 | Check latency or system health information | Active | MVP v2 / Sprint 2 | Passed on 2026-06-27 |
-| UAT-004 | Validate pattern-analysis progress visibility | Active | MVP v2 / Sprint 3 | Planned for Week 5 session |
-| UAT-005 | Validate simple alerts and chart experience | Active | MVP v2 / Sprint 3 | Planned for Week 5 session |
+| UAT-004 | Validate pattern-analysis progress visibility | Active | MVP v2 / Sprint 3 | Not executed with customer (Week 5 session not held) |
+| UAT-005 | Validate simple alerts and chart experience | Active | MVP v2 / Sprint 3 | Not executed with customer (Week 5 session not held) |
 
 ## UAT-001: Open the product and inspect the main dashboard
 
@@ -94,7 +95,7 @@ The customer can see pattern-analysis progress/output and understand what functi
 ### Execution history
 | Date | Executor | Result | Notes |
 |---|---|---|---|
-| 2026-07-XX | Customer/stakeholder with team guidance | Planned | To be executed in Week 5 customer session. |
+| 2026-07-05 | Team (internal pre-check only) | Not executed with customer | Week 5 customer session did not take place; formal customer UAT postponed to next available session. |
 
 ## UAT-005: Validate simple alerts and chart experience
 
@@ -114,18 +115,19 @@ The customer confirms that simple alerts and the updated chart experience are un
 ### Execution history
 | Date | Executor | Result | Notes |
 |---|---|---|---|
-| 2026-07-XX | Customer/stakeholder with team guidance | Planned | To be executed in Week 5 customer session. |
+| 2026-07-05 | Team (internal pre-check only) | Not executed with customer | Week 5 customer session did not take place; formal customer UAT postponed to next available session. |
 
-## Week 5 Execution Summary (Draft)
+## Week 5 Execution Summary
 
-The Week 5 UAT summary will be finalized after customer-executed UAT during the Week 5 recorded session.
+The planned Week 5 customer UAT session did not take place.  
+Only scenario maintenance and internal preparation were completed in this iteration.
 
 Private recording links and exact timecodes are not included in the public repository and are reserved for Moodle/private submission.
 
 | Scenario | Result | Customer feedback | Follow-up issue/PBI |
 |---|---|---|---|
-| UAT-001 | Planned | To be confirmed in Week 5 customer session. | TBD |
-| UAT-002 | Planned | To be confirmed in Week 5 customer session. | TBD |
-| UAT-003 | Planned | To be confirmed in Week 5 customer session. | TBD |
-| UAT-004 | Planned | To be confirmed in Week 5 customer session. | TBD |
-| UAT-005 | Planned | To be confirmed in Week 5 customer session. | TBD |
+| UAT-001 | Passed (previous customer execution on 2026-06-27) | Previously approved in customer session. | No follow-up required from this scenario |
+| UAT-002 | Passed (previous customer execution on 2026-06-27) | Previously approved in customer session. | No follow-up required from this scenario |
+| UAT-003 | Passed (previous customer execution on 2026-06-27) | Previously approved in customer session. | No follow-up required from this scenario |
+| UAT-004 | Not executed with customer | Customer feedback unavailable in Week 5 because the session was not held. | TBD (next customer session) |
+| UAT-005 | Not executed with customer | Customer feedback unavailable in Week 5 because the session was not held. | TBD (next customer session) |

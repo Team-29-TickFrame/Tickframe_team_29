@@ -11,7 +11,8 @@ synthetic price or candle.
 
 ## Current Scope
 
-- 10 USDT instruments: BTC, ETH, SOL, XRP, AVAX, TON, TRX, BONK, PENGU, FLOKI
+- 10 canonical USDT instruments: BTC, ETH, SOL, XRP, AVAX, GRAM, TRX, BONK,
+  PENGU, FLOKI; exchange support is explicit per instrument
 - Public Binance and Bybit WebSocket collectors
 - Event-time `1s` OHLCV with gaps and late-trade revisions
 - TimescaleDB history with stable delayed `1s`, `5s`, `15s` raw-trade
@@ -123,6 +124,11 @@ TICKFRAME_SECOND_REPAIR_HOURS=72h
 TICKFRAME_STABLE_CHART_DELAY_MS=2000
 ```
 
+The maintained market config may omit an exchange symbol when that venue has no
+active Spot market. For example, the canonical `GRAM-USDT` instrument currently
+uses Bybit's `GRAMUSDT` Spot symbol and does not subscribe to Binance while
+Binance reports the old `TONUSDT` market as unavailable.
+
 After backend startup or exchange reconnection, Tickframe automatically
 backfills recent public `1m` OHLCV into `historical_candles` so chart windows do
 not keep permanent holes after local downtime. The default recovery window is
@@ -222,17 +228,20 @@ python3 -m unittest discover -s backend/tests
 ## ML Training Pipeline
 
 The first maintained pattern-recognition experiment lives in
-[ml/pattern_recognition](ml/pattern_recognition). It trains a synthetic `1m`
-baseline for 96-candle windows and saves reproducible model artifacts.
+[ml/pattern_recognition](ml/pattern_recognition). It prepares Binance Public
+Data `1m` candles, weak-labels 96-candle windows with rule-based chart-pattern
+detectors, and saves reproducible model artifacts.
 
 ```bash
+python -m ml.pattern_recognition.prepare_binance_dataset --config ml/pattern_recognition/config.json
 python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json
 ```
 
-The training pipeline itself is offline. The saved baseline artifact is exposed
-through the experimental `/api/v1/patterns/ml` endpoint and the dashboard ML
-pattern panel for the `1m` timeframe only. Other timeframes remain unsupported
-until separate training and validation artifacts exist for them.
+The training step itself is offline after the Binance dataset has been prepared.
+The saved baseline artifact is exposed through the experimental
+`/api/v1/patterns/ml` endpoint and the dashboard ML pattern panel for the `1m`
+timeframe only. Other timeframes remain unsupported until separate training and
+validation artifacts exist for them.
 
 ## Deployment
 

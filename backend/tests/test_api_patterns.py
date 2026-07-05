@@ -1,39 +1,35 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from backend.app.main import ml_patterns
+from backend.app.pattern_ml import PatternMLDetector
+from backend.tests.test_pattern_ml import fixture_candles, write_fixture_model
 from ml.pattern_recognition import WINDOW_SIZE
-from ml.pattern_recognition.dataset import generate_dataset
-
-
-def synthetic_candles(label: str, seed: int = 7) -> list[dict]:
-    return [
-        dict(candle)
-        for candle in generate_dataset(
-            labels=[label],
-            samples_per_class=1,
-            window_size=WINDOW_SIZE,
-            seed=seed,
-        )[0].candles
-    ]
 
 
 class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_non_one_minute_timeframe_does_not_call_history_service(self) -> None:
-        with patch(
-            "backend.app.main.service.candle_history", new=AsyncMock()
-        ) as history:
-            result = await ml_patterns(
-                exchange="binance",
-                instrument_id="BTC-USDT",
-                timeframe="5m",
-            )
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
+
+            with patch(
+                "backend.app.main.pattern_ml_detector", detector
+            ), patch("backend.app.main.service.candle_history", new=AsyncMock()) as history:
+                result = await ml_patterns(
+                    exchange="binance",
+                    instrument_id="BTC-USDT",
+                    timeframe="5m",
+                )
 
         self.assertEqual(result["status"], "unsupported_timeframe")
         history.assert_not_called()
 
     async def test_one_minute_endpoint_uses_history_service_and_detector(self) -> None:
-        candles = synthetic_candles("double_top")
+        candles = fixture_candles("double_top")
         extra_incomplete = [
             {
                 **candles[0],
@@ -52,12 +48,19 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
         }
         mock_history = AsyncMock(return_value=history_response)
 
-        with patch("backend.app.main.service.candle_history", new=mock_history):
-            result = await ml_patterns(
-                exchange="binance",
-                instrument_id="BTC-USDT",
-                timeframe="1m",
-            )
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
+
+            with patch("backend.app.main.pattern_ml_detector", detector), patch(
+                "backend.app.main.service.candle_history", new=mock_history
+            ):
+                result = await ml_patterns(
+                    exchange="binance",
+                    instrument_id="BTC-USDT",
+                    timeframe="1m",
+                )
 
         mock_history.assert_awaited_once_with(
             exchange="binance",
@@ -71,6 +74,7 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["candleCount"], WINDOW_SIZE)
         self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
         self.assertIsNotNone(result["prediction"])
+        self.assertIn("ruleBased", result)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -588,17 +589,10 @@ export default function MarketChart({
   const lineSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const alertLineRefs = useRef<Array<{ series: PriceLineSeries; line: IPriceLine }>>([]);
-  const drawingPrimitiveRefs = useRef<Array<{ series: PriceLineSeries; primitive: DrawingPrimitive }>>([]);
-  const drawingLevelRefs = useRef<Array<{ series: PriceLineSeries; line: IPriceLine }>>([]);
-  const previewPrimitiveRef = useRef<{ series: PriceLineSeries; primitive: DrawingPrimitive } | null>(null);
-  const activeToolRef = useRef<DrawingTool>("cursor");
-  const chartModeRef = useRef<ChartMode>("candles");
-  const precisionRef = useRef(2);
-  const draftPointRef = useRef<DrawingPoint | null>(null);
-  const selectedDrawingIdRef = useRef<string | null>(null);
-  const drawingEditSessionRef = useRef<DrawingEditSession | null>(null);
-  const copiedDrawingRef = useRef<ChartDrawing | null>(null);
+  const [visibleLogicalRange, setVisibleLogicalRange] = useState<{
+    from: number;
+    to: number;
+  } | null>(null);
   const lastScopeRef = useRef<string | null>(null);
   const resetPendingRef = useRef(true);
   const suppressDrawingSaveRef = useRef(true);
@@ -619,18 +613,10 @@ export default function MarketChart({
   const readoutCandle = inspectCandle ?? latestCandle;
   const latestPrice = latestCandle?.close ?? 0;
   const precision = useMemo(() => pricePrecision(latestPrice), [latestPrice]);
-  const selectedDrawing = useMemo(
-    () => drawings.find((drawing) => drawing.id === selectedDrawingId) ?? null,
-    [drawings, selectedDrawingId],
+  const patternOverlay = useMemo(
+    () => patternOverlayGeometry(candles, visibleLogicalRange),
+    [candles, visibleLogicalRange],
   );
-
-  const detachPreview = useCallback(() => {
-    const preview = previewPrimitiveRef.current;
-    if (preview) {
-      preview.series.detachPrimitive(preview.primitive);
-      previewPrimitiveRef.current = null;
-    }
-  }, []);
 
   useEffect(() => {
     historyStateRef.current = { hasMore, historyLoading, onLoadEarlier };
@@ -1169,6 +1155,7 @@ export default function MarketChart({
     volumeSeriesRef.current = volumeSeries;
 
     const handleVisibleRange = (range: { from: number; to: number } | null) => {
+      setVisibleLogicalRange(range);
       if (!range || range.from > 15) return;
       const state = historyStateRef.current;
       if (state.hasMore && !state.historyLoading) state.onLoadEarlier();
@@ -1478,6 +1465,7 @@ export default function MarketChart({
     }
     renderedTimesRef.current = nextTimes;
     renderedSignaturesRef.current = nextSignatures;
+    setVisibleLogicalRange(chart.timeScale().getVisibleLogicalRange());
 
     if (resetPendingRef.current && candles.length > 0) {
       resetPendingRef.current = false;
@@ -1503,73 +1491,30 @@ export default function MarketChart({
       : `${drawings.length} drawing${drawings.length === 1 ? "" : "s"}`;
 
   return (
-    <div
-      className={`chart-stage ${activeTool !== "cursor" ? "is-drawing" : ""} ${
-        selectedDrawing !== null ? "has-selection" : ""
-      } ${editingDrawing ? "is-editing-drawing" : ""}`}
-    >
-      <div
-        ref={containerRef}
-        className="chart-canvas"
-        onPointerDown={startDrawingEdit}
-        onPointerMove={moveDrawingEdit}
-        onPointerUp={finishDrawingEdit}
-        onPointerCancel={finishDrawingEdit}
-      />
-
-      <div className="tv-chart-toolbar" aria-label="Trading chart controls">
-        <div className="tv-toolbar-group">
-          {CHART_MODES.map((mode) => (
-            <button
-              className={chartMode === mode.id ? "active" : ""}
-              key={mode.id}
-              type="button"
-              onClick={() => setChartMode(mode.id)}
-            >
-              {mode.label}
-            </button>
-          ))}
+    <div className="chart-stage">
+      <div ref={containerRef} className="chart-canvas" />
+      {patternOverlay && (
+        <div className="chart-pattern-overlay" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line
+              className="pattern-start-line"
+              x1={patternOverlay.startX}
+              x2={patternOverlay.startX}
+              y1="0"
+              y2="100"
+            />
+          </svg>
         </div>
-        <div className="tv-toolbar-group">
-          <button type="button" disabled={candles.length === 0} onClick={resetViewport}>
-            Fit
-          </button>
-          <button type="button" disabled={candles.length === 0} onClick={scrollToLatest}>
-            Latest
-          </button>
-          {hasMore && (
-            <button type="button" disabled={historyLoading} onClick={onLoadEarlier}>
-              {historyLoading ? "Loading" : "History"}
-            </button>
-          )}
-        </div>
-        <span className="tv-toolbar-state">{drawCountLabel}</span>
-      </div>
-
-      <div className="tv-drawing-rail" aria-label="Drawing tools">
-        {DRAWING_TOOLS.map((tool) => (
-          <button
-            className={activeTool === tool.id ? "active" : ""}
-            key={tool.id}
-            title={tool.title}
-            type="button"
-            onClick={() => setActiveTool(tool.id)}
-          >
-            {tool.label}
-          </button>
-        ))}
-        <span className="tv-rail-divider" />
-        <button type="button" title="Undo last drawing" onClick={undoDrawing}>
-          Undo
-        </button>
-        <button
-          type="button"
-          title="Copy selected drawing"
-          disabled={selectedDrawing === null}
-          onClick={copySelectedDrawing}
-        >
-          Copy
-        </button>
+      )}
+      <button
+        className="chart-reset"
+        type="button"
+        disabled={candles.length === 0}
+        onClick={resetViewport}
+      >
+        AUTO FIT
+      </button>
+      {hasMore && (
         <button
           type="button"
           title="Paste copied drawing"
@@ -1618,4 +1563,28 @@ export default function MarketChart({
       )}
     </div>
   );
+}
+
+function patternOverlayGeometry(
+  candles: DisplayCandle[],
+  visibleRange: { from: number; to: number } | null,
+): { startX: number } | null {
+  if (candles.length < 96 || !visibleRange) {
+    return null;
+  }
+
+  const visibleSpan = Math.max(0.000001, visibleRange.to - visibleRange.from);
+  const startIndex = candles.length - 96;
+  const patternBoundaryIndex = startIndex - 0.5;
+  return {
+    startX: clamp(
+      ((patternBoundaryIndex - visibleRange.from) / visibleSpan) * 100,
+      -4,
+      104,
+    ),
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

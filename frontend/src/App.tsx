@@ -376,7 +376,6 @@ const COIN_LOGO_SYMBOLS = new Set([
   "SOL",
   "XRP",
   "AVAX",
-  "TON",
   "TRX",
   "BONK",
   "PENGU",
@@ -3034,29 +3033,13 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           />
 
           <aside className="events-column">
-            <article
-              className={`panel ml-pattern-panel ${workspacePanelClass({
-                group: "side",
-                id: "ml",
-              })}`}
-              data-workspace-panel={workspacePanelKey({
-                group: "side",
-                id: "ml",
-              })}
-              style={workspacePanelStyle(sidePanelOrder("ml"), {
-                group: "side",
-                id: "ml",
-              })}
-            >
-              <div className="workspace-panel-shell">
-                <div className="panel-head compact">
-                <div className="panel-head-main">
-                  <div className="panel-title-with-logo">
-                    <CoinLogo base={instrument?.base} className="coin-logo-xs" />
-                    <div>
-                      <span className="eyebrow">ML PATTERN</span>
-                      <strong>{mlPattern?.modelVersion ?? "pattern-baseline-v0"}</strong>
-                    </div>
+            <article className="panel ml-pattern-panel">
+              <div className="panel-head compact">
+                <div className="panel-title-with-logo">
+                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                  <div>
+                    <span className="eyebrow">ML PATTERN</span>
+                    <strong>{mlPattern?.modelVersion ?? "pattern-real-data-v1"}</strong>
                   </div>
                 </div>
                 <WorkspaceHeaderDragZone
@@ -3105,35 +3088,6 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </small>
                 </div>
 
-                <div className="ml-pattern-stats">
-                  <div>
-                    <span>Confidence</span>
-                    <strong>
-                      {mlPattern?.prediction
-                        ? formatConfidence(mlPattern.prediction.confidence)
-                        : "--"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Window</span>
-                    <strong>{mlPattern?.windowSize ?? 96} candles</strong>
-                  </div>
-                  <div>
-                    <span>Source</span>
-                    <strong>{mlPattern?.source ?? "--"}</strong>
-                  </div>
-                </div>
-
-                {mlPattern?.alternatives && mlPattern.alternatives.length > 0 && (
-                  <div className="ml-alternatives">
-                    {mlPattern.alternatives.slice(0, 3).map((item) => (
-                      <span key={item.label}>
-                        {patternLabel(item.label)}
-                        <b>{formatConfidence(item.confidence)}</b>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
               </div>
             </article>
