@@ -2,16 +2,21 @@
 
 ## Tools Used
 
-The team used Cursor AI / ChatGPT-style assistance in a limited way.
+The team used Cursor AI and ChatGPT-style assistance.
 
 ## How AI Was Used
 
-AI assistance was used for documentation support during Assignment 5, including wording suggestions, improving structure, checking consistency between report sections, and preparing clearer links between project evidence, quality requirements, architecture decisions, and weekly documentation.
+AI was used to draft and edit documentation, check consistency between report
+sections, and organize links between architecture, quality, testing, and Week 5
+evidence.
 
 ## Human Contribution
 
-The team reviewed the Assignment 5 requirements, completed the project work, made final decisions, checked the repository materials, and prepared the submitted evidence. All documentation, architecture notes, quality evidence, and submission materials were reviewed and edited by the team before submission.
+The team selected the Sprint scope, made project decisions, reviewed generated
+text, edited repository files, and decided what evidence to submit.
 
 ## Limitations
 
-AI tools were not used to replace implementation, testing, UAT, sprint review, retrospective discussion, team decisions, or final verification.
+AI output was not treated as evidence. Product behavior, tests, UAT, Sprint
+Review status, release status, and private submission details must be verified
+by the team.

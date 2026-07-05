@@ -1,0 +1,67 @@
+@startuml
+title Tickframe Static View - Main Components
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+legend right
+  Static-view notation
+  Box = component, service, or external system
+  Database cylinder = stored state
+  Arrow = "uses" or "sends data to"
+  Dashed arrow = monitoring or model-file dependency
+endlegend
+
+actor "app user" as User
+
+package "Frontend" {
+  component "React terminal UI" as UI
+  component "Chart, alerts,\nmetrics and ML panels" as Panels
+  component "API/WebSocket client" as Client
+}
+
+package "Backend" {
+  component "FastAPI API\nREST + WebSocket" as API
+  component "MarketDataService\nmain coordinator" as Service
+  component "Exchange collectors" as Collectors
+  component "CandleAggregator" as Aggregator
+  component "LiveStore\nlatest in-memory state" as Store
+  component "Metrics engine" as Metrics
+  component "ML pattern adapter" as ML
+  component "AuthService" as Auth
+  component "DatabaseWriter" as Writer
+  component "Observability" as Obs
+}
+
+cloud "Binance public APIs" as Binance
+cloud "Bybit public APIs" as Bybit
+database "TimescaleDB" as DB
+folder "Pattern model files" as ModelFiles
+component "Prometheus" as Prometheus
+component "Grafana" as Grafana
+
+User --> UI : opens product
+UI --> Panels : shows charts and controls
+UI --> Client : asks for data
+Client --> API : REST calls and WebSockets
+
+API --> Auth : login/session actions
+API --> Service : market, candles, metrics
+API --> ML : pattern request
+
+Service --> Collectors : starts exchange streams
+Collectors --> Binance : public market data
+Collectors --> Bybit : public market data
+Collectors --> Service : normalized trades
+
+Service --> Aggregator : build candles
+Service --> Store : update latest state
+Service --> Metrics : compute analytics
+Service --> Writer : save trades, candles, metrics
+Writer --> DB : SQL writes and reads
+Auth --> DB : user/session data
+ML --> ModelFiles : load model artifact
+
+Service --> Obs : latency and health events
+Prometheus ..> API : scrape /metrics
+Grafana ..> Prometheus : read dashboards
+@enduml

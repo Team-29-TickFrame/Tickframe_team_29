@@ -1,0 +1,52 @@
+@startuml
+title Tickframe Deployment View - Docker Compose Runtime
+skinparam shadowing false
+
+legend right
+  Deployment-view notation
+  Node = machine, network boundary, or runtime container
+  Database cylinder = stateful datastore
+  Folder = persistent volume or configuration boundary
+  Cloud = external public service
+  Solid arrow = runtime network path
+  Dashed arrow = configuration or mounted persistence relation
+endlegend
+
+actor "app user" as Browser
+cloud "Binance and Bybit APIs" as Exchanges
+
+node "VM" as Host {
+  node "Optional host reverse proxy\nHTTPS/WSS termination" as Proxy
+
+  node "Docker Compose project network" as Compose {
+    node "frontend container\nNginx + built React app\nport 4173 -> 80" as Frontend
+    node "backend container\nBusiness Logic App:\nFastAPI + collectors\nport 8000" as Backend
+    database "timescaledb container\nPostgreSQL + TimescaleDB\nprivate port 5432" as Timescale
+    node "prometheus container\nport 9090" as Prometheus
+    node "grafana container\nport 3000" as Grafana
+  }
+
+  folder ".env private runtime\nconfiguration" as Env
+  folder ".env.example committed\nsanitized template" as EnvExample
+  folder "tickframe-timescale-data" as TimescaleVolume
+  folder "tickframe-prometheus-data" as PromVolume
+  folder "tickframe-grafana-data" as GrafVolume
+}
+
+Browser --> Proxy : HTTPS / WSS
+Proxy --> Frontend : serves product UI
+Browser --> Frontend : local HTTP when no proxy
+Frontend --> Backend : REST JSON and WebSocket proxy
+Backend --> Exchanges : public REST and WebSocket clients
+Backend --> Timescale : SQL over Compose network
+Prometheus --> Backend : scrape /metrics
+Grafana --> Prometheus : Prometheus datasource
+
+EnvExample ..> Env : documents required variables
+Env ..> Backend : runtime URLs and thresholds
+Env ..> Timescale : database password
+Env ..> Grafana : admin defaults
+Timescale ..> TimescaleVolume : persistent data
+Prometheus ..> PromVolume : metric history
+Grafana ..> GrafVolume : dashboards and settings
+@enduml

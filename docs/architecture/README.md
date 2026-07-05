@@ -1,472 +1,148 @@
-# Tickframe Architecture
+## Static View - Component Diagram
+show parts of the product and the simple "uses" relationships
+between them.
 
-This page is the maintained architecture landing page for Tickframe. It links
-the current architecture decisions to the product structure, quality
-requirements, and Sprint 3 / Assignment 5 documentation.
+### What The Static View Shows
 
-## Current Architecture
+The static view shows Tickframe as three main areas:
 
-Tickframe is a real-time crypto market analytics product. The product keeps
-Binance and Bybit as independent market data sources, normalizes public Spot
-trades, builds reproducible candles, stores history in TimescaleDB, and exposes
-market data to a React terminal through REST and WebSocket APIs.
+1. The user works with the React frontend.
+2. The frontend asks the FastAPI backend for data through REST and WebSocket
+   connections.
+3. The backend coordinates exchange collectors, candle building, live state,
+   metrics, ML pattern lookup, database persistence, and monitoring.
 
-The main runtime flow is:
+Outside the backend, Tickframe depends on Binance and Bybit for public market
+data, TimescaleDB for stored trades/candles/metrics, model files for the ML
+pattern endpoint, and Prometheus/Grafana for observability.
 
-1. Exchange collectors in [`backend/app/service.py`](../../backend/app/service.py)
-   and [`backend/app/exchanges/`](../../backend/app/exchanges/) subscribe to
-   public Binance and Bybit Spot streams.
-2. Exchange-specific messages are normalized into canonical trades using the
-   configured market and instrument map in
-   [`backend/config/markets.yaml`](../../backend/config/markets.yaml).
-3. [`backend/app/aggregation.py`](../../backend/app/aggregation.py) converts
-   trades into delayed, revision-aware `1s` OHLCV candles.
-4. [`backend/app/database.py`](../../backend/app/database.py) persists raw
-   trades, candle revisions, rollups, metric points, metric events, and latest
-   metric summaries in TimescaleDB.
-5. [`backend/app/main.py`](../../backend/app/main.py) exposes REST endpoints
-   for initial reads and WebSocket endpoints for market, candle, and metric
-   updates.
-6. [`frontend/src/api.ts`](../../frontend/src/api.ts) and
-   [`frontend/src/components/MarketChart.tsx`](../../frontend/src/components/MarketChart.tsx)
-   render the terminal view with exchange, instrument, timeframe, chart,
-   metric, and telemetry flows.
-7. [`docker-compose.yml`](../../docker-compose.yml) runs the local product
-   stack with backend, frontend, TimescaleDB, Prometheus, and Grafana.
+### Coupling And Cohesion
 
-## Architecture Views
+The design is cohesive because each major component has a clear job. Exchange
+collectors talk to Binance and Bybit. `CandleAggregator` builds candles.
+`LiveStore` keeps the latest in-memory market state. The metrics engine
+computes analytics. `DatabaseWriter` handles persistence. The frontend mostly
+renders data and sends requests through `frontend/src/api.ts`.
 
-| View | Diagram | Source |
-|---|---|---|
-| Static view | Component diagram | [`static-view/component-diagram.puml`](static-view/component-diagram.puml) |
-| Dynamic view | Sequence diagram — open a chart and receive a live candle update | [`dynamic-view/chart-open-and-live-update-sequence.puml`](dynamic-view/chart-open-and-live-update-sequence.puml) |
-| Deployment view | Deployment diagram | [`deployment-view/deployment-diagram.puml`](deployment-view/deployment-diagram.puml) |
-
-All three diagrams are PlantUML sources. They can be rendered locally with
-`plantuml docs/architecture/**/*.puml` or with any PlantUML-compatible viewer
-(VS Code PlantUML extension, IntelliJ plugin, or the PlantUML server). Rendered
-PNG/SVG output is intentionally not committed so the diagram source remains the
-single source of truth and stays trivial to diff in review.
-
----
-
-## Static View
-
-### Component Diagram
-
-```
-docs/architecture/static-view/component-diagram.puml
-```
-
-<details>
-<summary>View PlantUML source</summary>
-
-```plantuml
-@startuml component-diagram
-!theme plain
-skinparam componentStyle rectangle
-title Tickframe - Component Diagram (Static View)
-
-actor "User" as user
-
-package "External Exchanges" {
-  [Binance Spot\nWebSocket / REST] as binance
-  [Bybit Spot\nWebSocket / REST] as bybit
-}
-
-package "Tickframe Frontend (React + TypeScript)" {
-  [Terminal UI\n(App.tsx, MarketChart.tsx)] as ui
-  [API / WS Client\n(api.ts)] as apiClient
-}
-
-package "Tickframe Backend (FastAPI)" {
-  [Exchange Collectors] as collectors
-  [Candle Aggregator\n(aggregation.py)] as aggregator
-  [Live Store\n(store.py)] as liveStore
-  [Metrics Engine\n(metrics.py, pattern_ml.py)] as metricsEngine
-  [Market Data Service\n(service.py)] as marketService
-  [Auth\n(auth.py)] as auth
-  [REST + WebSocket API\n(main.py)] as api
-  [Database Writer\n(database.py, history.py)] as dbWriter
-  [Observability\n(observability.py, /metrics)] as observability
-}
-
-database "TimescaleDB" as db
-
-package "Observability Stack" {
-  [Prometheus] as prometheus
-  [Grafana Dashboard] as grafana
-}
-
-user --> ui
-ui --> apiClient
-apiClient --> api : REST + WebSocket
-binance --> collectors
-bybit --> collectors
-collectors --> marketService
-marketService --> aggregator
-aggregator --> liveStore
-marketService --> metricsEngine
-marketService --> dbWriter
-dbWriter --> db
-liveStore --> api
-metricsEngine --> api
-api --> auth
-auth --> db
-api --> observability
-observability --> prometheus
-prometheus --> grafana
-@enduml
-```
-
-The full annotated source (with notes on revision handling and retention) is
-in [`static-view/component-diagram.puml`](static-view/component-diagram.puml).
-
-</details>
-
-### What the Diagram Shows
-
-The component diagram shows Tickframe as three layers around a shared data
-store:
-
-- **External systems**: Binance and Bybit public Spot WebSocket/REST endpoints
-  are shown as separate, independent sources (never merged), consistent with
-  [ADR-001](adr/ADR-001-independent-exchange-sources.md).
-- **Frontend**: the terminal UI and its API/WS client, which talk to the
-  backend exclusively through REST for initial loads and WebSocket for live
-  updates.
-- **Backend**: exchange collectors, the candle aggregator, an in-memory live
-  store, the metrics engine, the REST/WebSocket API layer, an auth module, a
-  database writer, and an observability module.
-- **Infrastructure**: TimescaleDB as the persistent store, and Prometheus plus
-  Grafana as the observability stack that scrapes and visualizes backend
-  metrics.
-
-Arrows show the main relations: trades flow from exchanges through collectors
-into the aggregator and metrics engine, the database writer persists
-everything relevant to TimescaleDB, and the API layer exposes both the live
-store (fast, in-memory) and the database (durable, historical) to the
-frontend. Protocol labels (WebSocket, REST, SQL, PromQL) mark the important
-interfaces between components.
-
-### Coupling and Cohesion
-
-- **Cohesion is high inside modules**: `aggregation.py` only knows about
-  candle construction and revision rules, `database.py`/`history.py` only
-  know about persistence and time-range queries, `metrics.py` only computes
-  indicators, and `exchanges/*.py` only know how to talk to one exchange's
-  wire format. Each module has a single, well-named responsibility.
-- **Coupling to a shared in-process pipeline is intentional but real**:
-  `service.py` (the `MarketDataService`) coordinates collectors, the
-  aggregator, the live store, the metrics engine, and the database writer.
-  This creates a central coordination point; it is necessary because trades
-  must reach the aggregator, the metrics engine, and storage in a consistent
-  order, but it also means `service.py` is the module most sensitive to
-  change across the whole backend.
-- **Coupling to exchanges is isolated** behind the `ExchangeCollector` base
-  class (`exchanges/base.py`), so `binance.py` and `bybit.py` can change
-  independently and a new exchange can be added without touching the
-  aggregator, metrics engine, or API layer.
-- **Frontend and backend are loosely coupled** through documented REST/
-  WebSocket contracts (`api.ts` on one side, `main.py` on the other); neither
-  imports the other's code, only its network contract.
+The main coupling risk is `MarketDataService`. It is the central coordinator
+for many backend tasks, so many arrows point to it. This is understandable for
+the MVP because it makes the live-data flow easy to follow. Later, if the
+product grows, collectors, metrics workers, and recovery/backfill jobs may need
+to become more separate services.
 
 ### Maintainability Implications
 
-- Because exchange-specific logic is isolated, adding a third exchange mainly
-  touches `exchanges/`, `config.py`, and `markets.yaml`, not the aggregation,
-  metrics, or API layers — this keeps the blast radius of that kind of change
-  small.
-- Because `service.py` fans out to several downstream components, changes to
-  the trade-processing pipeline (e.g., adding a new derived series) tend to
-  require a coordinated change across `service.py`, `aggregation.py`, and
-  `database.py`. Tests for these modules are treated as critical-path tests
-  (see [ADR-002](adr/ADR-002-timescaledb-time-series-storage.md) and
-  [QR-003](../quality-requirements.md#qr-003-critical-module-test-coverage)) to
-  keep this coordination safe to change.
-- Separating the in-memory `LiveStore` from the durable database means the
-  live path can be reasoned about and tested without needing a running
-  database, which keeps unit tests fast, while database-integration tests
-  remain isolated to `database.py`/`history.py`.
+The structure is maintainable enough for the current product because most
+changes have an obvious place. A new exchange parser belongs in the collectors.
+A new metric belongs in the metrics engine. A new chart or alert control
+belongs in the frontend. A storage change belongs near `DatabaseWriter` and
+TimescaleDB.
 
-### Quality Requirements Supported or Constrained
+The part to watch is the backend coordinator. When `MarketDataService` changes,
+it can affect collectors, candles, metrics, streams, and storage at the same
+time. That is why tests and quality gates around this path are important.
 
-- The **independent-exchange, per-module collector** structure directly
-  supports [QR-002 (Exchange data failure visibility)](../quality-requirements.md#qr-002-exchange-data-failure-visibility):
-  a failure in one collector cannot silently corrupt the other exchange's
-  data path.
-- The **separate live store vs. database** structure supports
-  [QR-001 (Market data update latency)](../quality-requirements.md#qr-001-market-data-update-latency):
-  live reads do not have to wait on database round-trips.
-- The **central `MarketDataService` coordination point** constrains how
-  independently the aggregation and persistence logic can evolve; the
-  structure was chosen for ordering/consistency guarantees over the maximum
-  possible module independence, which is a deliberate tradeoff documented in
-  [ADR-002](adr/ADR-002-timescaledb-time-series-storage.md) and
-  [ADR-003](adr/ADR-003-websocket-driven-market-updates.md).
+### Quality Requirements Supported Or Constrained
 
----
+- [QR-001: Market data update latency](../quality-requirements.md#qr-001-market-data-update-latency)
+  is supported by WebSocket streams, in-memory live state, queue-based trade
+  processing, and explicit latency observability.
+- [QR-002: Exchange data failure visibility](../quality-requirements.md#qr-002-exchange-data-failure-visibility)
+  is supported by independent collectors and visible health/freshness state.
+- [QR-003: Critical module test coverage](../quality-requirements.md#qr-003-critical-module-test-coverage)
+  is supported by cohesive critical modules that can be tested separately.
+- QR-001 is constrained by the single backend process and shared service
+  orchestration. Under heavier load, workers or bounded background services may
+  need to be separated.
+- QR-003 is constrained by deployment and database paths that are harder to
+  cover without integration fixtures.
 
-## Dynamic View
+## Dynamic View - Live Market Update Sequence
 
-### Sequence Diagram
+Sources:
+[PlantUML](dynamic-view/live-market-update-sequence.puml) and
+[Mermaid](dynamic-view/live-market-update-sequence.mmd).
 
-```
-docs/architecture/dynamic-view/chart-open-and-live-update-sequence.puml
-```
+The dynamic perspective documents one non-trivial runtime workflow involving
+several components and multiple transactions.
 
-<details>
-<summary>View PlantUML source</summary>
+### Scenario Represented
 
-```plantuml
-@startuml chart-open-and-live-update-sequence
-!theme plain
-title Open a Chart and Receive a Live Candle Update (Dynamic View)
+This dynamic view represents the non-trivial live market-data workflow from an
+exchange trade event to visible UI updates and observability telemetry. The
+flow includes external exchange APIs, exchange parsing, queueing, aggregation,
+persistence, metric recomputation, WebSocket delivery, frontend display, and
+display-latency reporting.
 
-actor User
-participant "Terminal UI" as UI
-participant "API/WS Client" as Client
-participant "REST + WS API" as API
-participant "Market Data Service" as Service
-participant "Live Store" as Store
-participant "Candle Aggregator" as Aggregator
-participant "Database Writer" as DB
-database "TimescaleDB" as TSDB
-participant "Exchange Collector" as Collector
-participant "Binance" as Binance
+### Why This Scenario Matters
 
-== Initial history load ==
-User -> UI : selects exchange/instrument/timeframe
-UI -> Client : requestCandles(...)
-Client -> API : GET /api/v1/candles
-API -> Service : get_candles(...)
-Service -> DB : query historical candles
-DB -> TSDB : SELECT rows
-TSDB --> DB : candle rows
-DB --> Service : candle history
-Service --> API : candle history
-API --> Client : 200 OK
-Client --> UI : render historical candles
+This scenario is central to Tickframe because the product value depends on
+recent market information, clear chart state, and visible analytics. It is also
+the flow most likely to expose architecture risks: slow processing, stale
+exchange data, inconsistent candle state, database outages, or a mismatch
+between backend update time and frontend display time.
 
-== Live stream subscription ==
-UI -> Client : openCandleStream(stable)
-Client -> API : WS /ws/v1/candles/stable
-API -> Store : subscribe(stream key)
+### Boundaries, Decisions, And Quality Reasoning
 
-== Live trade arrives and propagates ==
-Binance -> Collector : trade event (WS push)
-Collector -> Service : normalized Trade
-Service -> Aggregator : update_candle(trade)
-Aggregator -> Store : publish revised 1s candle
-Aggregator -> DB : persist candle revision
-DB -> TSDB : UPSERT candle row
-Store -> API : notify subscribers
-API -> Client : WS push: updated candle
-Client -> UI : merge live candle into chart
-UI --> User : chart updates near real time
-@enduml
-```
+The sequence explains why [ADR-001](adr/ADR-001-independent-exchange-sources.md)
+keeps exchange sources independent, why [ADR-002](adr/ADR-002-timescaledb-time-series-storage.md)
+stores raw trades and candle history as time-series data, and why
+[ADR-003](adr/ADR-003-websocket-driven-market-updates.md) uses WebSockets for
+live market, candle, and metrics updates. It also supports reasoning about
+[QR-001](../quality-requirements.md#qr-001-market-data-update-latency) and
+[QR-002](../quality-requirements.md#qr-002-exchange-data-failure-visibility)
+because latency and freshness are captured along the same event path that users
+see in the terminal.
 
-The full annotated source is in
-[`dynamic-view/chart-open-and-live-update-sequence.puml`](dynamic-view/chart-open-and-live-update-sequence.puml).
+## Deployment View - Docker Compose Runtime
 
-</details>
+Sources:
+[PlantUML](deployment-view/docker-compose-deployment.puml) and
+[Mermaid](deployment-view/docker-compose-deployment.mmd).
 
-### Scenario
+The deployment perspective is a high-level runtime view rather than one
+scenario. 
 
-The diagram shows a user opening a chart for a given exchange, instrument, and
-timeframe, then receiving a live candle update after a new trade arrives on
-that exchange. It combines the two halves of a normal terminal session: (1) an
-initial REST-based history load, and (2) a WebSocket-driven live update that
-starts at the exchange and ends at the user's screen.
+### What The Deployment View Shows
 
-### Why This Scenario Is Important
+The deployment view shows the maintained runtime model from
+[`docker-compose.yml`](../../docker-compose.yml): a frontend container, backend
+container, private TimescaleDB datastore, Prometheus, Grafana, persistent Docker
+volumes, and private `.env` runtime configuration. The customer-facing path is
+browser access through an optional host reverse proxy to the frontend, which
+then calls the backend over REST and WebSocket routes.
 
-This is the core, non-trivial workflow of the product: everything else in
-Tickframe (metrics, alerts, patterns) is built on top of a user reliably
-seeing current, correctly revised candles for the exchange and instrument they
-selected. It is also the workflow most exposed to real-world failure modes —
-network hiccups, late trades, exchange-specific outages — so it is the
-scenario most worth documenting precisely.
+### Why This Deployment Model Was Chosen
 
-### Architecture Decisions, Integration Boundaries, and Quality Requirements It Helps Reason About
+Docker Compose was chosen because Tickframe is not only a static frontend. The
+product requires Python collectors, WebSocket services, a stateful time-series
+database, and observability services. A single Compose stack gives the team and
+reviewers one reproducible deployment shape for local runs and VM/VPS hosting,
+while keeping secrets in `.env` and documenting safe defaults in
+[`.env.example`](../../.env.example).
 
-- It shows the **REST-for-history / WebSocket-for-live** split from
-  [ADR-003](adr/ADR-003-websocket-driven-market-updates.md), including why the
-  frontend needs to merge two data paths rather than relying on one.
-- It shows the **exchange → collector → aggregator** boundary from
-  [ADR-001](adr/ADR-001-independent-exchange-sources.md): a trade is only
-  normalized after it leaves the exchange-specific collector, so exchange
-  quirks never leak into the aggregator or API layer.
-- It shows the **write-through-and-notify pattern** (aggregator writes to both
-  the live store and the database) that underpins
-  [ADR-002](adr/ADR-002-timescaledb-time-series-storage.md): the live store
-  gives low-latency delivery to connected clients, while TimescaleDB keeps a
-  durable, replayable history.
-- It is the primary path evaluated by
-  [QR-001 (Market data update latency)](../quality-requirements.md#qr-001-market-data-update-latency):
-  the diagram identifies every hop a trade must cross before a user sees it,
-  which is exactly what the 1-second latency budget in QR-001 has to cover.
+### Product Support And Constraints
 
-### What the Diagram Shows
+This deployment supports MVP v2 by making the customer-facing terminal, API,
+database, and observability stack runnable together. It also supports
+[ADR-004](adr/ADR-004-dockerized-local-deployment-and-observability.md), which
+keeps operational evidence inspectable through Prometheus and Grafana.
 
-The diagram is split into three fragments. The first (`Initial history load`)
-shows a synchronous REST call that returns already-persisted candle history
-from TimescaleDB. The second (`Live stream subscription`) shows the frontend
-opening a WebSocket and the backend registering that connection against a
-stream key (exchange + instrument + timeframe). The third (`Live trade
-arrives and propagates`) shows an asynchronous, event-driven path: a trade
-pushed by Binance travels through the collector, the market data service, and
-the aggregator, is persisted to TimescaleDB, and is simultaneously pushed to
-the already-open WebSocket connection so the chart updates without the user
-taking any further action.
+The model constrains the product because all application workers run inside one
+backend service. That is acceptable for the current MVP, but production growth
+may require separate collector, metric-worker, and API processes. The database
+volume also needs backup and retention management when the product is operated
+for a customer beyond grading or demo use.
 
----
+### Deployment And Operation Considerations
 
-## Deployment View
+- Keep `.env` private and submit any required access credentials only through
+  Moodle or another approved private channel.
+- Put a host-level reverse proxy in front of the frontend for public HTTPS/WSS
+  access.
+- Keep TimescaleDB private to the Compose network and persist it through the
+  `tickframe-timescale-data` volume.
+- Synchronize the host clock with NTP so latency measurements are meaningful.
+- Monitor `/health`, `/metrics`, Prometheus, and Grafana before declaring a
+  Sprint increment ready for customer review.
 
-### Deployment Diagram
-
-```
-docs/architecture/deployment-view/deployment-diagram.puml
-```
-
-<details>
-<summary>View PlantUML source</summary>
-
-```plantuml
-@startuml deployment-diagram
-!theme plain
-title Tickframe - Deployment Diagram (Docker Compose Runtime)
-
-actor "Customer / Reviewer (Browser)" as customer
-
-cloud "Public Internet" as internet {
-  node "Binance Spot API" as binanceNode
-  node "Bybit Spot API" as bybitNode
-}
-
-node "Docker Host" {
-  node "frontend container (nginx)" as frontendNode
-  node "backend container (FastAPI)" as backendNode
-  node "timescaledb container" as dbNode {
-    database "TimescaleDB" as db
-  }
-  node "prometheus container" as promNode
-  node "grafana container" as grafanaNode
-}
-
-customer --> frontendNode : HTTP port 4173
-customer --> grafanaNode : HTTP port 3000
-frontendNode --> backendNode : REST + WebSocket port 8000
-backendNode --> dbNode : SQL port 5432
-backendNode --> binanceNode : outbound WS/REST
-backendNode --> bybitNode : outbound WS/REST
-promNode --> backendNode : scrape /metrics
-grafanaNode --> promNode : PromQL query
-@enduml
-```
-
-The full annotated source (with volumes, health checks, and dependency
-ordering) is in
-[`deployment-view/deployment-diagram.puml`](deployment-view/deployment-diagram.puml).
-
-</details>
-
-### What the Diagram Shows
-
-The deployment diagram maps directly onto [`docker-compose.yml`](../../docker-compose.yml).
-It shows:
-
-- **Deployed services**: `frontend` (nginx serving the built React app),
-  `backend` (the FastAPI app, collectors, aggregator, and API), `timescaledb`,
-  `prometheus`, and `grafana`, each in its own container on one Docker host.
-- **Datastores/stateful infrastructure**: the `timescaledb` container with its
-  named volume `tickframe-timescale-data`, plus the `prometheus` and `grafana`
-  containers' own named volumes for metric and dashboard state.
-- **External services**: Binance and Bybit public APIs, reached by outbound
-  connections from the backend container only.
-- **Network/environment boundaries**: all five containers share a Compose
-  network; only `frontend` (port 4173→80), `backend` (port 8000), `prometheus`
-  (port 9090), and `grafana` (port 3000) are published to the host, and
-  `timescaledb`'s port 5432 stays internal to the Compose network.
-- **Customer-facing access path**: a browser reaches the product only through
-  the `frontend` container, which in turn talks to the `backend` container;
-  `grafana` is a separate, secondary access path for observability review.
-
-### Why the Selected Deployment Model Was Chosen
-
-Docker Compose was chosen because Tickframe needs five coordinated processes
-(API/collector service, frontend, database, and two observability services)
-to be reproducible for local development, grading/review, and small-scale
-operation without needing a container orchestrator. `docker-compose.yml`
-encodes explicit `depends_on` health-check ordering (backend waits for
-TimescaleDB to be healthy, frontend waits for backend to be healthy,
-Prometheus waits for backend, Grafana waits for Prometheus) so a single
-`docker compose up --build` produces a working stack deterministically. This
-decision is recorded in
-[ADR-004](adr/ADR-004-dockerized-local-deployment-and-observability.md).
-
-### How the Current Deployment Supports or Constrains the Product
-
-- **Supports** reproducible review: anyone with Docker can bring up the full
-  product, including working observability, with one command and a `.env`
-  file.
-- **Supports** operational visibility: Prometheus and Grafana are part of the
-  default stack, not an optional add-on, so latency and failure signals
-  required by [QR-001](../quality-requirements.md#qr-001-market-data-update-latency)
-  and [QR-002](../quality-requirements.md#qr-002-exchange-data-failure-visibility)
-  are available out of the box.
-- **Constrains** horizontal scaling: each service currently runs as a single
-  container with no replication or load balancing, so the deployment model as
-  it stands is intended for local/small-scale use, not high-availability
-  production traffic.
-- **Constrains** secrets handling: credentials (`POSTGRES_PASSWORD`, Grafana
-  admin credentials) are supplied through a local `.env` file rather than a
-  managed secrets store, which is acceptable for the current scope but would
-  need to change before a public production deployment.
-
-### What Must Be Considered When Deploying or Operating It for the Customer
-
-- A `.env` file with a real `POSTGRES_PASSWORD` (and optionally
-  `GRAFANA_ADMIN_PASSWORD`, exchange URL overrides, and backfill/repair
-  tuning) must be created before `docker compose up --build`, per the root
-  [`README.md`](../../README.md).
-- Only `frontend`'s port needs to be exposed to end customers; `backend`,
-  `prometheus`, and `grafana` ports are useful for reviewers/operators but are
-  not required for a customer-only deployment and can be restricted at the
-  network boundary.
-- TimescaleDB's volume (`tickframe-timescale-data`) is the durable state of
-  the product; operators must back it up or otherwise protect it, since
-  losing it loses trade/candle/metric history subject to the retention
-  policy in [ADR-002](adr/ADR-002-timescaledb-time-series-storage.md).
-- Outbound connectivity to Binance and Bybit public endpoints is required for
-  the backend container; operators should confirm this connectivity (and any
-  required fallback URLs, per [ADR-001](adr/ADR-001-independent-exchange-sources.md))
-  before relying on the deployment for live data.
-
----
-
-## Decision Map
-
-| Architecture concern | Decision record | Quality requirements |
-|---|---|---|
-| Keep exchange data inspectable and avoid synthetic blended prices. | [ADR-001: Independent exchange sources](adr/ADR-001-independent-exchange-sources.md) | [QR-001](../quality-requirements.md#qr-001-market-data-update-latency), [QR-002](../quality-requirements.md#qr-002-exchange-data-failure-visibility) |
-| Store market history as time-series data with bounded retention and rollups. | [ADR-002: TimescaleDB time-series storage](adr/ADR-002-timescaledb-time-series-storage.md) | [QR-001](../quality-requirements.md#qr-001-market-data-update-latency), [QR-003](../quality-requirements.md#qr-003-critical-module-test-coverage) |
-| Use WebSockets for live market, candle, and metrics updates while keeping REST for initial loads. | [ADR-003: WebSocket-driven market updates](adr/ADR-003-websocket-driven-market-updates.md) | [QR-001](../quality-requirements.md#qr-001-market-data-update-latency), [QR-002](../quality-requirements.md#qr-002-exchange-data-failure-visibility) |
-| Keep the complete product runnable through Docker Compose with observable services. | [ADR-004: Dockerized local deployment and observability](adr/ADR-004-dockerized-local-deployment-and-observability.md) | [QR-001](../quality-requirements.md#qr-001-market-data-update-latency), [QR-002](../quality-requirements.md#qr-002-exchange-data-failure-visibility), [QR-003](../quality-requirements.md#qr-003-critical-module-test-coverage) |
-
-## Related Maintained Documents
-
-- [Root README](../../README.md) for product scope, local run guidance, and
-  deployment notes.
-- [Development process](../development-process.md) for branch, PR, CI, and
-  configuration-management workflow.
-- [Quality requirements](../quality-requirements.md) and
-  [quality requirement tests](../quality-requirement-tests.md) for ISO/IEC
-  25010 traceability.
-- [Testing status](../testing.md) for current automated tests, CI gates, and
-  coverage evidence.
-- [Definition of Done](../definition-of-done.md) for the delivery gates that
-  apply to later MVP v2 work.
-2 work.

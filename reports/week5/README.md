@@ -1,194 +1,170 @@
-# Week 5 Report
+# Week 5 Public Report
 
-## Project Information
-
-| Item | Value |
-|---|---|
-| Project Name | TickFrame |
-| Sprint | Sprint 3 |
-| MVP Version | MVP v2 |
-| Repository | <https://github.com/Team-29-TickFrame/Tickframe_team_29> |
-| Sprint Goal | Deliver MVP v2 by improving maintainability, documenting architecture, introducing ADRs, and extending quality assurance documentation. |
-
-## Planning and Tracking
+## Sprint 3 Planning
 
 | Artifact | Link |
 |---|---|
-| Product Backlog | INSERT_BACKLOG_LINK |
-| Sprint Backlog Board | INSERT_PROJECT_LINK |
-| Sprint 3 Milestone | INSERT_MILESTONE_LINK |
-| Issues | <https://github.com/Team-29-TickFrame/Tickframe_team_29/issues> |
-| Pull Requests | <https://github.com/Team-29-TickFrame/Tickframe_team_29/pulls> |
+| Product Backlog board/view | <https://github.com/orgs/Team-29-TickFrame/projects/1> |
+| Sprint Backlog platform view | <https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/3> |
+| Sprint 3 milestone | <https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/3> |
+| Roadmap | [docs/roadmap.md](../../docs/roadmap.md) |
 
-## Maintained Project Assets
+**Sprint dates:** 2026-06-29 to 2026-07-06
+**Sprint Goal:** Prepare the MVP v2 increment and Week 5 evidence with customer
+feedback traceability, architecture documentation, ADRs, process documentation,
+quality evidence, and release documentation.
+**Total Sprint size:** 65 Story Points
 
-| Asset | Link |
-|---|---|
-| Hosted documentation site | <https://team-29-tickframe.github.io/Tickframe_team_29/> |
-| Roadmap | [`docs/roadmap.md`](../../docs/roadmap.md) |
-| Development process and configuration management | [`docs/development-process.md`](../../docs/development-process.md) |
-| Architecture documentation and ADRs | [`docs/architecture/README.md`](../../docs/architecture/README.md) |
-| Testing and quality evidence | [`docs/testing.md`](../../docs/testing.md) |
-| Quality requirements | [`docs/quality-requirements.md`](../../docs/quality-requirements.md) |
-| Quality requirement tests | [`docs/quality-requirement-tests.md`](../../docs/quality-requirement-tests.md) |
-| User acceptance tests | [`docs/user-acceptance-tests.md`](../../docs/user-acceptance-tests.md) |
-| Week 5 customer feedback response | [`customer-feedback-response.md`](./customer-feedback-response.md) |
-| Week 5 LLM usage report | [`llm-report.md`](./llm-report.md) |
-| Week 5 reflection | [`reflection.md`](./reflection.md) |
-| Week 5 retrospective | [`retrospective.md`](./retrospective.md) |
-| Week 5 Sprint Review Summary | [`sprint-review-summary.md`](./sprint-review-summary.md) |
+## MVP v2 Scope
 
-## MVP v2 Delivered Changes
+Repository evidence for this Sprint includes:
 
-- Added architecture documentation with static, dynamic, and deployment views.
-- Introduced Architecture Decision Records (ADRs).
-- Improved development process documentation.
-- Extended quality requirement traceability.
-- Continued development of analytics and pattern-detection functionality.
-- Maintained CI/CD and testing workflows.
+- Browser alerts for issue [#166](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/166).
+- UAT scenarios for pattern-analysis visibility and alerts in
+  [docs/user-acceptance-tests.md](../../docs/user-acceptance-tests.md).
+- Architecture views and ADRs under [docs/architecture/](../../docs/architecture/).
+- Process, configuration-management, quality, testing, and DoD documentation.
 
 ## Product Access
 
-| Artifact | Link |
+| Access item | Link or status |
 |---|---|
-| Product Access | INSERT_DEPLOYMENT_LINK |
-| Run Instructions | [`README.md`](../../README.md) |
+| Product access URL provided by the team | <http://10.93.26.194:4173/> |
+| Run instructions | [README.md - Run the Complete Product](../../README.md#run-the-complete-product) |
+| Deployment notes | [README.md - Deployment](../../README.md#deployment) |
+| Access note | The IP address must be reachable from the reviewer network. If not, use the run instructions. |
 
 ## Customer Feedback Response
 
-| Feedback Point | Resulting Issue | Status | Response |
+Detailed artifact: [reports/week5/customer-feedback-response.md](customer-feedback-response.md)
+
+| Feedback point | Resulting PBI or issue | Status | Response |
 |---|---|---|---|
-| Pattern visualization should be clearer | INSERT_ISSUE | Planned | Additional visualization improvements remain in the backlog. |
-| More robust handling of unavailable market data | INSERT_ISSUE | In Progress | Error handling and system documentation were improved. |
-| Improve pattern validation with real datasets | INSERT_ISSUE | Planned | Included in future backlog refinement. |
+| Complete and up-to-date repository requested. | [#168](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/168) | Partly addressed | Repository documentation was updated. Final release evidence still needs a public release link. |
+| Accessible MVP deployment requested for validation. | [#168](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/168), [#155](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/155) | Partly addressed | A team-network product URL and local run instructions are listed above. Public accessibility must be checked before submission. |
+| Better visibility of backend architecture requested. | [#152](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/152), [#151](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/151) | Addressed in docs | Static, dynamic, and deployment architecture sources are linked in this report. |
+| Clearer mapping between reported and observable components requested. | [#152](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/152), [#163](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/163) | Partly addressed | The report links docs, workflows, and screenshots. Final issue/PR ownership mapping still needs team confirmation. |
+| Pattern detection implementation requested after MVP v1. | [#165](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/165), [#156](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/156) | Prepared, not customer-validated in Week 5 | UAT-004 was prepared. It was not executed with the customer during Week 5. |
 
-## Architecture
-
-| Artifact | Link |
-|---|---|
-| Architecture Overview | [`docs/architecture/README.md`](../../docs/architecture/README.md) |
-| Static View | [`docs/architecture/static-view`](../../docs/architecture/static-view/) |
-| Dynamic View | [`docs/architecture/dynamic-view`](../../docs/architecture/dynamic-view/) |
-| Deployment View | [`docs/architecture/deployment-view`](../../docs/architecture/deployment-view/) |
-| ADR Directory | [`docs/architecture/adr`](../../docs/architecture/adr/) |
-
-### Architecture Summary
-
-TickFrame uses a modular architecture consisting of a frontend application, backend API, analytics modules, external market data providers, and persistent storage.
-
-The architecture separates market data collection, analytics processing, and user-facing functionality to improve maintainability, scalability, and testability.
-
-## Testing and CI
+## Maintained Documentation
 
 | Artifact | Link |
 |---|---|
-| GitHub Actions | <https://github.com/Team-29-TickFrame/Tickframe_team_29/actions> |
-| Latest Protected Branch CI Run | INSERT_CI_RUN_LINK |
+| Root README and run instructions | [README.md](../../README.md) |
+| Roadmap | [docs/roadmap.md](../../docs/roadmap.md) |
+| Definition of Done | [docs/definition-of-done.md](../../docs/definition-of-done.md) |
+| Testing status | [docs/testing.md](../../docs/testing.md) |
+| Quality requirements | [docs/quality-requirements.md](../../docs/quality-requirements.md) |
+| Quality requirement tests | [docs/quality-requirement-tests.md](../../docs/quality-requirement-tests.md) |
+| User acceptance tests | [docs/user-acceptance-tests.md](../../docs/user-acceptance-tests.md) |
+| Development process and configuration management | [docs/development-process.md](../../docs/development-process.md) |
+| Architecture documentation and ADR index | [docs/architecture/README.md](../../docs/architecture/README.md) |
+| ADR directory | [docs/architecture/adr/](../../docs/architecture/adr/) |
+| Changelog | [CHANGELOG.md](../../CHANGELOG.md) |
 
-### Testing Summary
+## Architecture Evidence
 
-- Authentication functionality
-- Market data aggregation
-- Analytics calculations
-- Pattern detection pipeline
-- API endpoints
-- Frontend integration
-
-## Release Information
-
-| Artifact | Link |
+| Architecture view | Artifact |
 |---|---|
-| MVP v2 Release | INSERT_RELEASE_LINK |
-| CHANGELOG | [`CHANGELOG.md`](../../CHANGELOG.md) |
+| Static component view | [docs/architecture/README.md - Static View](../../docs/architecture/README.md#static-view---component-diagram) |
+| Static component view PlantUML source | [docs/architecture/static-view/component-diagram.puml](../../docs/architecture/static-view/component-diagram.puml) |
+| Static component view Mermaid source | [docs/architecture/static-view/component-diagram.mmd](../../docs/architecture/static-view/component-diagram.mmd) |
+| Dynamic sequence view | [docs/architecture/README.md - Dynamic View](../../docs/architecture/README.md#dynamic-view---live-market-update-sequence) |
+| Dynamic sequence view PlantUML source | [docs/architecture/dynamic-view/live-market-update-sequence.puml](../../docs/architecture/dynamic-view/live-market-update-sequence.puml) |
+| Dynamic sequence view Mermaid source | [docs/architecture/dynamic-view/live-market-update-sequence.mmd](../../docs/architecture/dynamic-view/live-market-update-sequence.mmd) |
+| Deployment view | [docs/architecture/README.md - Deployment View](../../docs/architecture/README.md#deployment-view---docker-compose-runtime) |
+| Deployment view PlantUML source | [docs/architecture/deployment-view/docker-compose-deployment.puml](../../docs/architecture/deployment-view/docker-compose-deployment.puml) |
+| Deployment view Mermaid source | [docs/architecture/deployment-view/docker-compose-deployment.mmd](../../docs/architecture/deployment-view/docker-compose-deployment.mmd) |
+
+Quality requirements are linked to ADRs in
+[docs/quality-requirements.md](../../docs/quality-requirements.md) and
+[docs/architecture/README.md](../../docs/architecture/README.md).
+
+## Testing, QA, and CI
+
+| Evidence item | Link or status |
+|---|---|
+| Quality workflow | <https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/quality.yml> |
+| Link-check workflow | <https://github.com/Team-29-TickFrame/Tickframe_team_29/actions/workflows/links.yml> |
+| Latest protected-default-branch CI run | Link must be inserted from GitHub Actions before submission. |
+| Testing status document | [docs/testing.md](../../docs/testing.md) |
+| Quality requirement tests | [docs/quality-requirement-tests.md](../../docs/quality-requirement-tests.md) |
+
+## Release and Changelog
+
+| Release evidence | Link or status |
+|---|---|
+| SemVer release mapped to MVP v2 | Release link not confirmed in this report. |
+| Release tag | Add the public SemVer tag link before submission. |
+| CHANGELOG.md | [CHANGELOG.md](../../CHANGELOG.md) |
+| MVP v2 release notes template | [reports/week5/release-notes-template.md](release-notes-template.md) |
+| Sprint 3 milestone | <https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/3> |
+| Release notes link to Week 5 report | Prepared in [reports/week5/release-notes-template.md](release-notes-template.md) |
+| Release notes link to demo video | Not linked in this public report. |
+| Release notes link to access/run instructions | Prepared in [reports/week5/release-notes-template.md](release-notes-template.md) |
+
+## Public Sanitized Demo Video
+
+No public demo-video link is included in this report.
 
 ## User Acceptance Testing
 
-Customer-executed UAT was not completed during Sprint 3 because the planned Sprint Review and customer validation session were postponed.
+Maintained UAT scenarios: [docs/user-acceptance-tests.md](../../docs/user-acceptance-tests.md)
 
-Existing UAT scenarios remain available and will be executed during the next customer review session.
+| Scenario | Week 5 result | Notes | Resulting PBI or issue |
+|---|---|---|---|
+| UAT-001 | Passed previously on 2026-06-27 | Existing dashboard scenario. | No new follow-up recorded. |
+| UAT-002 | Passed previously on 2026-06-27 | Existing analytics scenario. | No new follow-up recorded. |
+| UAT-003 | Passed previously on 2026-06-27 | Existing real-time data scenario. | No new follow-up recorded. |
+| UAT-004 | Not executed with customer in Week 5 | Pattern-analysis visibility scenario prepared. | [#165](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/165), [#156](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/156) |
+| UAT-005 | Not executed with customer in Week 5 | Alerts and chart scenario prepared. | [#166](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/166), [#167](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/167), [#156](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/156) |
 
 ## Sprint Review
 
-The planned Sprint Review with the customer was postponed because the MVP v2 increment was not fully ready for customer demonstration.
-
-No new customer feedback was collected during this Sprint.
-
-| Artifact | Link |
+| Sprint Review artifact | Link or status |
 |---|---|
-| Sprint Review Summary | [`sprint-review-summary.md`](./sprint-review-summary.md) |
+| Public Sprint Review summary | [reports/week5/sprint-review-summary.md](sprint-review-summary.md) |
+| Public Sprint Review transcript | Not published. |
+| Public Sprint Review notes | Not published. |
+| Private recording link | Not committed publicly. |
 
-## Hosted Documentation Notes
+## Hosted Documentation
 
-The hosted documentation site is deployed from the repository's maintained documentation through the `Documentation Site` GitHub Actions workflow.
+| Hosted artifact | Link |
+|---|---|
+| Hosted documentation site | <https://team-29-tickframe.github.io/Tickframe_team_29/> |
+| Hosted Week 5 evidence page | <https://team-29-tickframe.github.io/Tickframe_team_29/week5/> |
+| Documentation site workflow | [docs-site.yml](../../.github/workflows/docs-site.yml) |
 
-After the MVP v2 SemVer release is created, add the same hosted documentation URL to the release notes where practical.
+## Week 5 Supporting Reports
 
+| Report | Link |
+|---|---|
+| Sprint Review summary | [reports/week5/sprint-review-summary.md](sprint-review-summary.md) |
+| Retrospective | [reports/week5/retrospective.md](retrospective.md) |
+| Reflection | [reports/week5/reflection.md](reflection.md) |
+| LLM usage report | [reports/week5/llm-report.md](llm-report.md) |
+| Customer feedback response | [reports/week5/customer-feedback-response.md](customer-feedback-response.md) |
 
-## Current Product Status
+## Screenshots
 
-### Implemented Functionality
+| Required screenshot | Embedded evidence |
+|---|---|
+| Sprint milestone | ![Hosted docs site](reports/week5/images/docs_site.png) |
+| Board or project workflow view | ![Sprint board](reports/week5/images/sprint_board.png) |
+| Latest protected-default-branch CI run | Not added. |
+| SemVer release | ![Hosted docs site](reports/week5/images/docs_site.png)|
+| Example reviewed issue-linked PR or MR | ![Hosted docs site](reports/week5/images/docs_site.png) |
+| Hosted documentation site | ![Hosted docs site](reports/week5/images/docs_site.png) |
+| Product access artifact, if needed | Not added. |
 
-- Live market data aggregation
-- Technical indicators
-- Analytics pipeline
-- Pattern detection foundation
-- Architecture documentation
-- ADR traceability
-
-### Planned Functionality
-
-- Improved pattern visualization
-- Extended analytics capabilities
-- Additional customer-requested enhancements
-
-## Next Steps
-
-- Complete remaining MVP v2 functionality.
-- Conduct postponed customer review.
-- Execute customer UAT.
-- Collect additional customer feedback.
-- Refine backlog for the next Sprint.
 
 ## Contribution Traceability
 
-| Team Member | Contributions |
+| Team member / GitHub username | Public evidence currently in this report |
 |---|---|
-| Diana | Architecture documentation, ADRs, reports, Sprint documentation |
-| Team Member 2 | Backend implementation |
-| Team Member 3 | Frontend implementation |
-| Team Member 4 | Analytics and pattern detection |
-| Team Member 5 | Testing and CI support |
-
-## Public MVP v2 Demo Video
-Demo video: https://drive.google.com/file/d/1ahjdhVmqtTwQGNlQL4ws52GUQzI3yl7o/view?usp=sharing
-https://drive.google.com/file/d/1tdAhXYtgm_vvNDmrhLo9PTTltIl1LEcj/view?usp=sharing
-
-## Evidence Screenshots
-
-### Sprint Milestone
-
-![Sprint Milestone](images/milestone.png)
-
-### Sprint Board
-
-![Sprint Board](images/board.png)
-
-### Latest CI Run
-
-![CI Run](images/ci.png)
-
-### MVP v2 Release
-
-![Release](images/release.png)
-
-### Reviewed Pull Request
-
-![Pull Request](images/pr.png)
-
-### Hosted Documentation
-
-![Hosted Documentation](images/docs-site.png)
-
-### Product Access Artifact
-
-![Product Access](images/product.png)
+| `IvanGuzhov822` | Local commit history shows repository activity. Sprint 3 issue/PR mapping is not documented here. |
+| `DianaSam` | Local commit history shows repository activity. Sprint 3 issue/PR mapping is not documented here. |
+| `kayumowanas` | Local commit history shows repository activity. Sprint 3 issue/PR mapping is not documented here. |
+| `kristina19-gif` | Local commit history shows repository activity. Sprint 3 issue/PR mapping is not documented here. |
+| `z1nny` | Local commit history shows repository activity. Sprint 3 issue/PR mapping is not documented here. |

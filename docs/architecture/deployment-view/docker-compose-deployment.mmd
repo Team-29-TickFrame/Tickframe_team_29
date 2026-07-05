@@ -1,0 +1,38 @@
+flowchart LR
+  Browser[app user browser]
+  Exchanges[(Binance and Bybit APIs)]
+
+  subgraph Host[VM]
+    Proxy[Optional host reverse proxy: HTTPS/WSS termination]
+
+    subgraph Compose[Docker Compose project network]
+      Frontend[frontend container: Nginx + built React app, port 4173 -> 80]
+      Backend[backend container: FastAPI + collectors, port 8000]
+      Timescale[(timescaledb container: PostgreSQL + TimescaleDB)]
+      Prometheus[prometheus container: port 9090]
+      Grafana[grafana container: port 3000]
+    end
+
+    Env[.env private runtime configuration]
+    EnvExample[.env.example committed sanitized template]
+    TimescaleVolume[(tickframe-timescale-data)]
+    PromVolume[(tickframe-prometheus-data)]
+    GrafVolume[(tickframe-grafana-data)]
+  end
+
+  Browser --> Proxy
+  Proxy --> Frontend
+  Browser --> Frontend
+  Frontend --> Backend
+  Backend --> Exchanges
+  Backend --> Timescale
+  Prometheus --> Backend
+  Grafana --> Prometheus
+
+  EnvExample -. documents variables .-> Env
+  Env -. configures .-> Backend
+  Env -. configures .-> Timescale
+  Env -. configures .-> Grafana
+  Timescale -. persists to .-> TimescaleVolume
+  Prometheus -. persists to .-> PromVolume
+  Grafana -. persists to .-> GrafVolume
