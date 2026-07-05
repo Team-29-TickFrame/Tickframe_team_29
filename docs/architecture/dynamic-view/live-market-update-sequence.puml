@@ -1,0 +1,50 @@
+@startuml
+title Tickframe Dynamic View - Live Market Update Sequence
+autonumber
+
+legend right
+  Dynamic-view notation
+  Lifeline = runtime participant/component
+  Solid arrow = synchronous call or direct handoff
+  Dashed arrow = async event, pushed update, or returned data
+  The scenario is non-trivial because it crosses exchange, backend,
+  database, metrics, WebSocket, frontend, and observability boundaries.
+endlegend
+
+participant "React terminal" as UI
+participant "FastAPI WebSocket\nendpoints" as API
+participant "MarketDataService" as Service
+participant "Binance or Bybit\npublic stream" as Exchange
+participant "Exchange collector" as Collector
+queue "Trade queue" as Queue
+participant "CandleAggregator" as Aggregator
+participant "LiveStore" as Store
+database "TimescaleDB" as DB
+participant "Metrics engine" as Metrics
+participant "Observability" as Obs
+
+UI -> API : Open market, candle,\nand metrics WebSockets
+API -> Service : Wait for stream\nrevision changes
+Exchange --> Collector : Trade message over\npublic WebSocket
+Collector -> Collector : Parse exchange-specific payload
+Collector -> Service : Enqueue canonical Trade
+Service -> Queue : Put Trade
+Queue --> Service : Consume Trade
+Service -> Store : Update market freshness state
+Service -> Aggregator : Add Trade to candle window
+Service -> DB : Persist raw trade
+Service -> Obs : Record exchange-to-backend latency
+Service --> API : Notify market and candle revisions
+API --> UI : Push latest market and candle payloads
+Aggregator --> Service : Finalized stable candle after\nallowed lateness window
+Service -> Store : Save stable candle snapshot
+Service -> DB : Persist candle revision
+Service -> Metrics : Queue metric recomputation
+Metrics -> DB : Read candle history when needed
+Metrics --> Service : Return metrics, events,\nand correlations
+Service -> DB : Persist metric points and\nlatest summary
+Service --> API : Notify stable candle and\nmetric revisions
+API --> UI : Push stable candles and\nmetric snapshot
+UI -> API : POST display-latency 
+API -> Obs : Record frontend display latency
+@enduml

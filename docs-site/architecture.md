@@ -29,6 +29,12 @@ Binance / Bybit public Spot streams
 ## Key Source Documents
 
 - [Architecture README](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/README.md)
+- [Static component view PlantUML](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/static-view/component-diagram.puml)
+- [Static component view source](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/static-view/component-diagram.mmd)
+- [Dynamic sequence view PlantUML](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/dynamic-view/live-market-update-sequence.puml)
+- [Dynamic sequence view source](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/dynamic-view/live-market-update-sequence.mmd)
+- [Deployment view PlantUML](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/deployment-view/docker-compose-deployment.puml)
+- [Deployment view source](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/deployment-view/docker-compose-deployment.mmd)
 - [Backend service](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/backend/app/service.py)
 - [Database writer](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/backend/app/database.py)
 - [Frontend API bindings](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/frontend/src/api.ts)
