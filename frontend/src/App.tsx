@@ -3089,7 +3089,6 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 </div>
 
               </div>
-              </div>
             </article>
 
             <WorkspaceResizeHandle

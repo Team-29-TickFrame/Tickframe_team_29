@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -602,6 +601,25 @@ export default function MarketChart({
   const candlesRef = useRef<DisplayCandle[]>([]);
   const candlesByTimeRef = useRef<Map<number, DisplayCandle>>(new Map());
   const historyStateRef = useRef({ hasMore, historyLoading, onLoadEarlier });
+  const chartModeRef = useRef<ChartMode>("candles");
+  const activeToolRef = useRef<DrawingTool>("cursor");
+  const selectedDrawingIdRef = useRef<string | null>(null);
+  const draftPointRef = useRef<DrawingPoint | null>(null);
+  const drawingEditSessionRef = useRef<DrawingEditSession | null>(null);
+  const copiedDrawingRef = useRef<ChartDrawing | null>(null);
+  const previewPrimitiveRef = useRef<{
+    series: PriceLineSeries;
+    primitive: DrawingPrimitive;
+  } | null>(null);
+  const drawingPrimitiveRefs = useRef<
+    Array<{ series: PriceLineSeries; primitive: DrawingPrimitive }>
+  >([]);
+  const drawingLevelRefs = useRef<
+    Array<{ series: PriceLineSeries; line: IPriceLine }>
+  >([]);
+  const alertLineRefs = useRef<
+    Array<{ series: PriceLineSeries; line: IPriceLine }>
+  >([]);
   const [chartMode, setChartMode] = useState<ChartMode>("candles");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
@@ -613,10 +631,22 @@ export default function MarketChart({
   const readoutCandle = inspectCandle ?? latestCandle;
   const latestPrice = latestCandle?.close ?? 0;
   const precision = useMemo(() => pricePrecision(latestPrice), [latestPrice]);
+  const precisionRef = useRef(precision);
+  const selectedDrawing = useMemo(
+    () => drawings.find((drawing) => drawing.id === selectedDrawingId) ?? null,
+    [drawings, selectedDrawingId],
+  );
   const patternOverlay = useMemo(
     () => patternOverlayGeometry(candles, visibleLogicalRange),
     [candles, visibleLogicalRange],
   );
+
+  const detachPreview = useCallback(() => {
+    const preview = previewPrimitiveRef.current;
+    if (!preview) return;
+    preview.series.detachPrimitive(preview.primitive);
+    previewPrimitiveRef.current = null;
+  }, []);
 
   useEffect(() => {
     historyStateRef.current = { hasMore, historyLoading, onLoadEarlier };
@@ -1515,26 +1545,38 @@ export default function MarketChart({
         AUTO FIT
       </button>
       {hasMore && (
+        <div className="tv-drawing-rail" aria-label={drawCountLabel}>
+          <button
+            type="button"
+            title="Paste copied drawing"
+            disabled={!hasCopiedDrawing}
+            onClick={pasteCopiedDrawing}
+          >
+            Paste
+          </button>
+          <button
+            type="button"
+            title="Delete selected drawing"
+            disabled={selectedDrawing === null}
+            onClick={deleteSelectedDrawing}
+          >
+            Delete
+          </button>
+          <button type="button" title="Clear drawings" onClick={clearDrawings}>
+            Clear
+          </button>
+        </div>
+      )}
+      {hasMore && (
         <button
+          className="chart-load-earlier"
           type="button"
-          title="Paste copied drawing"
-          disabled={!hasCopiedDrawing}
-          onClick={pasteCopiedDrawing}
+          disabled={historyLoading}
+          onClick={onLoadEarlier}
         >
-          Paste
+          {historyLoading ? "Loading..." : "Load earlier"}
         </button>
-        <button
-          type="button"
-          title="Delete selected drawing"
-          disabled={selectedDrawing === null}
-          onClick={deleteSelectedDrawing}
-        >
-          Delete
-        </button>
-        <button type="button" title="Clear drawings" onClick={clearDrawings}>
-          Clear
-        </button>
-      </div>
+      )}
 
       {readoutCandle && (
         <div className="tv-chart-readout" aria-label="OHLC values">
