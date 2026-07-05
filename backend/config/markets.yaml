@@ -1,4 +1,4 @@
-config_version: "1.0.0"
+config_version: "1.0.1"
 market_type: spot
 base_timeframe: 1s
 allowed_lateness_ms: 2000
@@ -54,13 +54,12 @@ instruments:
     symbols:
       binance: AVAXUSDT
       bybit: AVAXUSDT
-  - id: TON-USDT
-    name: Toncoin
-    base: TON
+  - id: GRAM-USDT
+    name: Gram
+    base: GRAM
     quote: USDT
     symbols:
-      binance: TONUSDT
-      bybit: TONUSDT
+      bybit: GRAMUSDT
   - id: TRX-USDT
     name: TRON
     base: TRX
