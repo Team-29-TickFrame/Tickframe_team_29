@@ -8,16 +8,43 @@ project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- User-configurable market alerts with metric presets, level-break rules,
-  browser-stored alert state, sound cues, and bottom-right toast notifications
-  for issue #166.
+- No entries yet.
 
 ### Changed
 - No entries yet.
 
 ### Fixed
+- No entries yet.
+
+### Removed
+- No entries yet.
+
+### Deprecated
+- No entries yet.
+
+### Security
+- No entries yet.
+
+## [1.2.0] - 2026-07-06
+
+### Added
+- User-configurable market alerts with metric presets, level-break rules,
+  browser-stored alert state, sound cues, and bottom-right toast notifications
+  for issue #166.
+- Assignment 5 architecture evidence with static, dynamic, and deployment
+  views in PlantUML and Mermaid source formats.
+- Public-safe Week 5 evidence index, customer-feedback response, Sprint Review
+  summary, reflection, retrospective, LLM usage report, and MVP v2 release
+  notes template.
+
+### Changed
+- Updated architecture, development-process, quality, testing, UAT, roadmap,
+  and hosted-docs links for the Assignment 5 / MVP v2 reporting package.
+
+### Fixed
 - Stopped subscribing to unavailable Binance `TONUSDT` and renamed the Bybit
   market to canonical `GRAM-USDT` for issue #178.
+- Fixed the Week 5 docs-site customer-feedback link.
 
 ### Removed
 - No entries yet.

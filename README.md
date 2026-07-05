@@ -47,6 +47,10 @@ policy. Old second candles are compressed automatically.
 - Current roadmap: [docs/roadmap.md](docs/roadmap.md)
 - Hosted documentation site: <https://team-29-tickframe.github.io/Tickframe_team_29/>
 - Definition of Done: [docs/definition-of-done.md](docs/definition-of-done.md)
+- Architecture documentation: [docs/architecture/README.md](docs/architecture/README.md)
+- Testing status: [docs/testing.md](docs/testing.md)
+- Quality requirements: [docs/quality-requirements.md](docs/quality-requirements.md)
+- User acceptance tests: [docs/user-acceptance-tests.md](docs/user-acceptance-tests.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Issue forms: [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/)
 - PR template: [.github/pull_request_template.md](.github/pull_request_template.md)
@@ -256,6 +260,9 @@ backups, and synchronize the host clock with NTP.
 - Pattern ML pipeline: [ml/pattern_recognition/README.md](ml/pattern_recognition/README.md)
 - Week 2 submission index: [reports/week2/README.md](reports/week2/README.md)
 - Week 3 submission index: [reports/week3/README.md](reports/week3/README.md)
+- Week 4 submission index: [reports/week4/README.md](reports/week4/README.md)
+- Week 5 submission index: [reports/week5/README.md](reports/week5/README.md)
+- Week 5 release notes template: [reports/week5/release-notes-template.md](reports/week5/release-notes-template.md)
 - MVP v0 report: [reports/week2/mvp-v0-report.md](reports/week2/mvp-v0-report.md)
 
 Never commit real `.env` files, passwords, or API credentials.

@@ -69,6 +69,7 @@ export default function MarketChart({
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const alertLineRefs = useRef<IPriceLine[]>([]);
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<{
     from: number;
     to: number;

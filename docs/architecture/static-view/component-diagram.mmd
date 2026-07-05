@@ -1,0 +1,50 @@
+flowchart LR
+  User[app user]
+
+  subgraph Frontend
+    UI[React terminal UI]
+    Panels[Chart, alerts, metrics and ML panels]
+    Client[API/WebSocket client]
+  end
+
+  subgraph Backend
+    API[FastAPI API: REST + WebSocket]
+    Service[MarketDataService main coordinator]
+    Collectors[Exchange collectors]
+    Aggregator[CandleAggregator]
+    Store[LiveStore latest in-memory state]
+    Metrics[Metrics engine]
+    ML[ML pattern adapter]
+    Auth[AuthService]
+    Writer[DatabaseWriter]
+    Obs[Observability]
+  end
+
+  Binance[(Binance public APIs)]
+  Bybit[(Bybit public APIs)]
+  DB[(TimescaleDB)]
+  ModelFiles[Pattern model files]
+  Prometheus[Prometheus]
+  Grafana[Grafana]
+
+  User --> UI
+  UI --> Panels
+  UI --> Client
+  Client --> API
+  API --> Auth
+  API --> Service
+  API --> ML
+  Service --> Collectors
+  Collectors --> Binance
+  Collectors --> Bybit
+  Collectors --> Service
+  Service --> Aggregator
+  Service --> Store
+  Service --> Metrics
+  Service --> Writer
+  Writer --> DB
+  Auth --> DB
+  ML --> ModelFiles
+  Service --> Obs
+  Prometheus -. scrapes /metrics .-> API
+  Grafana -. reads dashboards .-> Prometheus

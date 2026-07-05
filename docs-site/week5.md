@@ -8,14 +8,21 @@ excluded.
 ## Public Evidence Links
 
 - [Week 5 report index](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/reports/week5/README.md)
-- [Customer feedback response](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/reports/week5/customer-feedback-response.md.)
+- [Customer feedback response](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/reports/week5/customer-feedback-response.md)
 - [Roadmap](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/roadmap.md)
 - [Development process](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/development-process.md)
 - [Architecture documentation](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/README.md)
+- [Static architecture view - PlantUML](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/static-view/component-diagram.puml)
+- [Static architecture view - Mermaid](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/static-view/component-diagram.mmd)
+- [Dynamic architecture view - PlantUML](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/dynamic-view/live-market-update-sequence.puml)
+- [Dynamic architecture view - Mermaid](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/dynamic-view/live-market-update-sequence.mmd)
+- [Deployment architecture view - PlantUML](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/deployment-view/docker-compose-deployment.puml)
+- [Deployment architecture view - Mermaid](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/architecture/deployment-view/docker-compose-deployment.mmd)
 - [Testing and quality gate status](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/testing.md)
 - [Quality requirements](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/quality-requirements.md)
 - [Quality requirement tests](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/quality-requirement-tests.md)
 - [User acceptance tests](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/docs/user-acceptance-tests.md)
+- [MVP v2 release notes template](https://github.com/Team-29-TickFrame/Tickframe_team_29/blob/main/reports/week5/release-notes-template.md)
 
 ## Release Note
 

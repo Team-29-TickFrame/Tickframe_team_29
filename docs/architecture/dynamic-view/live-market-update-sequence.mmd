@@ -1,0 +1,38 @@
+sequenceDiagram
+  autonumber
+  participant UI as React terminal
+  participant API as FastAPI WebSocket endpoints
+  participant Service as MarketDataService
+  participant Exchange as Binance or Bybit public stream
+  participant Collector as Exchange collector
+  participant Queue as Trade queue
+  participant Aggregator as CandleAggregator
+  participant Store as LiveStore
+  participant DB as TimescaleDB
+  participant Metrics as Metrics engine
+  participant Obs as Observability
+
+  UI->>API: Open market, candle, and metrics WebSockets
+  API->>Service: Wait for stream revision changes
+  Exchange-->>Collector: Trade message over public WebSocket
+  Collector->>Collector: Parse exchange-specific payload
+  Collector->>Service: Enqueue canonical Trade
+  Service->>Queue: Put Trade
+  Queue-->>Service: Consume Trade
+  Service->>Store: Update market freshness state
+  Service->>Aggregator: Add Trade to candle window
+  Service->>DB: Persist raw trade
+  Service->>Obs: Record exchange-to-backend latency
+  Service-->>API: Notify market and candle revisions
+  API-->>UI: Push latest market and candle payloads
+  Aggregator-->>Service: Finalized stable candle after allowed lateness window
+  Service->>Store: Save stable candle snapshot
+  Service->>DB: Persist candle revision
+  Service->>Metrics: Queue metric recomputation
+  Metrics->>DB: Read candle history when needed
+  Metrics-->>Service: Return metrics, events, and correlations
+  Service->>DB: Persist metric points and latest summary
+  Service-->>API: Notify stable candle and metric revisions
+  API-->>UI: Push stable candles and metric snapshot
+  UI->>API: POST display-latency
+  API->>Obs: Record frontend display latency

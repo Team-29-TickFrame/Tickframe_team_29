@@ -1,5 +1,8 @@
 ## Static View - Component Diagram
 
+Sources:
+[PlantUML](static-view/component-diagram.puml) and
+[Mermaid](static-view/component-diagram.mmd).
 
 It shows the main parts of the product and the simple "uses" relationships
 between them.
@@ -61,6 +64,10 @@ time. That is why tests and quality gates around this path are important.
 
 ## Dynamic View - Live Market Update Sequence
 
+Sources:
+[PlantUML](dynamic-view/live-market-update-sequence.puml) and
+[Mermaid](dynamic-view/live-market-update-sequence.mmd).
+
 The dynamic perspective documents one non-trivial runtime workflow involving
 several components and multiple transactions.
 
@@ -93,6 +100,10 @@ because latency and freshness are captured along the same event path that users
 see in the terminal.
 
 ## Deployment View - Docker Compose Runtime
+
+Sources:
+[PlantUML](deployment-view/docker-compose-deployment.puml) and
+[Mermaid](deployment-view/docker-compose-deployment.mmd).
 
 The deployment perspective is a high-level runtime view rather than one
 scenario. 
@@ -139,5 +150,4 @@ for a customer beyond grading or demo use.
 - Synchronize the host clock with NTP so latency measurements are meaningful.
 - Monitor `/health`, `/metrics`, Prometheus, and Grafana before declaring a
   Sprint increment ready for customer review.
-
 
