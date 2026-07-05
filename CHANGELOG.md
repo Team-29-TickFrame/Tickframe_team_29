@@ -8,7 +8,9 @@ project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- No entries yet.
+- User-configurable market alerts with metric presets, level-break rules,
+  browser-stored alert state, sound cues, and bottom-right toast notifications
+  for issue #166.
 
 ### Changed
 - No entries yet.
