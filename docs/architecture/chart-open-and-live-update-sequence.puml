@@ -1,0 +1,56 @@
+@startuml chart-open-and-live-update-sequence
+!theme plain
+skinparam wrapWidth 220
+title Open a Chart and Receive a Live Candle Update (Dynamic View)
+
+actor User
+participant "Terminal UI\n(MarketChart.tsx)" as UI
+participant "API/WS Client\n(api.ts)" as Client
+participant "REST + WS API\n(main.py)" as API
+participant "Market Data Service\n(service.py)" as Service
+participant "Live Store\n(store.py)" as Store
+participant "Candle Aggregator\n(aggregation.py)" as Aggregator
+participant "Database Writer\n(database.py)" as DB
+database "TimescaleDB" as TSDB
+participant "Exchange Collector\n(exchanges/binance.py)" as Collector
+participant "Binance" as Binance
+
+== Initial history load ==
+User -> UI : selects exchange,\ninstrument, timeframe
+UI -> Client : requestCandles(...)
+Client -> API : GET /api/v1/candles\n?exchange&instrumentId&timeframe&limit
+API -> Service : get_candles(...)
+Service -> DB : query historical candles
+DB -> TSDB : SELECT time-series rows
+TSDB --> DB : candle rows
+DB --> Service : candle history
+Service --> API : candle history
+API --> Client : 200 OK (candle array)
+Client --> UI : render historical candles
+
+== Live stream subscription ==
+UI -> Client : openCandleStream(stable)
+Client -> API : WS /ws/v1/candles/stable\n?exchange&instrumentId&timeframe
+API -> Store : subscribe(stream key)
+Store --> API : ack subscription
+
+== Live trade arrives and propagates ==
+Binance -> Collector : trade event (WS push)
+Collector -> Service : normalized Trade
+Service -> Aggregator : update_candle(trade)
+Aggregator -> Aggregator : apply revision rules,\napply stable-chart delay
+Aggregator -> Store : publish revised 1s candle
+Aggregator -> DB : persist candle revision
+DB -> TSDB : UPSERT candle row
+Store -> API : notify subscribers\n(revision changed)
+API -> Client : WS push: updated candle
+Client -> UI : merge live candle\ninto chart series
+UI --> User : chart updates\nnear real time
+
+note over Aggregator, Store
+  Only changed revisions are pushed
+  (ADR-003); provisional candles are
+  flagged separately from stable ones
+end note
+
+@enduml

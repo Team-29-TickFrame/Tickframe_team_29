@@ -1,0 +1,73 @@
+@startuml component-diagram
+!theme plain
+skinparam componentStyle rectangle
+skinparam wrapWidth 200
+skinparam linetype ortho
+title Tickframe - Component Diagram (Static View)
+
+actor "User" as user
+
+package "External Exchanges" {
+  [Binance Spot\nWebSocket / REST] as binance
+  [Bybit Spot\nWebSocket / REST] as bybit
+}
+
+package "Tickframe Frontend (React + TypeScript)" {
+  [Terminal UI\n(App.tsx, MarketChart.tsx)] as ui
+  [API / WS Client\n(api.ts)] as apiClient
+}
+
+package "Tickframe Backend (FastAPI)" {
+  [Exchange Collectors\n(exchanges/binance.py,\nexchanges/bybit.py)] as collectors
+  [Candle Aggregator\n(aggregation.py)] as aggregator
+  [Live Store\n(store.py)] as liveStore
+  [Metrics Engine\n(metrics.py, pattern_ml.py)] as metricsEngine
+  [Market Data Service\n(service.py)] as marketService
+  [Auth\n(auth.py)] as auth
+  [REST + WebSocket API\n(main.py)] as api
+  [Database Writer\n(database.py, history.py)] as dbWriter
+  [Observability\n(observability.py, /metrics)] as observability
+}
+
+database "TimescaleDB\n(trades, candles,\nmetrics, users)" as db
+
+package "Observability Stack" {
+  [Prometheus] as prometheus
+  [Grafana Dashboard] as grafana
+}
+
+user --> ui : uses terminal (browser)
+ui --> apiClient : chart/instrument/\ntimeframe selection
+apiClient --> api : REST\n(candles, metrics,\ninstruments, auth)
+apiClient --> api : WebSocket\n(markets, candles,\nmetrics)
+
+binance --> collectors : public trade stream (WS)\nREST backfill
+bybit --> collectors : public trade stream (WS)\nREST backfill
+
+collectors --> marketService : normalized trades
+marketService --> aggregator : trades -> 1s OHLCV
+aggregator --> liveStore : candle revisions
+marketService --> metricsEngine : candle series
+marketService --> dbWriter : persist trades,\ncandles, metrics
+dbWriter --> db : SQL (asyncpg /\nSQLAlchemy)
+liveStore --> api : in-memory\nlive snapshots
+metricsEngine --> api : metric points\n/ events
+api --> auth : session /\ncredential checks
+auth --> db : user records
+api --> observability : latency &\nqueue samples
+observability --> prometheus : /metrics\n(scrape)
+prometheus --> grafana : query (PromQL)
+
+note right of aggregator
+  Stable candles are revision-aware
+  and delayed; provisional candles
+  are marked non-canonical (ADR-003)
+end note
+
+note bottom of db
+  Bounded retention:
+  raw trades 72h, 1s candles 14d,
+  larger rollups long-term (ADR-002)
+end note
+
+@enduml

@@ -1,0 +1,62 @@
+@startuml deployment-diagram
+!theme plain
+skinparam wrapWidth 200
+title Tickframe - Deployment Diagram (Docker Compose Runtime)
+
+actor "Customer /\nReviewer (Browser)" as customer
+
+cloud "Public Internet" as internet {
+  node "Binance Spot API\n(WS + REST)" as binanceNode
+  node "Bybit Spot API\n(WS + REST)" as bybitNode
+}
+
+node "Docker Host\n(local machine / server)" {
+
+  node "frontend container\n(nginx, Dockerfile: frontend/Dockerfile)" as frontendNode {
+    artifact "React/TS build\n(static bundle)" as frontendArtifact
+  }
+
+  node "backend container\n(FastAPI, Dockerfile: backend/Dockerfile)" as backendNode {
+    artifact "Tickframe API\n+ collectors + aggregator" as backendArtifact
+  }
+
+  node "timescaledb container\n(timescale/timescaledb:2.17.2-pg16)" as dbNode {
+    database "TimescaleDB\n(tickframe DB)" as db
+    folder "volume:\ntickframe-timescale-data" as dbVolume
+  }
+
+  node "prometheus container\n(prom/prometheus:v2.55.1)" as promNode {
+    folder "volume:\ntickframe-prometheus-data" as promVolume
+  }
+
+  node "grafana container\n(grafana/grafana:11.4.0)" as grafanaNode {
+    folder "volume:\ntickframe-grafana-data" as grafanaVolume
+  }
+}
+
+customer --> frontendNode : HTTPS/HTTP\nport 4173 -> 80
+customer --> grafanaNode : HTTP\nport 3000\n(dashboard review)
+
+frontendNode --> backendNode : REST + WebSocket\nport 8000
+
+backendNode --> dbNode : asyncpg / SQLAlchemy\nport 5432 (internal network)
+backendNode --> binanceNode : public WS/REST\n(outbound, market data)
+backendNode --> bybitNode : public WS/REST\n(outbound, market data)
+
+promNode --> backendNode : scrape GET /metrics\nport 8000, every 5s
+grafanaNode --> promNode : PromQL query\nport 9090
+
+note right of backendNode
+  depends_on: timescaledb (healthy)
+  env vars from local .env
+  (DATABASE_URL, exchange URLs,
+  backfill/repair tuning) - ADR-004
+end note
+
+note bottom of dbNode
+  Retention enforced by backend jobs:
+  raw trades 72h, 1s candles 14d,
+  larger rollups long-term (ADR-002)
+end note
+
+@enduml
