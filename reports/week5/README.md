@@ -166,6 +166,7 @@ After the MVP v2 SemVer release is created, add the same hosted documentation UR
 
 ## Public MVP v2 Demo Video
 Demo video: https://drive.google.com/file/d/1ahjdhVmqtTwQGNlQL4ws52GUQzI3yl7o/view?usp=sharing
+https://drive.google.com/file/d/1tdAhXYtgm_vvNDmrhLo9PTTltIl1LEcj/view?usp=sharing
 
 ## Evidence Screenshots
 
