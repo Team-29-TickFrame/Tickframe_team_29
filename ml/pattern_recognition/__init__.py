@@ -1,5 +1,5 @@
-"""Synthetic chart-pattern training pipeline."""
+"""Real-data chart-pattern training pipeline."""
 
-PATTERN_MODEL_VERSION = "pattern-baseline-v0"
+PATTERN_MODEL_VERSION = "pattern-real-data-v1"
 SUPPORTED_TIMEFRAME = "1m"
 WINDOW_SIZE = 96

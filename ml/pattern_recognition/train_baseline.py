@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import Dict, List, Sequence
 
 from . import PATTERN_MODEL_VERSION, SUPPORTED_TIMEFRAME, WINDOW_SIZE
-from .dataset import DatasetExample, dataset_summary, generate_dataset
-from .features import FEATURE_NAMES, extract_features
+from .dataset import FeatureExample, dataset_summary, load_feature_dataset
+from .features import FEATURE_NAMES
 from .model import GaussianNaiveBayesClassifier, evaluate_predictions
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=("Train the first maintained synthetic 1m chart-pattern baseline.")
+        description="Train the maintained real-data 1m chart-pattern baseline."
     )
     parser.add_argument(
         "--config",
@@ -27,16 +27,21 @@ def parse_args() -> argparse.Namespace:
         help="Override the configured output directory.",
     )
     parser.add_argument(
-        "--samples-per-class",
+        "--dataset-path",
+        default=None,
+        help="Override the prepared feature dataset JSONL path.",
+    )
+    parser.add_argument(
+        "--max-examples-per-class",
         type=int,
         default=None,
-        help="Override synthetic examples per label.",
+        help="Override the maximum loaded examples per label.",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=None,
-        help="Override the configured random seed.",
+        help="Kept in the resolved config for experiment reproducibility.",
     )
     parser.add_argument(
         "--smoke",
@@ -53,23 +58,22 @@ def main() -> None:
     resolved = resolve_config(config, args)
     validate_config(resolved)
 
-    output_dir = Path(resolved["outputDir"])
+    output_dir = Path(str(resolved["outputDir"]))
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    examples = generate_dataset(
-        labels=resolved["labels"],
-        samples_per_class=resolved["samplesPerClass"],
-        window_size=resolved["windowSize"],
-        seed=resolved["seed"],
+    examples = load_balanced_dataset(
+        Path(str(resolved["datasetPath"])),
+        labels=list(resolved["labels"]),
+        max_examples_per_class=int(resolved["maxExamplesPerClass"]),
     )
-    train_examples, test_examples = stratified_split(
+    train_examples, test_examples = chronological_stratified_split(
         examples,
-        test_fraction=resolved["testFraction"],
+        test_fraction=float(resolved["testFraction"]),
     )
 
-    train_features = [extract_features(example.candles) for example in train_examples]
+    train_features = [example.features for example in train_examples]
     train_labels = [example.label for example in train_examples]
-    test_features = [extract_features(example.candles) for example in test_examples]
+    test_features = [example.features for example in test_examples]
     test_labels = [example.label for example in test_examples]
 
     model = GaussianNaiveBayesClassifier()
@@ -78,17 +82,18 @@ def main() -> None:
     evaluation = evaluate_predictions(
         expected=test_labels,
         predicted=predictions,
-        labels=resolved["labels"],
+        labels=list(resolved["labels"]),
     )
 
     generated_at = datetime.now(timezone.utc).isoformat()
     dataset_manifest = {
         "dataset": resolved["dataset"],
+        "datasetPath": resolved["datasetPath"],
         "generatedAt": generated_at,
         "timeframe": resolved["timeframe"],
         "windowSize": resolved["windowSize"],
         "seed": resolved["seed"],
-        "samplesPerClass": resolved["samplesPerClass"],
+        "maxExamplesPerClass": resolved["maxExamplesPerClass"],
         "totalExamples": len(examples),
         "trainExamples": len(train_examples),
         "testExamples": len(test_examples),
@@ -119,6 +124,9 @@ def main() -> None:
         {
             "expected": example.label,
             "predicted": model.predict_one(features).label,
+            "symbol": example.symbol,
+            "openTime": example.open_time,
+            "closeTime": example.close_time,
             "probabilities": {
                 label: round(value, 6)
                 for label, value in model.predict_one(features).probabilities.items()
@@ -154,12 +162,16 @@ def resolve_config(
     resolved = dict(config)
     if args.output_dir is not None:
         resolved["outputDir"] = args.output_dir
-    if args.samples_per_class is not None:
-        resolved["samplesPerClass"] = args.samples_per_class
+    if args.dataset_path is not None:
+        resolved["datasetPath"] = args.dataset_path
+    if args.max_examples_per_class is not None:
+        resolved["maxExamplesPerClass"] = args.max_examples_per_class
     if args.seed is not None:
         resolved["seed"] = args.seed
     if args.smoke:
-        resolved["samplesPerClass"] = min(int(resolved["samplesPerClass"]), 24)
+        resolved["maxExamplesPerClass"] = min(
+            int(resolved["maxExamplesPerClass"]), 24
+        )
         resolved["outputDir"] = str(Path(str(resolved["outputDir"])) / "smoke")
     return resolved
 
@@ -173,26 +185,69 @@ def validate_config(config: Dict[str, object]) -> None:
         raise ValueError(f"This pipeline expects {WINDOW_SIZE} candles per example.")
     if not 0.0 < float(config["testFraction"]) < 1.0:
         raise ValueError("testFraction must be between 0 and 1.")
-    if int(config["samplesPerClass"]) < 10:
-        raise ValueError("samplesPerClass must be at least 10.")
+    if not str(config.get("datasetPath", "")).strip():
+        raise ValueError("datasetPath must point to a prepared feature JSONL file.")
+    if int(config["maxExamplesPerClass"]) < 10:
+        raise ValueError("maxExamplesPerClass must be at least 10.")
 
 
-def stratified_split(
-    examples: Sequence[DatasetExample],
+def load_balanced_dataset(
+    path: Path,
+    *,
+    labels: Sequence[str],
+    max_examples_per_class: int,
+) -> List[FeatureExample]:
+    loaded = load_feature_dataset(path, labels=labels)
+    by_label: Dict[str, List[FeatureExample]] = {}
+    for example in loaded:
+        by_label.setdefault(example.label, []).append(example)
+
+    examples: List[FeatureExample] = []
+    for label in labels:
+        ordered = sorted(by_label.get(label, []), key=lambda item: item.open_time)
+        examples.extend(evenly_sample(ordered, max_examples_per_class))
+    if not examples:
+        raise ValueError(f"No examples were loaded from {path}.")
+    return examples
+
+
+def chronological_stratified_split(
+    examples: Sequence[FeatureExample],
     *,
     test_fraction: float,
-) -> tuple[List[DatasetExample], List[DatasetExample]]:
-    by_label: Dict[str, List[DatasetExample]] = {}
+) -> tuple[List[FeatureExample], List[FeatureExample]]:
+    by_label: Dict[str, List[FeatureExample]] = {}
     for example in examples:
         by_label.setdefault(example.label, []).append(example)
 
-    train: List[DatasetExample] = []
-    test: List[DatasetExample] = []
+    train: List[FeatureExample] = []
+    test: List[FeatureExample] = []
     for label_examples in by_label.values():
-        test_count = max(1, round(len(label_examples) * test_fraction))
-        test.extend(label_examples[:test_count])
-        train.extend(label_examples[test_count:])
+        ordered = sorted(label_examples, key=lambda item: item.open_time)
+        test_count = max(1, round(len(ordered) * test_fraction))
+        train.extend(ordered[:-test_count])
+        test.extend(ordered[-test_count:])
     return train, test
+
+
+def evenly_sample(
+    examples: Sequence[FeatureExample], limit: int
+) -> List[FeatureExample]:
+    if len(examples) <= limit:
+        return list(examples)
+    if limit <= 1:
+        return [examples[-1]]
+
+    last_index = len(examples) - 1
+    selected: List[FeatureExample] = []
+    seen_indices = set()
+    for index in range(limit):
+        source_index = round(index * last_index / (limit - 1))
+        if source_index in seen_indices:
+            continue
+        selected.append(examples[source_index])
+        seen_indices.add(source_index)
+    return selected
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -205,13 +260,13 @@ def write_json(path: Path, payload: object) -> None:
 def model_card(
     *, metrics: Dict[str, object], dataset_manifest: Dict[str, object]
 ) -> str:
-    return f"""# Pattern Baseline v0 Model Card
+    return f"""# Pattern Real Data v1 Model Card
 
 ## Purpose
 
-This artifact is the first maintained Tickframe training pipeline result for
-geometric chart-pattern recognition. It is an offline experiment artifact, not
-a production trading signal.
+This artifact is the maintained Tickframe training pipeline result for
+geometric chart-pattern recognition on real Binance public market data. It is
+an offline experiment artifact, not a production trading signal.
 
 ## Supported Scope
 
@@ -229,13 +284,13 @@ a production trading signal.
 
 The classifier uses handcrafted OHLCV shape features and a Gaussian Naive Bayes
 decision rule. Each label is represented by per-feature means and variances
-learned from the synthetic training split.
+learned from weak-labeled real Binance public market data.
 
 ## Dataset
 
 - Dataset version: `{metrics["dataset"]}`
+- Dataset path: `{dataset_manifest["datasetPath"]}`
 - Generated at: `{metrics["generatedAt"]}`
-- Seed: `{dataset_manifest["seed"]}`
 - Total examples: `{dataset_manifest["totalExamples"]}`
 - Train examples: `{dataset_manifest["trainExamples"]}`
 - Test examples: `{dataset_manifest["testExamples"]}`
@@ -249,12 +304,12 @@ See `metrics.json` and `confusion_matrix.json` for the full evaluation output.
 
 ## Limitations
 
-- Training data is synthetic and does not prove real-market pattern quality.
+- Training labels are weak labels generated from rule-based chart definitions.
 - The model is maintained only for 1m candles and 96-candle windows.
 - Predictions should be displayed as experimental pattern observations, not as
   buy/sell advice.
-- Real-data validation, weak labeling, human labeling, and backtesting are
-  planned follow-up work.
+- Human review, cross-exchange validation, and backtesting remain required
+  before treating the model as product-quality.
 """
 
 

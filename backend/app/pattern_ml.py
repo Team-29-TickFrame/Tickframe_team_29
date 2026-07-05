@@ -12,6 +12,7 @@ from ml.pattern_recognition import (
 )
 from ml.pattern_recognition.features import extract_features
 from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
+from ml.pattern_recognition.weak_labeling import label_window
 
 
 DEFAULT_CONFIDENCE_THRESHOLD = 0.45
@@ -38,7 +39,7 @@ class PatternMLDetector:
             / "ml"
             / "pattern_recognition"
             / "runs"
-            / "baseline-v0"
+            / "real-data-v1"
             / "model.json"
         )
         self.confidence_threshold = _confidence_threshold(confidence_threshold)
@@ -119,6 +120,7 @@ class PatternMLDetector:
             }
 
         features = extract_features(closed)
+        rule_based = _rule_based_explanation(closed)
         prediction = model.predict_one(features)
         alternatives = [
             {
@@ -140,7 +142,7 @@ class PatternMLDetector:
         return {
             "status": status,
             "message": (
-                "Synthetic-trained baseline matched a chart pattern."
+                "Real-data baseline matched a chart pattern."
                 if status == "pattern_detected"
                 else "No reliable ML pattern is above the configured threshold."
             ),
@@ -162,6 +164,7 @@ class PatternMLDetector:
             "dataFrom": int(closed[0]["openTime"]),
             "dataTo": int(closed[-1]["closeTime"]),
             "candleCount": len(closed),
+            "ruleBased": rule_based,
             "experimental": True,
         }
 
@@ -181,6 +184,41 @@ def _has_complete_ohlcv(candle: Dict[str, object]) -> bool:
     return all(
         candle.get(field) is not None for field in ("open", "high", "low", "close")
     )
+
+
+def _rule_based_explanation(
+    candles: Sequence[Dict[str, object]],
+) -> Dict[str, object]:
+    weak_label = label_window(candles)
+    anchors = []
+    for name, index in weak_label.anchors.items():
+        if index < 0 or index >= len(candles):
+            continue
+        candle = candles[index]
+        anchors.append(
+            {
+                "name": name,
+                "index": index,
+                "openTime": int(candle["openTime"]),
+                "closeTime": int(candle["closeTime"]),
+                "open": _float_or_none(candle.get("open")),
+                "high": _float_or_none(candle.get("high")),
+                "low": _float_or_none(candle.get("low")),
+                "close": _float_or_none(candle.get("close")),
+            }
+        )
+    return {
+        "label": weak_label.label,
+        "score": round(weak_label.score, 6),
+        "reason": weak_label.reason,
+        "anchors": anchors,
+    }
+
+
+def _float_or_none(value: object) -> Optional[float]:
+    if value is None:
+        return None
+    return float(value)
 
 
 def _confidence_threshold(default: float) -> float:

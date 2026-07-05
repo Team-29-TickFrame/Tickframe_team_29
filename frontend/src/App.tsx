@@ -2080,7 +2080,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   <CoinLogo base={instrument?.base} className="coin-logo-xs" />
                   <div>
                     <span className="eyebrow">ML PATTERN</span>
-                    <strong>{mlPattern?.modelVersion ?? "pattern-baseline-v0"}</strong>
+                    <strong>{mlPattern?.modelVersion ?? "pattern-real-data-v1"}</strong>
                   </div>
                 </div>
                 <span
@@ -2122,35 +2122,6 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </small>
                 </div>
 
-                <div className="ml-pattern-stats">
-                  <div>
-                    <span>Confidence</span>
-                    <strong>
-                      {mlPattern?.prediction
-                        ? formatConfidence(mlPattern.prediction.confidence)
-                        : "--"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Window</span>
-                    <strong>{mlPattern?.windowSize ?? 96} candles</strong>
-                  </div>
-                  <div>
-                    <span>Source</span>
-                    <strong>{mlPattern?.source ?? "--"}</strong>
-                  </div>
-                </div>
-
-                {mlPattern?.alternatives && mlPattern.alternatives.length > 0 && (
-                  <div className="ml-alternatives">
-                    {mlPattern.alternatives.slice(0, 3).map((item) => (
-                      <span key={item.label}>
-                        {patternLabel(item.label)}
-                        <b>{formatConfidence(item.confidence)}</b>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             </article>
 
