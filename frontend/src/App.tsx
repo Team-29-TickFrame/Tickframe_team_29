@@ -1,5 +1,7 @@
 import {
+  type CSSProperties,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -23,7 +25,7 @@ import {
   register,
   stableCandleWebSocketUrl,
 } from "./api";
-import MarketChart from "./components/MarketChart";
+import MarketChart, { type ChartAlertLine } from "./components/MarketChart";
 import type {
   AuthResponse,
   AuthUser,
@@ -39,6 +41,7 @@ import type {
   Market,
   MarketsResponse,
   MetricEvent,
+  MetricPoint,
   MetricsResponse,
   MlPatternResponse,
   StreamStatus,
@@ -95,6 +98,146 @@ interface DashboardProps {
   session: AuthSession;
   onLogout: () => void;
 }
+
+type ActiveView = "dashboard" | "alerts";
+type AlertMetricId =
+  | "price"
+  | "rsi"
+  | "vwapDeviationPct"
+  | "shortMomentumPct"
+  | "momentumPct"
+  | "meanReversionZScore"
+  | "realizedVolatilityPct"
+  | "volumeSpikeRatio"
+  | "priceVolumeDivergencePct";
+type AlertCondition = "above" | "below" | "crosses_above" | "crosses_below";
+type AlertSeverity = "medium" | "high";
+
+interface UserAlert {
+  id: string;
+  label: string;
+  exchange: Exchange;
+  instrumentId: string;
+  instrumentBase: string;
+  timeframe: Timeframe;
+  metric: AlertMetricId;
+  condition: AlertCondition;
+  threshold: number;
+  cooldownMs: number;
+  once: boolean;
+  enabled: boolean;
+  createdAt: number;
+  lastTriggeredAt: number | null;
+}
+
+interface AlertDraft {
+  label: string;
+  metric: AlertMetricId;
+  condition: AlertCondition;
+  threshold: string;
+  cooldownSeconds: string;
+  once: boolean;
+}
+
+interface AlertToast {
+  id: string;
+  title: string;
+  body: string;
+  severity: AlertSeverity;
+  createdAt: number;
+}
+
+interface AlertPreset {
+  label: string;
+  description: string;
+  metric: AlertMetricId;
+  condition: AlertCondition;
+  threshold: number | ((livePrice: number | null) => number | null);
+  cooldownSeconds: number;
+  once?: boolean;
+}
+
+const USER_ALERTS_STORAGE_KEY = "tickframe.userAlerts.v1";
+const ALERT_TOAST_TTL_MS = 8_000;
+const ALERT_TOAST_EXIT_MS = 260;
+const ALERT_BEEP_DATA_URI =
+  "data:audio/wav;base64,UklGRuQDAABXQVZFZm10IBAAAAABAAEAoA8AAEAfAAACABAAZGF0YcADAAAAAIIBIQEc/Mv7hARXCFP9vfNE/pwOJAjM8Z3wXArpFev88eUg+WgaDhLs6XjjAQ02JAAAxti88FAkfh7q5E/Wdgv9LcYFLdTN6YEjgSPN6S3UxgX9LXYLT9bq5Isf6CYK773SAABDLfYQGNl14BYbsSmK9APSOvrTKzMWf9x/3DMW0ys6+gPSivSxKRYbdeAY2fYQQy0AAL3SCu/oJosf6uRP1nYL/S3GBS3UzemBI4Ejzekt1MYF/S12C0/W6uSLH+gmCu+90gAAQy32EBjZdeAWG7EpivQD0jr60yszFn/cf9wzFtMrOvoD0or0sSkWG3XgGNn2EEMtAAC90grv6CaLH+rkT9Z2C/0txgUt1M3pgSOBI83pLdTGBf0tdgtP1urkix/oJgrvvdIAAEMt9hAY2XXgFhuxKYr0A9I6+tMrMxZ/3H/cMxbTKzr6A9KK9LEpFht14BjZ9hBDLQAAvdIK7+gmix/q5E/Wdgv9LcYFLdTN6YEjgSPN6S3UxgX9LXYLT9bq5Isf6CYK773SAABDLfYQGNl14BYbsSmK9APSOvrTKzMWf9x/3DMW0ys6+gPSivSxKRYbdeAY2fYQQy0AAL3SCu/oJosf6uRP1nYL/S3GBS3UzemBI4Ejzekt1MYF/S12C0/W6uSLH+gmCu+90gAAQy32EBjZdeAWG7EpivQD0jr60yszFn/cf9wzFtMrOvoD0or0sSkWG3XgGNn2EEMtAAC90grv6CaLH+rkT9Z2C/0txgUt1M3pgSOBI83pLdTGBf0tdgtP1urkix/oJgrvvdIAAEMt9hAY2XXgFhuxKYr0A9I6+tMrMxZ/3H/cMxbTKzr6A9KK9LEpFht14BjZ9hBDLQAAvdIK7+gmix/q5E/Wdgv9LcYFLdTN6YEjgSPN6S3UxgX9LXYLT9bq5Isf6CYK773SAABDLfYQGNl14BYbsSmK9APSOvrTKzMWf9x/3DMW0ys6+gPSivSxKRYbdeAY2fYQQy0AAL3SCu/oJosf6uRP1nYL/S3GBS3UzemBI4Ejzekt1MYF/S12C0/W6uSLH+gmCu+90gAAQy32EBjZdeAWG7EpivQD0jr60yszFn/cf9wzFtMrOvoD0or0sSkWG3XgGNn2EEMtAAC90grv6CaLH+rkT9Z2C/0txgUt1M3pgSOBI83pLdTGBf0tdgtP1urkix/oJgrvvdIAAEMt9hAY2XXgFhuxKYr0A9I6+tMrMxZ/3H/cMxbTKzr6A9KK9LEpFht14BjZ9hBDLQAAvdIK7+gmix/q5E/Wdgv9LcYFLdTN6YEjgSPN6S3UxgX9LXYLT9bq5Isf6CYK773SAABDLfYQGNl14BYbsSmK9APSOvrTKzMWf9x/3DMW0ys6+gPSivSxKRYbdeAY2fYQQy0AAL3SCu/oJosf6uRP1nYL/S3GBS3UzemBI4Ejzekt1MYF/S12C0/W6uSLH+gmCu+90gAAsiyKEI7aCeJkGZEmi/Wc1uD6WCYlE9LhROJQEpsjYfvJ2x73yx9QFL3oy+MWDK8fAABz4cP0ShkcFBPvd+bgBgUbUgNZ58rzFROkEqD0F+rRAtgVTQU97Sf0aA0MEDf5du4AAGgQ8AXf8sD1dwiCDLX8WvN8/vUKRgUD+HX4cQQ4CP3+h/hI/rwFYwN0/Bz8fAFlAwAAvf1d//kAZQA=";
+
+const ALERT_METRICS: Array<{
+  id: AlertMetricId;
+  label: string;
+  shortLabel: string;
+  unit: "price" | "percent" | "ratio" | "number";
+}> = [
+  { id: "price", label: "Last trade price", shortLabel: "Price", unit: "price" },
+  { id: "rsi", label: "RSI", shortLabel: "RSI", unit: "number" },
+  { id: "vwapDeviationPct", label: "VWAP deviation", shortLabel: "VWAP dev", unit: "percent" },
+  { id: "shortMomentumPct", label: "Short momentum", shortLabel: "Short mom", unit: "percent" },
+  { id: "momentumPct", label: "Long momentum", shortLabel: "Momentum", unit: "percent" },
+  { id: "meanReversionZScore", label: "Mean reversion Z-score", shortLabel: "Z-score", unit: "number" },
+  { id: "realizedVolatilityPct", label: "Realized volatility", shortLabel: "Volatility", unit: "percent" },
+  { id: "volumeSpikeRatio", label: "Volume spike ratio", shortLabel: "Volume spike", unit: "ratio" },
+  { id: "priceVolumeDivergencePct", label: "Price / volume divergence", shortLabel: "Divergence", unit: "percent" },
+];
+
+const ALERT_CONDITIONS: Array<{ id: AlertCondition; label: string }> = [
+  { id: "above", label: "Moves above" },
+  { id: "below", label: "Moves below" },
+  { id: "crosses_above", label: "Breaks above" },
+  { id: "crosses_below", label: "Breaks below" },
+];
+
+const ALERT_PRESETS: AlertPreset[] = [
+  {
+    label: "Price +1%",
+    description: "Notify when price trades 1% above now.",
+    metric: "price",
+    condition: "crosses_above",
+    threshold: (price) => (price === null ? null : price * 1.01),
+    cooldownSeconds: 120,
+  },
+  {
+    label: "Price -1%",
+    description: "Notify when price trades 1% below now.",
+    metric: "price",
+    condition: "crosses_below",
+    threshold: (price) => (price === null ? null : price * 0.99),
+    cooldownSeconds: 120,
+  },
+  {
+    label: "RSI high",
+    description: "Notify when RSI moves above 70.",
+    metric: "rsi",
+    condition: "above",
+    threshold: 70,
+    cooldownSeconds: 180,
+  },
+  {
+    label: "RSI low",
+    description: "Notify when RSI moves below 30.",
+    metric: "rsi",
+    condition: "below",
+    threshold: 30,
+    cooldownSeconds: 180,
+  },
+  {
+    label: "Volume spike",
+    description: "Notify when volume is 2x baseline.",
+    metric: "volumeSpikeRatio",
+    condition: "above",
+    threshold: 2,
+    cooldownSeconds: 180,
+  },
+];
+
+const DEFAULT_ALERT_DRAFT: AlertDraft = {
+  label: "",
+  metric: "price",
+  condition: "crosses_above",
+  threshold: "",
+  cooldownSeconds: "120",
+  once: false,
+};
 
 function TickframeLogo({ className = "" }: { className?: string }) {
   return (
@@ -428,6 +571,79 @@ function eventLabel(event: MetricEvent): string {
     .join(" ");
 }
 
+function alertMetricDefinition(metric: AlertMetricId) {
+  return ALERT_METRICS.find((item) => item.id === metric) ?? ALERT_METRICS[0];
+}
+
+function conditionLabel(condition: AlertCondition): string {
+  return ALERT_CONDITIONS.find((item) => item.id === condition)?.label ?? condition;
+}
+
+function createAlertId(prefix = "alert"): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function safeStoredAlerts(): UserAlert[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(USER_ALERTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as UserAlert[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (alert) =>
+        typeof alert.id === "string" &&
+        typeof alert.label === "string" &&
+        typeof alert.threshold === "number" &&
+        typeof alert.enabled === "boolean",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function alertMetricValue(
+  metric: AlertMetricId,
+  livePrice: number | null,
+  latestMetrics: MetricPoint | null,
+): number | null {
+  if (metric === "price") return livePrice;
+  const value = latestMetrics?.[metric];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatAlertValue(metric: AlertMetricId, value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "--";
+  const definition = alertMetricDefinition(metric);
+  if (definition.unit === "price") return formatPrice(value);
+  if (definition.unit === "percent") return formatMetricPercent(value, true);
+  if (definition.unit === "ratio") return formatRatio(value);
+  return formatSignedNumber(value, 2);
+}
+
+function alertConditionMet(
+  condition: AlertCondition,
+  currentValue: number,
+  previousValue: number | null,
+  threshold: number,
+): boolean {
+  if (condition === "above") return currentValue > threshold;
+  if (condition === "below") return currentValue < threshold;
+  if (previousValue === null) return false;
+  if (condition === "crosses_above") {
+    return previousValue <= threshold && currentValue > threshold;
+  }
+  return previousValue >= threshold && currentValue < threshold;
+}
+
+function alertSeverity(alert: UserAlert, currentValue: number): AlertSeverity {
+  const distance =
+    alert.threshold === 0
+      ? Math.abs(currentValue)
+      : Math.abs((currentValue - alert.threshold) / alert.threshold);
+  return distance > 0.05 || alert.metric === "price" ? "high" : "medium";
+}
+
 function marketKey(market: Market): string {
   return `${market.exchange}:${market.instrumentId}`;
 }
@@ -625,6 +841,7 @@ function useMarketFeed() {
 
 function Dashboard({ session, onLogout }: DashboardProps) {
   const { instruments, markets, health, streamStatus, error } = useMarketFeed();
+  const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [instrumentId, setInstrumentId] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState<Timeframe>("5s");
@@ -661,7 +878,153 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [mlPatternError, setMlPatternError] = useState<string | null>(null);
   const [instrumentMenuOpen, setInstrumentMenuOpen] = useState(false);
+  const [userAlerts, setUserAlerts] = useState<UserAlert[]>(safeStoredAlerts);
+  const [alertDraft, setAlertDraft] =
+    useState<AlertDraft>(DEFAULT_ALERT_DRAFT);
+  const [dashboardAlertComposerOpen, setDashboardAlertComposerOpen] =
+    useState(false);
+  const [alertFormError, setAlertFormError] = useState<string | null>(null);
+  const [alertToasts, setAlertToasts] = useState<AlertToast[]>([]);
+  const [dismissingToastIds, setDismissingToastIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [toastDragOffsets, setToastDragOffsets] = useState<Record<string, number>>(
+    {},
+  );
+  const [alertSoundReady, setAlertSoundReady] = useState(false);
   const historyLoadingRef = useRef(false);
+  const alertAudioRef = useRef<AudioContext | null>(null);
+  const previousAlertValuesRef = useRef<Record<string, number | null>>({});
+  const toastDragStartRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      USER_ALERTS_STORAGE_KEY,
+      JSON.stringify(userAlerts),
+    );
+  }, [userAlerts]);
+
+  const dismissAlertToast = useCallback((id: string) => {
+    setDismissingToastIds((current) => {
+      if (current.has(id)) return current;
+      const next = new Set(current);
+      next.add(id);
+      return next;
+    });
+    window.setTimeout(() => {
+      setAlertToasts((current) => current.filter((item) => item.id !== id));
+      setDismissingToastIds((current) => {
+        if (!current.has(id)) return current;
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+      setToastDragOffsets((current) => {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }, ALERT_TOAST_EXIT_MS);
+  }, []);
+
+  const pushAlertToast = useCallback(
+    (toast: Omit<AlertToast, "id" | "createdAt">) => {
+      const id = createAlertId("toast");
+      setAlertToasts((current) =>
+        [{ ...toast, id, createdAt: Date.now() }, ...current].slice(0, 5),
+      );
+      window.setTimeout(() => dismissAlertToast(id), ALERT_TOAST_TTL_MS);
+    },
+    [dismissAlertToast],
+  );
+
+  const startAlertToastDrag = useCallback(
+    (id: string, event: ReactPointerEvent<HTMLElement>) => {
+      if (dismissingToastIds.has(id)) return;
+      toastDragStartRef.current[id] = event.clientX;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [dismissingToastIds],
+  );
+
+  const moveAlertToastDrag = useCallback(
+    (id: string, event: ReactPointerEvent<HTMLElement>) => {
+      const startX = toastDragStartRef.current[id];
+      if (startX === undefined) return;
+      const offset = Math.max(0, event.clientX - startX);
+      setToastDragOffsets((current) =>
+        current[id] === offset ? current : { ...current, [id]: offset },
+      );
+    },
+    [],
+  );
+
+  const clearAlertToastDrag = useCallback((id: string) => {
+    delete toastDragStartRef.current[id];
+    setToastDragOffsets((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  const finishAlertToastDrag = useCallback(
+    (id: string, event: ReactPointerEvent<HTMLElement>) => {
+      const startX = toastDragStartRef.current[id];
+      const offset = startX === undefined ? 0 : Math.max(0, event.clientX - startX);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      if (offset > 86) {
+        delete toastDragStartRef.current[id];
+        dismissAlertToast(id);
+        return;
+      }
+      clearAlertToastDrag(id);
+    },
+    [clearAlertToastDrag, dismissAlertToast],
+  );
+
+  const playAlertSound = useCallback(async () => {
+    try {
+      const audioWindow = window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      };
+      const AudioContextConstructor =
+        window.AudioContext ?? audioWindow.webkitAudioContext;
+      if (!AudioContextConstructor) {
+        if (typeof Audio === "undefined") return;
+        const audio = new Audio(ALERT_BEEP_DATA_URI);
+        await audio.play();
+        setAlertSoundReady(true);
+        return;
+      }
+      const context =
+        alertAudioRef.current ?? new AudioContextConstructor();
+      alertAudioRef.current = context;
+      if (context.state === "suspended") {
+        await context.resume();
+      }
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const now = context.currentTime;
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, now);
+      oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.26);
+      setAlertSoundReady(true);
+    } catch {
+      setAlertSoundReady(false);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1105,11 +1468,210 @@ function Dashboard({ session, onLogout }: DashboardProps) {
         10_000
       : null;
   const selectedCollector = health?.collectors[exchange];
-  const backendHealthy = health?.status === "ok";
   const isLive =
     streamStatus === "live" &&
     selectedMarket?.status === "live" &&
     selectedCollector?.connected !== false;
+  const alertMetrics = metrics?.latest ?? latestMetrics;
+  const currentScopeAlerts = userAlerts.filter(
+    (alert) =>
+      alert.exchange === exchange &&
+      alert.instrumentId === instrumentId &&
+      alert.timeframe === timeframe,
+  );
+  const activeCurrentScopeAlerts = currentScopeAlerts.filter(
+    (alert) => alert.enabled,
+  );
+  const chartAlertLines: ChartAlertLine[] = currentScopeAlerts
+    .filter(
+      (alert) =>
+        alert.enabled &&
+        alert.metric === "price" &&
+        Number.isFinite(alert.threshold),
+    )
+    .map((alert) => ({
+      id: alert.id,
+      label: `${conditionLabel(alert.condition)} ${formatAlertValue(
+        alert.metric,
+        alert.threshold,
+      )}`,
+      price: alert.threshold,
+      tone:
+        alert.condition === "below" || alert.condition === "crosses_below"
+          ? "below"
+          : "above",
+    }));
+  const dashboardAlertPresets = ALERT_PRESETS.slice(0, 4);
+  const enabledAlertCount = userAlerts.filter((alert) => alert.enabled).length;
+
+  const createAlert = useCallback(
+    (draft: AlertDraft) => {
+      const threshold = Number(draft.threshold);
+      const cooldownSeconds = Number(draft.cooldownSeconds);
+      if (!Number.isFinite(threshold)) {
+        setAlertFormError("Enter a numeric threshold.");
+        return;
+      }
+      if (!Number.isFinite(cooldownSeconds) || cooldownSeconds < 5) {
+        setAlertFormError("Cooldown must be at least 5 seconds.");
+        return;
+      }
+
+      const definition = alertMetricDefinition(draft.metric);
+      const label =
+        draft.label.trim() ||
+        `${definition.shortLabel} ${conditionLabel(draft.condition)} ${formatAlertValue(
+          draft.metric,
+          threshold,
+        )}`;
+      const nextAlert: UserAlert = {
+        id: createAlertId(),
+        label,
+        exchange,
+        instrumentId,
+        instrumentBase: instrument?.base ?? instrumentId,
+        timeframe,
+        metric: draft.metric,
+        condition: draft.condition,
+        threshold,
+        cooldownMs: cooldownSeconds * 1000,
+        once: draft.once,
+        enabled: true,
+        createdAt: Date.now(),
+        lastTriggeredAt: null,
+      };
+      setUserAlerts((current) => [nextAlert, ...current]);
+      setAlertDraft(DEFAULT_ALERT_DRAFT);
+      setAlertFormError(null);
+      setDashboardAlertComposerOpen(false);
+      pushAlertToast({
+        title: "Alert armed",
+        body: `${nextAlert.label} on ${exchangeLabel(exchange)} ${
+          nextAlert.instrumentBase
+        }`,
+        severity: "medium",
+      });
+    },
+    [exchange, instrument?.base, instrumentId, pushAlertToast, timeframe],
+  );
+
+  const createPresetAlert = useCallback(
+    (preset: AlertPreset) => {
+      const threshold =
+        typeof preset.threshold === "function"
+          ? preset.threshold(livePrice)
+          : preset.threshold;
+      if (threshold === null || !Number.isFinite(threshold)) {
+        setAlertFormError("This preset needs a live price first.");
+        return;
+      }
+      createAlert({
+        label: preset.label,
+        metric: preset.metric,
+        condition: preset.condition,
+        threshold: String(threshold),
+        cooldownSeconds: String(preset.cooldownSeconds),
+        once: Boolean(preset.once),
+      });
+    },
+    [createAlert, livePrice],
+  );
+
+  const toggleAlert = useCallback((id: string) => {
+    setUserAlerts((current) =>
+      current.map((alert) =>
+        alert.id === id ? { ...alert, enabled: !alert.enabled } : alert,
+      ),
+    );
+  }, []);
+
+  const removeAlert = useCallback((id: string) => {
+    setUserAlerts((current) => current.filter((alert) => alert.id !== id));
+    delete previousAlertValuesRef.current[id];
+  }, []);
+
+  useEffect(() => {
+    const now = Date.now();
+    const nextPrevious = { ...previousAlertValuesRef.current };
+    const triggered: Array<{
+      alert: UserAlert;
+      value: number;
+      severity: AlertSeverity;
+    }> = [];
+
+    for (const alert of userAlerts) {
+      if (
+        !alert.enabled ||
+        alert.exchange !== exchange ||
+        alert.instrumentId !== instrumentId ||
+        alert.timeframe !== timeframe
+      ) {
+        continue;
+      }
+
+      const currentValue = alertMetricValue(alert.metric, livePrice, alertMetrics);
+      if (currentValue === null) continue;
+      const previousValue = nextPrevious[alert.id] ?? null;
+      nextPrevious[alert.id] = currentValue;
+
+      const cooledDown =
+        alert.lastTriggeredAt === null ||
+        now - alert.lastTriggeredAt >= alert.cooldownMs;
+      if (
+        cooledDown &&
+        alertConditionMet(
+          alert.condition,
+          currentValue,
+          previousValue,
+          alert.threshold,
+        )
+      ) {
+        triggered.push({
+          alert,
+          value: currentValue,
+          severity: alertSeverity(alert, currentValue),
+        });
+      }
+    }
+
+    previousAlertValuesRef.current = nextPrevious;
+    if (triggered.length === 0) return;
+
+    const triggeredIds = new Set(triggered.map(({ alert }) => alert.id));
+    setUserAlerts((current) =>
+      current.map((alert) =>
+        triggeredIds.has(alert.id)
+          ? {
+              ...alert,
+              enabled: alert.once ? false : alert.enabled,
+              lastTriggeredAt: now,
+            }
+          : alert,
+      ),
+    );
+
+    for (const { alert, value, severity } of triggered) {
+      pushAlertToast({
+        title: alert.label,
+        body: `${exchangeLabel(alert.exchange)} ${alert.instrumentBase} ${alertMetricDefinition(
+          alert.metric,
+        ).shortLabel}: ${formatAlertValue(alert.metric, value)} (${conditionLabel(
+          alert.condition,
+        ).toLowerCase()} ${formatAlertValue(alert.metric, alert.threshold)})`,
+        severity,
+      });
+    }
+    void playAlertSound();
+  }, [
+    alertMetrics,
+    exchange,
+    instrumentId,
+    livePrice,
+    playAlertSound,
+    pushAlertToast,
+    timeframe,
+    userAlerts,
+  ]);
 
   return (
     <div className="app-shell">
@@ -1120,14 +1682,21 @@ function Dashboard({ session, onLogout }: DashboardProps) {
         </div>
 
         <nav className="primary-nav" aria-label="Primary navigation">
-          <button className="nav-item active" type="button">
+          <button
+            className={`nav-item ${activeView === "dashboard" ? "active" : ""}`}
+            type="button"
+            onClick={() => setActiveView("dashboard")}
+          >
             <span className="nav-index">01</span>
             <span>Dashboard</span>
           </button>
-          <button className="nav-item" type="button" disabled>
+          <button
+            className={`nav-item ${activeView === "alerts" ? "active" : ""}`}
+            type="button"
+            onClick={() => setActiveView("alerts")}
+          >
             <span className="nav-index">02</span>
             <span>Alerts</span>
-            <small>soon</small>
           </button>
           <button className="nav-item" type="button" disabled>
             <span className="nav-index">03</span>
@@ -1136,13 +1705,6 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           </button>
         </nav>
 
-        <div className="rail-status">
-          <span className={`status-orb ${backendHealthy ? "live" : "warn"}`} />
-          <div>
-            <span>PIPELINE</span>
-            <strong>{health?.status ?? "checking"}</strong>
-          </div>
-        </div>
       </aside>
 
       <main className="workspace">
@@ -1276,6 +1838,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           </div>
         </section>
 
+        {activeView === "dashboard" ? (
         <section className="terminal-grid">
           <div className="market-stack">
             <article className="chart-panel panel">
@@ -1305,6 +1868,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 historyLoading={historyLoading}
                 hasMore={hasMoreHistory}
                 onLoadEarlier={loadEarlier}
+                alertLines={chartAlertLines}
               />
               <div className="chart-foot">
                 <span>
@@ -1590,6 +2154,169 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 )}
               </div>
             </article>
+
+            <article className="panel dashboard-alert-panel">
+              <div className="panel-head compact">
+                <div className="panel-title-with-logo">
+                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                  <div>
+                    <span className="eyebrow">ALERTS</span>
+                    <strong>
+                      {activeCurrentScopeAlerts.length
+                        ? `${activeCurrentScopeAlerts.length} watching`
+                        : "No active alerts"}
+                    </strong>
+                  </div>
+                </div>
+                <button
+                  className="alert-add-button"
+                  type="button"
+                  onClick={() => {
+                    if (dashboardAlertComposerOpen) {
+                      setDashboardAlertComposerOpen(false);
+                      return;
+                    }
+                    setAlertFormError(null);
+                    setAlertDraft({
+                      label: "Price above level",
+                      metric: "price",
+                      condition: "crosses_above",
+                      threshold:
+                        livePrice === null
+                          ? ""
+                          : livePrice.toFixed(livePrice >= 1 ? 2 : 6),
+                      cooldownSeconds: "120",
+                      once: false,
+                    });
+                    setDashboardAlertComposerOpen(true);
+                  }}
+                >
+                  {dashboardAlertComposerOpen ? "Close" : "Price level"}
+                </button>
+              </div>
+
+              {currentScopeAlerts.length > 0 ? (
+                <div className="dashboard-alert-list">
+                  {currentScopeAlerts.slice(0, 4).map((alert) => (
+                    <article
+                      className={`dashboard-alert-row ${
+                        alert.enabled ? "enabled" : "disabled"
+                      }`}
+                      key={alert.id}
+                    >
+                      <div>
+                        <strong>{alert.label}</strong>
+                        <span>
+                          {alertMetricDefinition(alert.metric).shortLabel}{" "}
+                          {conditionLabel(alert.condition)}{" "}
+                          {formatAlertValue(alert.metric, alert.threshold)}
+                        </span>
+                      </div>
+                      <button type="button" onClick={() => toggleAlert(alert.id)}>
+                        {alert.enabled ? "Pause" : "Resume"}
+                      </button>
+                      <button type="button" onClick={() => removeAlert(alert.id)}>
+                        Remove
+                      </button>
+                    </article>
+                  ))}
+                  {currentScopeAlerts.length > 4 && (
+                    <button
+                      className="dashboard-alert-more"
+                      type="button"
+                      onClick={() => setActiveView("alerts")}
+                    >
+                      View {currentScopeAlerts.length - 4} more
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="dashboard-alert-templates">
+                <span>Quick templates</span>
+                <div className="dashboard-alert-presets">
+                  {dashboardAlertPresets.map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => createPresetAlert(preset)}
+                    >
+                      <strong>{preset.label}</strong>
+                      <span>{preset.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {dashboardAlertComposerOpen && (
+                <form
+                  className="dashboard-alert-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    createAlert({
+                      ...alertDraft,
+                      label:
+                        alertDraft.condition === "crosses_below"
+                          ? "Price below level"
+                          : "Price above level",
+                      metric: "price",
+                      cooldownSeconds: "120",
+                      once: false,
+                    });
+                  }}
+                >
+                  <div className="dashboard-level-toggle">
+                    <button
+                      className={
+                        alertDraft.condition === "crosses_above" ? "active" : ""
+                      }
+                      type="button"
+                      onClick={() =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          label: "Price above level",
+                          condition: "crosses_above",
+                        }))
+                      }
+                    >
+                      Above
+                    </button>
+                    <button
+                      className={
+                        alertDraft.condition === "crosses_below" ? "active" : ""
+                      }
+                      type="button"
+                      onClick={() =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          label: "Price below level",
+                          condition: "crosses_below",
+                        }))
+                      }
+                    >
+                      Below
+                    </button>
+                  </div>
+                  <label>
+                    <span>Price level</span>
+                    <input
+                      inputMode="decimal"
+                      value={alertDraft.threshold}
+                      onChange={(event) =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          threshold: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <button type="submit">Save level alert</button>
+                </form>
+              )}
+              {alertFormError && (
+                <p className="dashboard-alert-error">{alertFormError}</p>
+              )}
+            </article>
             <article className="panel signal-panel">
               <div className="panel-head compact">
                 <div className="panel-title-with-logo">
@@ -1636,6 +2363,293 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             </article>
           </aside>
         </section>
+        ) : (
+        <section className="alerts-workspace" aria-label="User alerts">
+          <div className="alerts-main">
+            <article className="panel alert-builder-panel">
+              <div className="panel-head compact">
+                <div className="panel-title-with-logo">
+                  <CoinLogo base={instrument?.base} className="coin-logo-xs" />
+                  <div>
+                    <span className="eyebrow">USER ALERTS</span>
+                    <strong>{exchangeLabel(exchange)} {instrumentId}</strong>
+                  </div>
+                </div>
+                <span className={`quality-badge ${isLive ? "good" : "warn"}`}>
+                  {isLive ? "ARMED" : "WAITING"}
+                </span>
+              </div>
+
+              <div className="alert-reading-grid">
+                <div>
+                  <span>Last price</span>
+                  <strong>{formatPrice(livePrice)}</strong>
+                </div>
+                <div>
+                  <span>RSI</span>
+                  <strong>
+                    {alertMetrics?.rsi === null || alertMetrics?.rsi === undefined
+                      ? "--"
+                      : alertMetrics.rsi.toFixed(1)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Volume spike</span>
+                  <strong>{formatRatio(alertMetrics?.volumeSpikeRatio ?? null)}</strong>
+                </div>
+                <div>
+                  <span>Events</span>
+                  <strong>{metricEvents.length}</strong>
+                </div>
+              </div>
+
+              <form
+                className="alert-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  createAlert(alertDraft);
+                }}
+              >
+                <label className="alert-field alert-field-wide">
+                  <span>Alert name</span>
+                  <input
+                    value={alertDraft.label}
+                    onChange={(event) =>
+                      setAlertDraft((draft) => ({
+                        ...draft,
+                        label: event.target.value,
+                      }))
+                    }
+                    placeholder="Resistance break"
+                  />
+                </label>
+
+                <div className="alert-form-grid">
+                  <label className="alert-field">
+                    <span>Metric</span>
+                    <select
+                      value={alertDraft.metric}
+                      onChange={(event) =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          metric: event.target.value as AlertMetricId,
+                        }))
+                      }
+                    >
+                      {ALERT_METRICS.map((metric) => (
+                        <option key={metric.id} value={metric.id}>
+                          {metric.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="alert-field">
+                    <span>Condition</span>
+                    <select
+                      value={alertDraft.condition}
+                      onChange={(event) =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          condition: event.target.value as AlertCondition,
+                        }))
+                      }
+                    >
+                      {ALERT_CONDITIONS.map((condition) => (
+                        <option key={condition.id} value={condition.id}>
+                          {condition.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="alert-field">
+                    <span>Threshold</span>
+                    <input
+                      inputMode="decimal"
+                      value={alertDraft.threshold}
+                      onChange={(event) =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          threshold: event.target.value,
+                        }))
+                      }
+                      placeholder="0.00"
+                    />
+                  </label>
+
+                  <label className="alert-field">
+                    <span>Cooldown, sec</span>
+                    <input
+                      inputMode="numeric"
+                      value={alertDraft.cooldownSeconds}
+                      onChange={(event) =>
+                        setAlertDraft((draft) => ({
+                          ...draft,
+                          cooldownSeconds: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <label className="alert-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={alertDraft.once}
+                    onChange={(event) =>
+                      setAlertDraft((draft) => ({
+                        ...draft,
+                        once: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Disable after first trigger</span>
+                </label>
+
+                {alertFormError && (
+                  <div className="alert-form-error" role="alert">
+                    {alertFormError}
+                  </div>
+                )}
+
+                <div className="alert-actions">
+                  <button type="submit">Save alert</button>
+                  <button
+                    type="button"
+                    className={alertSoundReady ? "sound-ready" : ""}
+                    onClick={() => void playAlertSound()}
+                  >
+                    {alertSoundReady ? "Sound ready" : "Test sound"}
+                  </button>
+                </div>
+              </form>
+            </article>
+
+            <article className="panel alert-presets-panel">
+              <div className="panel-head compact">
+                <div>
+                  <span className="eyebrow">METRIC PRESETS</span>
+                  <strong>Common market alerts</strong>
+                </div>
+              </div>
+              <div className="alert-preset-grid">
+                {ALERT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => createPresetAlert(preset)}
+                  >
+                    <strong>{preset.label}</strong>
+                    <span>{preset.description}</span>
+                    <b>
+                      {alertMetricDefinition(preset.metric).shortLabel}{" "}
+                      {conditionLabel(preset.condition).toLowerCase()}
+                    </b>
+                  </button>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <aside className="alerts-side">
+            <article className="panel alert-rules-panel">
+              <div className="panel-head compact">
+                <div>
+                  <span className="eyebrow">ACTIVE RULES</span>
+                  <strong>{currentScopeAlerts.length} for current scope</strong>
+                </div>
+                <span className={`quality-badge ${enabledAlertCount ? "good" : "neutral"}`}>
+                  {enabledAlertCount ? `${enabledAlertCount} ON` : "EMPTY"}
+                </span>
+              </div>
+
+              {userAlerts.length > 0 ? (
+                <div className="alert-rule-list">
+                  {userAlerts.map((alert) => (
+                    <article
+                      className={`alert-rule-card ${alert.enabled ? "enabled" : ""}`}
+                      key={alert.id}
+                    >
+                      <div>
+                        <strong>{alert.label}</strong>
+                        <span>
+                          {exchangeLabel(alert.exchange)} {alert.instrumentBase}{" "}
+                          {alert.timeframe}
+                        </span>
+                      </div>
+                      <p>
+                        {alertMetricDefinition(alert.metric).shortLabel}{" "}
+                        {conditionLabel(alert.condition).toLowerCase()}{" "}
+                        {formatAlertValue(alert.metric, alert.threshold)}
+                      </p>
+                      <footer>
+                        <span>
+                          Last {alert.lastTriggeredAt ? formatClock(alert.lastTriggeredAt) : "--"}
+                        </span>
+                        <button type="button" onClick={() => toggleAlert(alert.id)}>
+                          {alert.enabled ? "On" : "Off"}
+                        </button>
+                        <button type="button" onClick={() => removeAlert(alert.id)}>
+                          Remove
+                        </button>
+                      </footer>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="signal-empty">
+                  <span className="signal-crosshair" />
+                  <strong>No user alerts</strong>
+                  <p>
+                    Save a price level or metric threshold to monitor this
+                    market while you work.
+                  </p>
+                </div>
+              )}
+            </article>
+
+            <article className="panel signal-panel alert-engine-panel">
+              <div className="panel-head compact">
+                <div>
+                  <span className="eyebrow">ENGINE EVENTS</span>
+                  <strong>Built-in metric signals</strong>
+                </div>
+                <span className={`quality-badge ${metricEvents.length ? "good" : "neutral"}`}>
+                  {metricEvents.length ? `${metricEvents.length} LIVE` : "QUIET"}
+                </span>
+              </div>
+              {metricEvents.length > 0 ? (
+                <div className="signal-list">
+                  {metricEvents.map((event) => (
+                    <article
+                      className={`signal-card ${event.severity}`}
+                      key={`${event.type}:${event.openTime}:${event.metric}`}
+                    >
+                      <div>
+                        <strong>{eventLabel(event)}</strong>
+                        <span>{formatClock(event.openTime)}</span>
+                      </div>
+                      <p>{event.description}</p>
+                      <footer>
+                        <span>{event.metric}</span>
+                        <b>{event.value === null ? "--" : event.value.toFixed(2)}</b>
+                        <span>{formatConfidence(event.confidence)}</span>
+                      </footer>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="signal-empty">
+                  <span className="signal-crosshair" />
+                  <strong>No engine events</strong>
+                  <p>Built-in metrics are quiet for the selected market window.</p>
+                </div>
+              )}
+            </article>
+          </aside>
+        </section>
+        )}
 
         <footer className="system-footer">
           <span>
@@ -1647,6 +2661,45 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           <span>DB {health?.database.status ?? "--"}</span>
           <span className="footer-time">{formatClock(Date.now())} MSK</span>
         </footer>
+
+        <div className="alert-toast-stack" aria-live="assertive">
+          {alertToasts.map((toast) => {
+            const dragOffset = toastDragOffsets[toast.id] ?? 0;
+            const isDismissing = dismissingToastIds.has(toast.id);
+            return (
+              <article
+                className={`alert-toast ${toast.severity} ${
+                  dragOffset > 0 ? "dragging" : ""
+                } ${isDismissing ? "dismissing" : ""}`}
+                key={toast.id}
+                onPointerDown={(event) => startAlertToastDrag(toast.id, event)}
+                onPointerMove={(event) => moveAlertToastDrag(toast.id, event)}
+                onPointerUp={(event) => finishAlertToastDrag(toast.id, event)}
+                onPointerCancel={() => clearAlertToastDrag(toast.id)}
+                style={
+                  {
+                    "--toast-drag-x": `${dragOffset}px`,
+                  } as CSSProperties
+                }
+              >
+                <div className="alert-toast-head">
+                  <strong>{toast.title}</strong>
+                  <span>{formatClock(toast.createdAt)}</span>
+                  <button
+                    aria-label="Close notification"
+                    className="alert-toast-close"
+                    type="button"
+                    onClick={() => dismissAlertToast(toast.id)}
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    x
+                  </button>
+                </div>
+                <p>{toast.body}</p>
+              </article>
+            );
+          })}
+        </div>
       </main>
     </div>
   );

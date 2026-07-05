@@ -25,6 +25,8 @@ synthetic price or candle.
 - Persisted metric history plus pushed metric snapshots for the terminal
 - Prometheus latency metrics and a provisioned Grafana observability dashboard
 - React and TypeScript terminal with exchange, instrument, and timeframe controls
+- User-configurable browser alerts with metric presets, price-level rules,
+  sound cues, and bottom-right notifications
 - TimescaleDB persistence and Docker Compose deployment
 
 Pattern detectors and chart-pattern confidence are already exposed through the
