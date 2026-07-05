@@ -28,6 +28,11 @@ synthetic price or candle.
 - React and TypeScript terminal with exchange, instrument, and timeframe controls
 - User-configurable browser alerts with metric presets, price-level rules,
   sound cues, and bottom-right notifications
+- TradingView-style chart workspace on `lightweight-charts` with `1m` startup,
+  OHLC readout, persisted editable/copyable drawing tools, measurement, and
+  level annotations
+- Browser-stored workspace builder with drag-and-drop panel ordering, presets,
+  chart-height and event-rail sliders, panel slot assignment, and reset controls
 - TimescaleDB persistence and Docker Compose deployment
 
 Pattern detectors and chart-pattern confidence are already exposed through the
@@ -173,6 +178,14 @@ The chart loads its initial history through REST, then listens to
 persisted as canonical history; they let the user see the current forming candle
 near real time while stable candles remain delayed enough to preserve OHLC
 correctness.
+
+The charting UI intentionally uses the open-source TradingView
+`lightweight-charts` package. It provides TradingView-style interactions and
+drawing tools for MVP v2, while the proprietary TradingView Advanced Charts
+library remains a future integration option that requires TradingView approval.
+The dashboard also stores per-browser layout preferences so users can drag
+panels into their preferred order, expand the chart, resize the event rail, and
+assign panels to the workspace slots that fit their workflow.
 
 Stop the stack with:
 

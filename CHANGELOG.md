@@ -11,6 +11,14 @@ project uses [Semantic Versioning](https://semver.org/).
 - User-configurable market alerts with metric presets, level-break rules,
   browser-stored alert state, sound cues, and bottom-right toast notifications
   for issue #166.
+- TradingView-style chart controls with Candles/Line/Area modes, OHLC readout,
+  persisted drawing tools, selectable/editable/deletable/copyable drawings,
+  Fibonacci levels, measurement, and fit/latest/history actions for issue #167.
+- One-minute default chart bootstrapping that waits for an initial candle
+  history window before displaying the chart surface.
+- Browser-stored dashboard workspace builder with drag-and-drop panel ordering,
+  presets, chart-height and event-rail sliders, panel slot assignment, and reset
+  actions.
 
 ### Changed
 - No entries yet.
