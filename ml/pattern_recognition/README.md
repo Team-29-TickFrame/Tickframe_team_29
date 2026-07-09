@@ -6,7 +6,8 @@ chart-pattern recognition on real Binance public market data.
 ## Scope
 
 - Dataset type: Binance public spot `1m` OHLCV
-- Timeframe: `1m` only
+- Source timeframe: `1m`
+- Prepared dataset timeframes: `1m`, `5m`, `15m`, `1h`, `1d`
 - Window size: `96` closed candles
 - Intended live cadence: recalculate after each newly closed `1m` candle
 - Labels:
@@ -17,21 +18,47 @@ chart-pattern recognition on real Binance public market data.
   - `double_bottom`
   - `none`
 
-The current product should treat the model as available only for `1m`. Other
-timeframes are intentionally unsupported until separate training and validation
-artifacts exist.
+The current product model artifact is still wired to the `1m` training file.
+The preparation pipeline can now produce additional timeframe datasets for
+separate training and validation artifacts.
 
 ## Dataset Preparation
 
-The prepared dataset is built from Binance Public Data monthly spot kline
-archives. Each configured symbol is downloaded from its first available monthly
-archive, normalized into the Tickframe candle shape, scanned with rule-based
-weak-label detectors, and converted into feature rows.
+The prepared dataset is built from Binance Public Data monthly and daily spot
+kline archives. Each configured symbol is normalized into the Tickframe candle
+shape, sorted by `openTime`, scanned with rule-based weak-label detectors, and
+converted into feature rows.
+
+The cleaner enforces:
+
+- all `openTime` / `closeTime` values are normalized to milliseconds;
+- candles are sorted chronologically after monthly and daily archives are merged;
+- generated windows must be contiguous, with no gap, duplicate, or backward jump;
+- examples are sampled more evenly by year per symbol and label;
+- hard negatives are retained as `label=none` rows with `hardNegativeFor`;
+- each row stores `labelScores` and flat `softScores` such as
+  `double_top_score` and `triangle_score`;
+- extra prepared files are emitted for configured timeframes, e.g.
+  `features-5m.jsonl`, `features-15m.jsonl`, `features-1h.jsonl`, and
+  `features-1d.jsonl`.
 
 From the repository root:
 
 ```bash
 python -m ml.pattern_recognition.prepare_binance_dataset --config ml/pattern_recognition/config.json
+```
+
+Rebuild prepared datasets from already downloaded local normalized files without
+network access:
+
+```bash
+python -m ml.pattern_recognition.prepare_binance_dataset --config ml/pattern_recognition/config.json --offline-normalized
+```
+
+Rewrite normalized CSV files into sorted millisecond timestamps while rebuilding:
+
+```bash
+python -m ml.pattern_recognition.prepare_binance_dataset --config ml/pattern_recognition/config.json --offline-normalized --rebuild-normalized
 ```
 
 Local raw and prepared data are written under:
