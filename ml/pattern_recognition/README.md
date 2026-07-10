@@ -35,6 +35,8 @@ The cleaner enforces:
 - candles are sorted chronologically after monthly and daily archives are merged;
 - generated windows must be contiguous, with no gap, duplicate, or backward jump;
 - examples are sampled more evenly by year per symbol and label;
+- candidate windows are capped per `label + year` bucket to keep large rebuilds
+  bounded in memory;
 - hard negatives are retained as `label=none` rows with `hardNegativeFor`;
 - each row stores `labelScores` and flat `softScores` such as
   `double_top_score` and `triangle_score`;
@@ -71,8 +73,18 @@ This directory is intentionally gitignored because it can become large.
 
 ## Model
 
-The baseline model is a dependency-free Gaussian Naive Bayes classifier. The
-pipeline trains on handcrafted OHLCV shape features generated from real
+The training pipeline supports multiple classifier backends behind one artifact
+interface:
+
+- `auto` - try LightGBM first, then scikit-learn HistGradientBoosting;
+- `lightgbm` - require LightGBM;
+- `hist_gradient_boosting` - require scikit-learn HistGradientBoosting;
+- `gaussian_nb` - dependency-free Gaussian Naive Bayes baseline.
+
+The default config uses `auto`. Gaussian Naive Bayes remains available as the
+baseline for comparison and smoke checks.
+
+The pipeline trains on handcrafted OHLCV shape features generated from real
 weak-labeled windows:
 
 ```text
@@ -89,6 +101,12 @@ Prepare data first, then train:
 
 ```bash
 python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json
+```
+
+Force the old baseline:
+
+```bash
+python -m ml.pattern_recognition.train_baseline --config ml/pattern_recognition/config.json --model-type gaussian_nb
 ```
 
 Fast smoke check after preparing data:

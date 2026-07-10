@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import os
+import random
 import re
 import time
 import urllib.request
@@ -75,6 +76,50 @@ class FeatureRow:
     open_time: int
     year: int
     is_hard_negative: bool
+
+
+class BoundedCandidateSampler:
+    def __init__(self, *, per_label_year_limit: int, seed: int) -> None:
+        self.per_label_year_limit = per_label_year_limit
+        self._rng = random.Random(seed)
+        self._buckets: Dict[str, Dict[int, List[FeatureRow]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        self._seen: Counter[tuple[str, int]] = Counter()
+
+    def add(self, row: FeatureRow) -> None:
+        key = (row.label, row.year)
+        self._seen[key] += 1
+        bucket = self._buckets[row.label][row.year]
+        if len(bucket) < self.per_label_year_limit:
+            bucket.append(row)
+            return
+        replacement_index = self._rng.randrange(self._seen[key])
+        if replacement_index < self.per_label_year_limit:
+            bucket[replacement_index] = row
+
+    def rows_by_label(self) -> Dict[str, List[FeatureRow]]:
+        return {
+            label: [
+                row
+                for year in sorted(years)
+                for row in sorted(years[year], key=lambda item: item.open_time)
+            ]
+            for label, years in self._buckets.items()
+        }
+
+    def seen_counts_by_label(self) -> Dict[str, int]:
+        counts: Counter[str] = Counter()
+        for label, _year in self._seen:
+            counts[label] += self._seen[(label, _year)]
+        return dict(sorted(counts.items()))
+
+    def sampled_count(self) -> int:
+        return sum(
+            len(rows)
+            for years in self._buckets.values()
+            for rows in years.values()
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -156,6 +201,12 @@ def main() -> None:
     hard_negative_min_score = float(
         config.get("labeling", {}).get("hardNegativeMinScore", 0.42)
     )
+    candidate_cap_per_label_year = int(
+        config.get("labeling", {}).get(
+            "candidateCapPerLabelYear",
+            max(500, min(max_examples_per_label, 1000)),
+        )
+    )
     timeframes = dataset_timeframes(config=config, args=args)
     end_date = _parse_date(args.end_date) if args.end_date else None
 
@@ -176,6 +227,7 @@ def main() -> None:
         "windowSize": window_size,
         "stride": stride,
         "maxExamplesPerLabel": max_examples_per_label,
+        "candidateCapPerLabelYear": candidate_cap_per_label_year,
         "hardNegativeMinScore": hard_negative_min_score,
         "symbols": {},
         "labels": list(config["labels"]),
@@ -201,6 +253,7 @@ def main() -> None:
     try:
         for symbol in symbols:
             normalized_path = normalized_dir / f"{symbol}-{SOURCE_TIMEFRAME}.csv"
+            print(f"prepare symbol={symbol} load_normalized={normalized_path}", flush=True)
             archive_summary: Dict[str, object] = {}
             if not args.offline_normalized:
                 monthly_archives = list_monthly_archives(symbol)
@@ -249,6 +302,11 @@ def main() -> None:
                 continue
 
             source_candles, clean_stats = load_ordered_candles(normalized_path)
+            print(
+                f"loaded symbol={symbol} rows={clean_stats['rows']} "
+                f"clean={len(source_candles)} backward_jumps={clean_stats['backwardJumpsBeforeSort']}",
+                flush=True,
+            )
             if args.offline_normalized and args.rebuild_normalized:
                 rewrite_normalized_candles(source_candles, normalized_path)
 
@@ -263,7 +321,21 @@ def main() -> None:
             }
 
             for timeframe in timeframes:
-                timeframe_candles = resample_candles(source_candles, timeframe)
+                print(
+                    f"resample symbol={symbol} timeframe={timeframe} start "
+                    f"source_candles={len(source_candles)}",
+                    flush=True,
+                )
+                timeframe_candles = (
+                    source_candles
+                    if timeframe == SOURCE_TIMEFRAME
+                    else resample_candles(source_candles, timeframe)
+                )
+                print(
+                    f"resample symbol={symbol} timeframe={timeframe} done "
+                    f"candles={len(timeframe_candles)}",
+                    flush=True,
+                )
                 stats = prepare_features_from_candles(
                     timeframe_candles,
                     output=feature_files[timeframe],
@@ -275,6 +347,7 @@ def main() -> None:
                     none_stride_multiplier=none_stride_multiplier,
                     min_score=min_score,
                     hard_negative_min_score=hard_negative_min_score,
+                    candidate_cap_per_label_year=candidate_cap_per_label_year,
                 )
                 totals[timeframe].update(stats["labelCounts"])
                 feature_files[timeframe].flush()
@@ -282,6 +355,12 @@ def main() -> None:
                     "candleCount": len(timeframe_candles),
                     **stats,
                 }
+                print(
+                    f"prepared symbol={symbol} timeframe={timeframe} "
+                    f"candles={len(timeframe_candles)} examples={sum(stats['labelCounts'].values())} "
+                    f"labels={stats['labelCounts']}",
+                    flush=True,
+                )
 
             manifest["symbols"][symbol] = symbol_manifest
     finally:
@@ -606,22 +685,44 @@ def prepare_features_from_candles(
     none_stride_multiplier: int,
     min_score: float,
     hard_negative_min_score: float,
+    candidate_cap_per_label_year: int,
 ) -> Dict[str, object]:
-    candidates: Dict[str, List[FeatureRow]] = defaultdict(list)
+    candidates = BoundedCandidateSampler(
+        per_label_year_limit=candidate_cap_per_label_year,
+        seed=_stable_seed(f"{symbol}:{timeframe}"),
+    )
     skipped_gap_windows = 0
     scanned_windows = 0
     timeframe_ms = timeframe_to_ms(timeframe)
+    total_candles = len(candles)
+    progress_step = max(1, total_candles // 10)
+    next_progress_at = progress_step
+    started_at = time.perf_counter()
 
     window: deque[Dict[str, object]] = deque(maxlen=window_size)
     previous_open_time: Optional[int] = None
     seen = 0
-    for candle in candles:
+    for candle_index, candle in enumerate(candles, start=1):
         open_time = int(candle["openTime"])
         if previous_open_time is not None and open_time - previous_open_time != timeframe_ms:
             skipped_gap_windows += max(0, len(window) - window_size + 1)
             window.clear()
         previous_open_time = open_time
         window.append(candle)
+        if candle_index >= next_progress_at or candle_index == total_candles:
+            elapsed = max(0.001, time.perf_counter() - started_at)
+            percent = candle_index / max(1, total_candles) * 100
+            print(
+                f"progress symbol={symbol} timeframe={timeframe} "
+                f"candles={candle_index}/{total_candles} ({percent:.1f}%) "
+                f"scanned_windows={scanned_windows} "
+                f"sampled_candidates={candidates.sampled_count()} "
+                f"seen={candidates.seen_counts_by_label()} "
+                f"elapsed_s={elapsed:.1f}",
+                flush=True,
+            )
+            while next_progress_at <= candle_index:
+                next_progress_at += progress_step
         if len(window) < window_size:
             continue
         seen += 1
@@ -680,10 +781,11 @@ def prepare_features_from_candles(
             ).year,
             is_hard_negative=hard_negative_for is not None,
         )
-        candidates[weak_label.label].append(row)
+        candidates.add(row)
 
     selected: List[FeatureRow] = []
-    for label, rows in candidates.items():
+    sampled_candidates = candidates.rows_by_label()
+    for label, rows in sampled_candidates.items():
         selected.extend(sample_evenly_by_year(rows, max_examples_per_label))
     selected.sort(key=lambda row: (row.open_time, row.symbol, row.label))
     for row in selected:
@@ -698,10 +800,12 @@ def prepare_features_from_candles(
     year_counts = Counter(str(row.year) for row in selected)
     return {
         "labelCounts": dict(sorted(label_counts.items())),
-        "candidateCounts": {
+        "candidateCounts": candidates.seen_counts_by_label(),
+        "sampledCandidateCounts": {
             label: len(rows)
-            for label, rows in sorted(candidates.items())
+            for label, rows in sorted(sampled_candidates.items())
         },
+        "candidateCapPerLabelYear": candidate_cap_per_label_year,
         "hardNegativeCounts": dict(sorted(hard_negative_counts.items())),
         "yearCounts": dict(sorted(year_counts.items())),
         "scannedWindows": scanned_windows,
@@ -820,6 +924,13 @@ def sample_evenly_by_year(
         ]
         selected.extend(remaining[: limit - len(selected)])
     return sorted(selected[:limit], key=lambda row: row.open_time)
+
+
+def _stable_seed(value: str) -> int:
+    seed = 0
+    for char in value:
+        seed = (seed * 131 + ord(char)) % (2**32)
+    return seed
 
 
 def _urlopen_bytes(url: str) -> bytes:

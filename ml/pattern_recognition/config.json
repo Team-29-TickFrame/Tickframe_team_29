@@ -2,6 +2,7 @@
   "experiment": "pattern-real-data-v1",
   "dataset": "binance-public-spot-1m-weak-labels-v1",
   "seed": 42,
+  "modelType": "auto",
   "timeframe": "1m",
   "datasetTimeframes": [
     "1m",
@@ -31,6 +32,7 @@
     "stride": 12,
     "noneStrideMultiplier": 8,
     "maxExamplesPerLabel": 3000,
+    "candidateCapPerLabelYear": 1000,
     "minPatternScore": 0.58,
     "hardNegativeMinScore": 0.42
   },
