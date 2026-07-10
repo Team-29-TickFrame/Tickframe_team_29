@@ -588,7 +588,6 @@ export default function MarketChart({
   const lineSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const alertLineRefs = useRef<IPriceLine[]>([]);
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<{
     from: number;
     to: number;

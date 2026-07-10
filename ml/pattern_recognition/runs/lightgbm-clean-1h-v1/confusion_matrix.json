@@ -1,0 +1,50 @@
+{
+  "double_bottom": {
+    "double_bottom": 1449,
+    "double_top": 481,
+    "flag": 11,
+    "head_and_shoulders": 3,
+    "none": 7,
+    "triangle": 49
+  },
+  "double_top": {
+    "double_bottom": 395,
+    "double_top": 1528,
+    "flag": 12,
+    "head_and_shoulders": 1,
+    "none": 5,
+    "triangle": 59
+  },
+  "flag": {
+    "double_bottom": 22,
+    "double_top": 26,
+    "flag": 45,
+    "head_and_shoulders": 0,
+    "none": 1,
+    "triangle": 4
+  },
+  "head_and_shoulders": {
+    "double_bottom": 47,
+    "double_top": 33,
+    "flag": 0,
+    "head_and_shoulders": 1,
+    "none": 0,
+    "triangle": 5
+  },
+  "none": {
+    "double_bottom": 43,
+    "double_top": 57,
+    "flag": 0,
+    "head_and_shoulders": 1,
+    "none": 14,
+    "triangle": 11
+  },
+  "triangle": {
+    "double_bottom": 82,
+    "double_top": 105,
+    "flag": 4,
+    "head_and_shoulders": 0,
+    "none": 0,
+    "triangle": 96
+  }
+}

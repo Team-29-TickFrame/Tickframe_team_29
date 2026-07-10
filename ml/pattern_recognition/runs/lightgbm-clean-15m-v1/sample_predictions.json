@@ -1,0 +1,182 @@
+[
+  {
+    "closeTime": 1756335599999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756249200000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.75404,
+      "double_top": 0.182107,
+      "flag": 0.001126,
+      "head_and_shoulders": 0.056988,
+      "none": 0.005612,
+      "triangle": 0.000126
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1756421099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756334700000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.714067,
+      "double_top": 0.259999,
+      "flag": 0.000654,
+      "head_and_shoulders": 0.022721,
+      "none": 0.002444,
+      "triangle": 0.000116
+    },
+    "symbol": "BONKUSDT"
+  },
+  {
+    "closeTime": 1756431899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756345500000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.666241,
+      "double_top": 0.308768,
+      "flag": 0.001252,
+      "head_and_shoulders": 0.020521,
+      "none": 0.003062,
+      "triangle": 0.000155
+    },
+    "symbol": "BONKUSDT"
+  },
+  {
+    "closeTime": 1756499399999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756413000000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.111505,
+      "double_top": 0.62129,
+      "flag": 0.000152,
+      "head_and_shoulders": 0.252074,
+      "none": 0.014844,
+      "triangle": 0.000136
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1756520999999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756434600000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.058392,
+      "double_top": 0.207046,
+      "flag": 0.000382,
+      "head_and_shoulders": 0.013124,
+      "none": 0.106552,
+      "triangle": 0.614505
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1756531799999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756445400000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.110079,
+      "double_top": 0.161913,
+      "flag": 0.009152,
+      "head_and_shoulders": 0.015111,
+      "none": 0.0333,
+      "triangle": 0.670445
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1756539899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756453500000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.613769,
+      "double_top": 0.114222,
+      "flag": 0.000251,
+      "head_and_shoulders": 0.042983,
+      "none": 0.005922,
+      "triangle": 0.222853
+    },
+    "symbol": "ETHUSDT"
+  },
+  {
+    "closeTime": 1756542599999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756456200000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.154787,
+      "double_top": 0.107421,
+      "flag": 0.003102,
+      "head_and_shoulders": 0.037114,
+      "none": 0.012863,
+      "triangle": 0.684713
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1756626299999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756539900000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.156789,
+      "double_top": 0.174914,
+      "flag": 0.000446,
+      "head_and_shoulders": 0.018733,
+      "none": 0.005745,
+      "triangle": 0.643373
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1756637099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756550700000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.092389,
+      "double_top": 0.279243,
+      "flag": 0.000134,
+      "head_and_shoulders": 0.053041,
+      "none": 0.004906,
+      "triangle": 0.570287
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1756640699999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756554300000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.562158,
+      "double_top": 0.085211,
+      "flag": 0.000102,
+      "head_and_shoulders": 0.031331,
+      "none": 0.009412,
+      "triangle": 0.311787
+    },
+    "symbol": "FLOKIUSDT"
+  },
+  {
+    "closeTime": 1756694699999,
+    "expected": "head_and_shoulders",
+    "openTime": 1756608300000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.101758,
+      "double_top": 0.843578,
+      "flag": 3.5e-05,
+      "head_and_shoulders": 0.05081,
+      "none": 0.003693,
+      "triangle": 0.000127
+    },
+    "symbol": "FLOKIUSDT"
+  }
+]

@@ -15,7 +15,8 @@ export type Timeframe =
   | "1m"
   | "5m"
   | "15m"
-  | "1h";
+  | "1h"
+  | "1d";
 
 export interface Instrument {
   instrumentId: string;
@@ -216,9 +217,16 @@ export interface MlPatternResponse {
   source: HistorySource | string;
   generatedAt: number;
   confidenceThreshold?: number;
+  recommendedThreshold?: number;
+  passesThreshold?: boolean;
+  thresholdMode?: string;
   prediction: {
     label: string;
     confidence: number;
+    recommendedThreshold?: number;
+    passesThreshold?: boolean;
+    thresholdMode?: string;
+    thresholdReason?: string;
   } | null;
   alternatives: Array<{
     label: string;

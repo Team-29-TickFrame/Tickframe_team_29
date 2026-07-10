@@ -11,8 +11,9 @@ TIMEFRAME_SECONDS: Dict[str, int] = {
     "5m": 300,
     "15m": 900,
     "1h": 3600,
+    "1d": 86_400,
 }
-PERSISTED_TIMEFRAMES = {"1m", "5m", "15m", "1h"}
+PERSISTED_TIMEFRAMES = {"1m", "5m", "15m", "1h", "1d"}
 RUNTIME_TIMEFRAMES = {"5s", "15s"}
 ONE_SECOND_RETENTION_MS = 14 * 24 * 60 * 60 * 1000
 
