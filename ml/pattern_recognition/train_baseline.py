@@ -9,7 +9,7 @@ from typing import Dict, List, Sequence
 from . import PATTERN_MODEL_VERSION, SUPPORTED_TIMEFRAME, WINDOW_SIZE
 from .dataset import FeatureExample, dataset_summary, load_feature_dataset
 from .features import FEATURE_NAMES
-from .model import GaussianNaiveBayesClassifier, evaluate_predictions
+from .model import BoostedTreeClassifier, create_classifier, evaluate_predictions
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,6 +44,20 @@ def parse_args() -> argparse.Namespace:
         help="Kept in the resolved config for experiment reproducibility.",
     )
     parser.add_argument(
+        "--model-type",
+        choices=[
+            "auto",
+            "lightgbm",
+            "hist_gradient_boosting",
+            "gaussian_nb",
+        ],
+        default=None,
+        help=(
+            "Classifier to train. auto tries LightGBM first, then "
+            "scikit-learn HistGradientBoosting."
+        ),
+    )
+    parser.add_argument(
         "--smoke",
         action="store_true",
         help="Run a tiny fast check without changing the main config file.",
@@ -76,8 +90,15 @@ def main() -> None:
     test_features = [example.features for example in test_examples]
     test_labels = [example.label for example in test_examples]
 
-    model = GaussianNaiveBayesClassifier()
+    model = create_classifier(
+        str(resolved.get("modelType", "auto")),
+        seed=int(resolved["seed"]),
+    )
     model.fit(train_features, train_labels, feature_names=FEATURE_NAMES)
+    model_type = model.__class__.__name__
+    model_backend = (
+        model.resolved_backend if isinstance(model, BoostedTreeClassifier) else "baseline"
+    )
     predictions = model.predict(test_features)
     evaluation = evaluate_predictions(
         expected=test_labels,
@@ -105,7 +126,9 @@ def main() -> None:
     metrics = {
         "experiment": resolved["experiment"],
         "modelVersion": PATTERN_MODEL_VERSION,
-        "modelType": "GaussianNaiveBayesClassifier",
+        "modelType": model_type,
+        "modelBackend": model_backend,
+        "baselineModelType": "GaussianNaiveBayesClassifier",
         "dataset": resolved["dataset"],
         "timeframe": resolved["timeframe"],
         "windowSize": resolved["windowSize"],
@@ -150,6 +173,8 @@ def main() -> None:
         "trained "
         f"experiment={resolved['experiment']} "
         f"model={PATTERN_MODEL_VERSION} "
+        f"type={metrics['modelType']} "
+        f"backend={metrics['modelBackend']} "
         f"accuracy={metrics['accuracy']} "
         f"macro_f1={metrics['macroF1']} "
         f"output_dir={output_dir}"
@@ -168,6 +193,8 @@ def resolve_config(
         resolved["maxExamplesPerClass"] = args.max_examples_per_class
     if args.seed is not None:
         resolved["seed"] = args.seed
+    if args.model_type is not None:
+        resolved["modelType"] = args.model_type
     if args.smoke:
         resolved["maxExamplesPerClass"] = min(
             int(resolved["maxExamplesPerClass"]), 24
@@ -189,6 +216,8 @@ def validate_config(config: Dict[str, object]) -> None:
         raise ValueError("datasetPath must point to a prepared feature JSONL file.")
     if int(config["maxExamplesPerClass"]) < 10:
         raise ValueError("maxExamplesPerClass must be at least 10.")
+    if str(config.get("modelType", "")).strip() == "":
+        config["modelType"] = "auto"
 
 
 def load_balanced_dataset(
@@ -280,11 +309,13 @@ an offline experiment artifact, not a production trading signal.
 
 - Model version: `{metrics["modelVersion"]}`
 - Model type: `{metrics["modelType"]}`
+- Model backend: `{metrics.get("modelBackend", "baseline")}`
 - Feature count: `{metrics["featureCount"]}`
 
-The classifier uses handcrafted OHLCV shape features and a Gaussian Naive Bayes
-decision rule. Each label is represented by per-feature means and variances
-learned from weak-labeled real Binance public market data.
+The classifier uses handcrafted OHLCV shape features learned from weak-labeled
+real Binance public market data. `auto` training attempts LightGBM first and
+falls back to scikit-learn HistGradientBoosting when LightGBM is unavailable.
+Gaussian Naive Bayes remains available as the baseline model.
 
 ## Dataset
 
