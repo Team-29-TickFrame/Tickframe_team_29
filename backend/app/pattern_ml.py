@@ -11,7 +11,7 @@ from ml.pattern_recognition import (
     WINDOW_SIZE,
 )
 from ml.pattern_recognition.features import extract_features
-from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
+from ml.pattern_recognition.model import PatternClassifier, load_pattern_model
 from ml.pattern_recognition.weak_labeling import label_window
 
 
@@ -43,7 +43,7 @@ class PatternMLDetector:
             / "model.json"
         )
         self.confidence_threshold = _confidence_threshold(confidence_threshold)
-        self._model: Optional[GaussianNaiveBayesClassifier] = None
+        self._model: Optional[PatternClassifier] = None
         self._load_error: Optional[str] = None
 
     def predict(
@@ -147,7 +147,7 @@ class PatternMLDetector:
                 else "No reliable ML pattern is above the configured threshold."
             ),
             "modelVersion": PATTERN_MODEL_VERSION,
-            "modelType": "GaussianNaiveBayesClassifier",
+            "modelType": self._model_type(model),
             "supportedTimeframes": [SUPPORTED_TIMEFRAME],
             "exchange": exchange,
             "instrumentId": instrument_id,
@@ -168,16 +168,22 @@ class PatternMLDetector:
             "experimental": True,
         }
 
-    def _load_model(self) -> Optional[GaussianNaiveBayesClassifier]:
+    def _load_model(self) -> Optional[PatternClassifier]:
         if self._model is not None:
             return self._model
         try:
-            self._model = GaussianNaiveBayesClassifier.load(self.model_path)
+            self._model = load_pattern_model(self.model_path)
             self._load_error = None
         except Exception as error:
             self._load_error = str(error)
             self._model = None
         return self._model
+
+    def _model_type(self, model: PatternClassifier) -> str:
+        backend = getattr(model, "resolved_backend", None)
+        if backend:
+            return f"{model.__class__.__name__}:{backend}"
+        return model.__class__.__name__
 
 
 def _has_complete_ohlcv(candle: Dict[str, object]) -> bool:

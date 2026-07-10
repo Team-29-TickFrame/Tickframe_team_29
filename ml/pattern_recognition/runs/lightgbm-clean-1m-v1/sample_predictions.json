@@ -1,0 +1,182 @@
+[
+  {
+    "closeTime": 1736026499999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736020740000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.147474,
+      "double_top": 0.18928,
+      "flag": 0.000752,
+      "head_and_shoulders": 0.57747,
+      "none": 0.006284,
+      "triangle": 0.07874
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736092739999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736086980000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.054371,
+      "double_top": 0.172723,
+      "flag": 0.00037,
+      "head_and_shoulders": 0.718596,
+      "none": 0.00127,
+      "triangle": 0.05267
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736093459999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736087700000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.045269,
+      "double_top": 0.1302,
+      "flag": 0.000151,
+      "head_and_shoulders": 0.801527,
+      "none": 0.001087,
+      "triangle": 0.021766
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736094179999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736088420000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.009687,
+      "double_top": 0.049723,
+      "flag": 0.000102,
+      "head_and_shoulders": 0.929898,
+      "none": 0.000456,
+      "triangle": 0.010134
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736489459999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736483700000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.237505,
+      "double_top": 0.103625,
+      "flag": 0.000218,
+      "head_and_shoulders": 0.626202,
+      "none": 0.032317,
+      "triangle": 0.000133
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736490179999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736484420000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.067677,
+      "double_top": 0.063662,
+      "flag": 8.4e-05,
+      "head_and_shoulders": 0.85573,
+      "none": 0.012797,
+      "triangle": 5e-05
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736490899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736485140000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.139184,
+      "double_top": 0.134338,
+      "flag": 0.000221,
+      "head_and_shoulders": 0.715083,
+      "none": 0.011062,
+      "triangle": 0.000113
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736491619999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736485860000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.11169,
+      "double_top": 0.114877,
+      "flag": 0.000305,
+      "head_and_shoulders": 0.761316,
+      "none": 0.011695,
+      "triangle": 0.000117
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736536259999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736530500000,
+    "predicted": "flag",
+    "probabilities": {
+      "double_bottom": 0.02436,
+      "double_top": 0.10146,
+      "flag": 0.762158,
+      "head_and_shoulders": 0.027496,
+      "none": 0.013563,
+      "triangle": 0.070963
+    },
+    "symbol": "FLOKIUSDT"
+  },
+  {
+    "closeTime": 1736796179999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736790420000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.363648,
+      "double_top": 0.106475,
+      "flag": 0.000435,
+      "head_and_shoulders": 0.526531,
+      "none": 0.002787,
+      "triangle": 0.000124
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1736912579999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736906820000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.048086,
+      "double_top": 0.037931,
+      "flag": 7e-05,
+      "head_and_shoulders": 0.852234,
+      "none": 0.001002,
+      "triangle": 0.060678
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1736913299999,
+    "expected": "head_and_shoulders",
+    "openTime": 1736907540000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.072198,
+      "double_top": 0.089481,
+      "flag": 0.000235,
+      "head_and_shoulders": 0.786431,
+      "none": 0.001477,
+      "triangle": 0.050178
+    },
+    "symbol": "XRPUSDT"
+  }
+]

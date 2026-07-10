@@ -1,0 +1,53 @@
+{
+  "accuracy": 0.750911,
+  "baselineModelType": "GaussianNaiveBayesClassifier",
+  "confidenceThreshold": 0.65,
+  "dataset": "binance-public-spot-1m-weak-labels-v1",
+  "experiment": "pattern-real-data-v1",
+  "featureCount": 38,
+  "generatedAt": "2026-07-10T14:39:47.721129+00:00",
+  "intendedInferenceCadence": "after_each_closed_1m_candle",
+  "macroF1": 0.768031,
+  "modelBackend": "lightgbm",
+  "modelType": "BoostedTreeClassifier",
+  "modelVersion": "pattern-real-data-v1",
+  "perClass": {
+    "double_bottom": {
+      "f1": 0.734589,
+      "precision": 0.758657,
+      "recall": 0.712
+    },
+    "double_top": {
+      "f1": 0.679831,
+      "precision": 0.71802,
+      "recall": 0.6455
+    },
+    "flag": {
+      "f1": 0.950626,
+      "precision": 0.920114,
+      "recall": 0.983232
+    },
+    "head_and_shoulders": {
+      "f1": 0.709621,
+      "precision": 0.759553,
+      "recall": 0.66585
+    },
+    "none": {
+      "f1": 0.745828,
+      "precision": 0.823565,
+      "recall": 0.6815
+    },
+    "triangle": {
+      "f1": 0.787688,
+      "precision": 0.677594,
+      "recall": 0.9405
+    }
+  },
+  "supportedTimeframes": [
+    "1m"
+  ],
+  "testExamples": 9880,
+  "timeframe": "1m",
+  "trainExamples": 39523,
+  "windowSize": 96
+}
