@@ -12,9 +12,18 @@ from .features import FEATURE_NAMES
 from .model import BoostedTreeClassifier, create_classifier, evaluate_predictions
 
 
+DATASET_PATHS_BY_TIMEFRAME = {
+    "1m": "features.jsonl",
+    "5m": "features-5m.jsonl",
+    "15m": "features-15m.jsonl",
+    "1h": "features-1h.jsonl",
+    "1d": "features-1d.jsonl",
+}
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train the maintained real-data 1m chart-pattern baseline."
+        description="Train the maintained real-data chart-pattern baseline."
     )
     parser.add_argument(
         "--config",
@@ -30,6 +39,15 @@ def parse_args() -> argparse.Namespace:
         "--dataset-path",
         default=None,
         help="Override the prepared feature dataset JSONL path.",
+    )
+    parser.add_argument(
+        "--timeframe",
+        choices=sorted(DATASET_PATHS_BY_TIMEFRAME.keys()),
+        default=None,
+        help=(
+            "Prepared dataset timeframe to train on. When --dataset-path is not "
+            "provided, this selects the matching features*.jsonl file."
+        ),
     )
     parser.add_argument(
         "--max-examples-per-class",
@@ -132,8 +150,8 @@ def main() -> None:
         "dataset": resolved["dataset"],
         "timeframe": resolved["timeframe"],
         "windowSize": resolved["windowSize"],
-        "intendedInferenceCadence": "after_each_closed_1m_candle",
-        "supportedTimeframes": [SUPPORTED_TIMEFRAME],
+        "intendedInferenceCadence": f"after_each_closed_{resolved['timeframe']}_candle",
+        "supportedTimeframes": [resolved["timeframe"]],
         "confidenceThreshold": resolved["confidenceThreshold"],
         "generatedAt": generated_at,
         "trainExamples": len(train_examples),
@@ -187,6 +205,15 @@ def resolve_config(
     resolved = dict(config)
     if args.output_dir is not None:
         resolved["outputDir"] = args.output_dir
+    if args.timeframe is not None:
+        resolved["timeframe"] = args.timeframe
+        if args.dataset_path is None:
+            resolved["datasetPath"] = str(
+                dataset_path_for_timeframe(
+                    Path(str(resolved["datasetPath"])),
+                    args.timeframe,
+                )
+            )
     if args.dataset_path is not None:
         resolved["datasetPath"] = args.dataset_path
     if args.max_examples_per_class is not None:
@@ -204,9 +231,13 @@ def resolve_config(
 
 
 def validate_config(config: Dict[str, object]) -> None:
-    if config["timeframe"] != SUPPORTED_TIMEFRAME:
+    allowed_timeframes = list(
+        config.get("datasetTimeframes", DATASET_PATHS_BY_TIMEFRAME.keys())
+    )
+    if config["timeframe"] not in allowed_timeframes:
         raise ValueError(
-            f"This pipeline is maintained only for {SUPPORTED_TIMEFRAME} candles."
+            "This pipeline has prepared dataset support only for "
+            f"{', '.join(allowed_timeframes)} candles."
         )
     if int(config["windowSize"]) != WINDOW_SIZE:
         raise ValueError(f"This pipeline expects {WINDOW_SIZE} candles per example.")
@@ -218,6 +249,11 @@ def validate_config(config: Dict[str, object]) -> None:
         raise ValueError("maxExamplesPerClass must be at least 10.")
     if str(config.get("modelType", "")).strip() == "":
         config["modelType"] = "auto"
+
+
+def dataset_path_for_timeframe(current_path: Path, timeframe: str) -> Path:
+    filename = DATASET_PATHS_BY_TIMEFRAME[timeframe]
+    return current_path.parent / filename
 
 
 def load_balanced_dataset(
@@ -299,9 +335,9 @@ an offline experiment artifact, not a production trading signal.
 
 ## Supported Scope
 
-- Timeframe: `{metrics["timeframe"]}` only
+- Timeframe: `{metrics["timeframe"]}`
 - Window size: `{metrics["windowSize"]}` closed candles
-- Intended update cadence: after each newly closed 1m candle
+- Intended update cadence: after each newly closed {metrics["timeframe"]} candle
 - Supported labels: {", ".join(dataset_manifest["labels"])}
 - Confidence threshold planned for product integration: `{metrics["confidenceThreshold"]}`
 
@@ -336,7 +372,7 @@ See `metrics.json` and `confusion_matrix.json` for the full evaluation output.
 ## Limitations
 
 - Training labels are weak labels generated from rule-based chart definitions.
-- The model is maintained only for 1m candles and 96-candle windows.
+- This artifact is trained only for its listed timeframe and 96-candle windows.
 - Predictions should be displayed as experimental pattern observations, not as
   buy/sell advice.
 - Human review, cross-exchange validation, and backtesting remain required
