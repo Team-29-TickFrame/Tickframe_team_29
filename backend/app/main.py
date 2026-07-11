@@ -299,14 +299,6 @@ async def ml_patterns(
     ensure_supported_market(exchange, instrument_id)
     if timeframe not in TIMEFRAME_SECONDS:
         raise HTTPException(status_code=400, detail="Unsupported timeframe")
-    if timeframe != "1m":
-        return pattern_ml_detector.predict(
-            exchange=exchange,
-            instrument_id=instrument_id,
-            timeframe=timeframe,
-            source="unsupported",
-            candles=[],
-        )
     try:
         history = await service.candle_history(
             exchange=exchange,

@@ -1,0 +1,182 @@
+[
+  {
+    "closeTime": 1744556099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744527300000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.107004,
+      "double_top": 0.779256,
+      "flag": 0.000116,
+      "head_and_shoulders": 0.110372,
+      "none": 0.00315,
+      "triangle": 0.000102
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1744610699999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744581900000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.118114,
+      "double_top": 0.136392,
+      "flag": 0.001098,
+      "head_and_shoulders": 0.076173,
+      "none": 0.016501,
+      "triangle": 0.651722
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1744612499999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744583700000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.339987,
+      "double_top": 0.182636,
+      "flag": 0.019592,
+      "head_and_shoulders": 0.403084,
+      "none": 0.054291,
+      "triangle": 0.000408
+    },
+    "symbol": "ETHUSDT"
+  },
+  {
+    "closeTime": 1744614299999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744585500000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.124423,
+      "double_top": 0.319495,
+      "flag": 0.009933,
+      "head_and_shoulders": 0.215934,
+      "none": 0.008488,
+      "triangle": 0.321727
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1744616099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744587300000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.107425,
+      "double_top": 0.094118,
+      "flag": 0.000495,
+      "head_and_shoulders": 0.282609,
+      "none": 0.022485,
+      "triangle": 0.492868
+    },
+    "symbol": "ETHUSDT"
+  },
+  {
+    "closeTime": 1744617899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744589100000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.170905,
+      "double_top": 0.360978,
+      "flag": 0.001373,
+      "head_and_shoulders": 0.173233,
+      "none": 0.010417,
+      "triangle": 0.283094
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1744619699999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744590900000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.103616,
+      "double_top": 0.121639,
+      "flag": 0.000394,
+      "head_and_shoulders": 0.734915,
+      "none": 0.039355,
+      "triangle": 8.1e-05
+    },
+    "symbol": "ETHUSDT"
+  },
+  {
+    "closeTime": 1744621499999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744592700000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.104335,
+      "double_top": 0.40773,
+      "flag": 0.000299,
+      "head_and_shoulders": 0.092837,
+      "none": 0.010754,
+      "triangle": 0.384045
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1744646099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744617300000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.446523,
+      "double_top": 0.438763,
+      "flag": 0.00018,
+      "head_and_shoulders": 0.110405,
+      "none": 0.003981,
+      "triangle": 0.000148
+    },
+    "symbol": "BONKUSDT"
+  },
+  {
+    "closeTime": 1744648499999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744619700000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.212159,
+      "double_top": 0.5707,
+      "flag": 0.000133,
+      "head_and_shoulders": 0.107136,
+      "none": 0.109724,
+      "triangle": 0.000148
+    },
+    "symbol": "BTCUSDT"
+  },
+  {
+    "closeTime": 1744649699999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744620900000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.084873,
+      "double_top": 0.867745,
+      "flag": 6.2e-05,
+      "head_and_shoulders": 0.044196,
+      "none": 0.00303,
+      "triangle": 9.4e-05
+    },
+    "symbol": "BONKUSDT"
+  },
+  {
+    "closeTime": 1744652099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1744623300000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.223981,
+      "double_top": 0.49669,
+      "flag": 0.000174,
+      "head_and_shoulders": 0.15311,
+      "none": 0.125833,
+      "triangle": 0.000212
+    },
+    "symbol": "BTCUSDT"
+  }
+]

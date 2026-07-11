@@ -70,7 +70,15 @@ const TIMEFRAMES: Timeframe[] = [
   "5m",
   "15m",
   "1h",
+  "1d",
 ];
+const ML_PATTERN_TIMEFRAMES = new Set<Timeframe>([
+  "1m",
+  "5m",
+  "15m",
+  "1h",
+  "1d",
+]);
 const HISTORY_PAGE_SIZE = 1500;
 const INITIAL_CHART_READY_CANDLES = 240;
 const METRICS_LIMIT = 300;
@@ -92,7 +100,6 @@ const GUEST_AUTH_RESPONSE: AuthResponse = {
     createdAt: "2026-01-01T00:00:00.000Z",
   },
 };
-
 interface AuthSession {
   token: string;
   user: AuthUser;
@@ -770,6 +777,13 @@ function formatMetricEventValue(event: MetricEvent): string {
   }
   if (event.metric === "rsi") return event.value.toFixed(1);
   return formatSignedNumber(event.value, 2);
+}
+
+function formatScore(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "--";
+  }
+  return value.toFixed(2);
 }
 
 function patternLabel(value: string): string {
@@ -3225,7 +3239,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   >
                     {mlPatternLoading
                       ? "CALC"
-                      : timeframe === "1m"
+                      : ML_PATTERN_TIMEFRAMES.has(timeframe)
                         ? "ML ON"
                         : "LOCKED"}
                   </span>
@@ -3235,7 +3249,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 <div className="ml-pattern-result">
                   <span>
                     {mlPattern?.status === "pattern_detected"
-                      ? "Detected pattern"
+                      ? "Pattern"
                       : "Current state"}
                   </span>
                   <strong>
@@ -3243,7 +3257,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                     mlPattern.status === "pattern_detected"
                       ? patternLabel(mlPattern.prediction.label)
                       : mlPattern?.status === "unsupported_timeframe"
-                        ? "Switch to 1m"
+                        ? "Switch timeframe"
                         : mlPattern?.status === "insufficient_data"
                           ? "Collecting candles"
                           : "No reliable pattern"}
@@ -3252,6 +3266,27 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                     {mlPattern?.message ??
                       "Waiting for the ML detector response."}
                   </small>
+                  {mlPattern?.prediction &&
+                    mlPattern.status === "pattern_detected" && (
+                      <div className="ml-pattern-demo-metrics">
+                        <div>
+                          <span>Confidence</span>
+                          <strong>
+                            {formatScore(mlPattern.prediction.confidence)}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Threshold</span>
+                          <strong>
+                            {formatScore(
+                              mlPattern.prediction.recommendedThreshold ??
+                                mlPattern.recommendedThreshold ??
+                                mlPattern.confidenceThreshold,
+                            )}
+                          </strong>
+                        </div>
+                      </div>
+                    )}
                 </div>
                 <div className="ml-pattern-meta" aria-label="ML detector details">
                   <span>

@@ -1160,10 +1160,9 @@ button:focus-visible {
 }
 
 .pattern-start-line {
-  stroke: rgba(99, 216, 255, 0.95);
-  stroke-dasharray: 2 2;
-  stroke-width: 0.7;
-  filter: drop-shadow(0 0 5px rgba(99, 216, 255, 0.9));
+  stroke: rgba(99, 216, 255, 1);
+  stroke-width: 1.25;
+  filter: drop-shadow(0 0 7px rgba(99, 216, 255, 0.95));
 }
 
 .chart-reset {
@@ -1582,6 +1581,27 @@ button:focus-visible {
   color: var(--muted-strong);
   line-height: 1.55;
   text-transform: none;
+}
+
+.ml-pattern-demo-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ml-pattern-demo-metrics div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ml-pattern-demo-metrics strong {
+  font-size: 13px;
+  letter-spacing: 0;
 }
 
 .signal-list {

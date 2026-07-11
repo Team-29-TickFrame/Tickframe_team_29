@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import math
+import pickle
+import base64
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Protocol, Sequence
 
 
 VARIANCE_FLOOR = 1e-9
@@ -15,6 +18,29 @@ class Prediction:
     label: str
     confidence: float
     probabilities: Dict[str, float]
+
+
+class PatternClassifier(Protocol):
+    labels: List[str]
+    feature_names: List[str]
+
+    def fit(
+        self,
+        features: Sequence[Sequence[float]],
+        labels: Sequence[str],
+        *,
+        feature_names: Sequence[str],
+    ) -> None:
+        ...
+
+    def predict(self, features: Sequence[Sequence[float]]) -> List[str]:
+        ...
+
+    def predict_one(self, features: Sequence[float]) -> Prediction:
+        ...
+
+    def save(self, path: Path) -> None:
+        ...
 
 
 class GaussianNaiveBayesClassifier:
@@ -166,6 +192,196 @@ class GaussianNaiveBayesClassifier:
                 raise ValueError(f"Invalid mean for label {label}.")
             if not all(math.isfinite(value) and value > 0 for value in variances):
                 raise ValueError(f"Invalid variance for label {label}.")
+
+
+class BoostedTreeClassifier:
+    """Optional boosted-tree classifier backed by LightGBM or scikit-learn."""
+
+    def __init__(
+        self,
+        *,
+        backend: str = "auto",
+        random_state: int = 42,
+    ) -> None:
+        self.backend = backend
+        self.random_state = random_state
+        self.labels: List[str] = []
+        self.feature_names: List[str] = []
+        self.estimator: object | None = None
+        self.resolved_backend: str = ""
+
+    def fit(
+        self,
+        features: Sequence[Sequence[float]],
+        labels: Sequence[str],
+        *,
+        feature_names: Sequence[str],
+    ) -> None:
+        if len(features) != len(labels):
+            raise ValueError("features and labels must have the same length.")
+        if not features:
+            raise ValueError("Cannot train on an empty dataset.")
+
+        self.feature_names = list(feature_names)
+        self.labels = sorted(set(labels))
+        self.resolved_backend, estimator = _build_boosted_estimator(
+            self.backend,
+            random_state=self.random_state,
+        )
+        estimator.fit([list(row) for row in features], list(labels))
+        self.estimator = estimator
+
+    def predict(self, features: Sequence[Sequence[float]]) -> List[str]:
+        return [self.predict_one(row).label for row in features]
+
+    def predict_one(self, features: Sequence[float]) -> Prediction:
+        probabilities = self.predict_proba_one(features)
+        label = max(probabilities, key=probabilities.get)
+        return Prediction(
+            label=label,
+            confidence=probabilities[label],
+            probabilities=probabilities,
+        )
+
+    def predict_proba_one(self, features: Sequence[float]) -> Dict[str, float]:
+        if self.estimator is None:
+            raise ValueError("Boosted tree model is not fitted.")
+        estimator = self.estimator
+        if not hasattr(estimator, "predict_proba"):
+            raise ValueError("Boosted tree estimator does not expose predict_proba.")
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="X does not have valid feature names.*",
+                category=UserWarning,
+            )
+            raw_probabilities = estimator.predict_proba([list(features)])[0]
+        classes = [str(label) for label in getattr(estimator, "classes_", self.labels)]
+        probabilities = {
+            label: float(value)
+            for label, value in zip(classes, raw_probabilities)
+        }
+        for label in self.labels:
+            probabilities.setdefault(label, 0.0)
+        total = sum(probabilities.values())
+        if total <= 0:
+            fallback = 1.0 / max(1, len(self.labels))
+            return {label: fallback for label in self.labels}
+        return {label: probabilities[label] / total for label in self.labels}
+
+    def save(self, path: Path) -> None:
+        if self.estimator is None:
+            raise ValueError("Cannot save an unfitted boosted tree model.")
+        payload = {
+            "modelType": "BoostedTreeClassifier",
+            "backend": self.resolved_backend or self.backend,
+            "requestedBackend": self.backend,
+            "labels": self.labels,
+            "featureNames": self.feature_names,
+            "randomState": self.random_state,
+            "estimatorPickleBase64": base64.b64encode(
+                pickle.dumps(self.estimator)
+            ).decode("ascii"),
+        }
+        path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    @classmethod
+    def load(cls, path: Path) -> "BoostedTreeClassifier":
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        model = cls(
+            backend=str(payload.get("requestedBackend", payload.get("backend", "auto"))),
+            random_state=int(payload.get("randomState", 42)),
+        )
+        model.labels = list(payload["labels"])
+        model.feature_names = list(payload["featureNames"])
+        model.resolved_backend = str(payload.get("backend", "unknown"))
+        model.estimator = pickle.loads(
+            base64.b64decode(str(payload["estimatorPickleBase64"]).encode("ascii"))
+        )
+        return model
+
+
+def create_classifier(
+    model_type: str,
+    *,
+    seed: int = 42,
+) -> PatternClassifier:
+    normalized = model_type.strip().lower().replace("-", "_")
+    if normalized in {"gaussian", "gaussian_nb", "gaussian_naive_bayes"}:
+        return GaussianNaiveBayesClassifier()
+    if normalized in {"auto", "lightgbm", "hist_gradient_boosting", "histgradientboosting"}:
+        backend = "hist_gradient_boosting" if normalized == "histgradientboosting" else normalized
+        return BoostedTreeClassifier(backend=backend, random_state=seed)
+    raise ValueError(f"Unsupported model type: {model_type}")
+
+
+def load_pattern_model(path: Path) -> PatternClassifier:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    model_type = str(payload.get("modelType", "GaussianNaiveBayesClassifier"))
+    if model_type == "GaussianNaiveBayesClassifier":
+        return GaussianNaiveBayesClassifier.load(path)
+    if model_type == "BoostedTreeClassifier":
+        return BoostedTreeClassifier.load(path)
+    raise ValueError(f"Unsupported model artifact type: {model_type}")
+
+
+def _build_boosted_estimator(
+    backend: str,
+    *,
+    random_state: int,
+) -> tuple[str, object]:
+    normalized = backend.strip().lower().replace("-", "_")
+    attempts = (
+        ["lightgbm", "hist_gradient_boosting"]
+        if normalized == "auto"
+        else [normalized]
+    )
+    errors: List[str] = []
+    for attempt in attempts:
+        if attempt == "lightgbm":
+            try:
+                from lightgbm import LGBMClassifier  # type: ignore
+            except Exception as error:
+                errors.append(f"lightgbm unavailable: {error}")
+                continue
+            return (
+                "lightgbm",
+                LGBMClassifier(
+                    objective="multiclass",
+                    n_estimators=240,
+                    learning_rate=0.045,
+                    num_leaves=31,
+                    subsample=0.9,
+                    colsample_bytree=0.9,
+                    random_state=random_state,
+                    n_jobs=-1,
+                    verbosity=-1,
+                ),
+            )
+        if attempt in {"hist_gradient_boosting", "histgradientboosting"}:
+            try:
+                from sklearn.ensemble import HistGradientBoostingClassifier  # type: ignore
+            except Exception as error:
+                errors.append(f"sklearn HistGradientBoosting unavailable: {error}")
+                continue
+            return (
+                "hist_gradient_boosting",
+                HistGradientBoostingClassifier(
+                    learning_rate=0.06,
+                    max_iter=220,
+                    max_leaf_nodes=31,
+                    l2_regularization=0.01,
+                    random_state=random_state,
+                ),
+            )
+        errors.append(f"unknown backend: {attempt}")
+    raise RuntimeError(
+        "No boosted-tree backend is available. "
+        + " | ".join(errors)
+    )
 
 
 def evaluate_predictions(

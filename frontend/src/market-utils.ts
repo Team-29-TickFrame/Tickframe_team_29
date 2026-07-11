@@ -8,6 +8,7 @@ const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
   "5m": 5 * 60,
   "15m": 15 * 60,
   "1h": 60 * 60,
+  "1d": 24 * 60 * 60,
 };
 
 export const MAX_VISUAL_BRIDGE_INTERVALS = 3;

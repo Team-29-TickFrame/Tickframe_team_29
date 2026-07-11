@@ -25,6 +25,7 @@ ROLLUP_VIEWS = {
     "5m": "candles_5m",
     "15m": "candles_15m",
     "1h": "candles_1h",
+    "1d": "candles_1d",
 }
 SQL_INTERVALS = {
     "5s": "5 seconds",

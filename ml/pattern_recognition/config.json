@@ -2,7 +2,15 @@
   "experiment": "pattern-real-data-v1",
   "dataset": "binance-public-spot-1m-weak-labels-v1",
   "seed": 42,
+  "modelType": "auto",
   "timeframe": "1m",
+  "datasetTimeframes": [
+    "1m",
+    "5m",
+    "15m",
+    "1h",
+    "1d"
+  ],
   "windowSize": 96,
   "datasetPath": "data/ml/pattern_recognition/binance-public-spot-1m/prepared/features.jsonl",
   "maxExamplesPerClass": 10000,
@@ -24,7 +32,9 @@
     "stride": 12,
     "noneStrideMultiplier": 8,
     "maxExamplesPerLabel": 3000,
-    "minPatternScore": 0.58
+    "candidateCapPerLabelYear": 1000,
+    "minPatternScore": 0.58,
+    "hardNegativeMinScore": 0.42
   },
   "labels": [
     "head_and_shoulders",

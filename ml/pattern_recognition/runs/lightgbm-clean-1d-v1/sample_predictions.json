@@ -1,0 +1,182 @@
+[
+  {
+    "closeTime": 1762387199999,
+    "expected": "head_and_shoulders",
+    "openTime": 1754092800000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.001814,
+      "double_top": 0.993976,
+      "flag": 6e-06,
+      "head_and_shoulders": 0.004013,
+      "none": 0.000188,
+      "triangle": 3e-06
+    },
+    "symbol": "ETHUSDT"
+  },
+  {
+    "closeTime": 1780876799999,
+    "expected": "head_and_shoulders",
+    "openTime": 1772582400000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.01213,
+      "double_top": 0.986288,
+      "flag": 1.2e-05,
+      "head_and_shoulders": 3.5e-05,
+      "none": 0.001525,
+      "triangle": 9e-06
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1780963199999,
+    "expected": "head_and_shoulders",
+    "openTime": 1772668800000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.113286,
+      "double_top": 0.886156,
+      "flag": 2.4e-05,
+      "head_and_shoulders": 1e-05,
+      "none": 0.000343,
+      "triangle": 0.00018
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1781913599999,
+    "expected": "head_and_shoulders",
+    "openTime": 1773619200000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.01281,
+      "double_top": 0.965724,
+      "flag": 4.5e-05,
+      "head_and_shoulders": 0.000193,
+      "none": 0.021118,
+      "triangle": 0.000109
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1782950399999,
+    "expected": "head_and_shoulders",
+    "openTime": 1774656000000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.044279,
+      "double_top": 0.954821,
+      "flag": 2.6e-05,
+      "head_and_shoulders": 1.8e-05,
+      "none": 0.000834,
+      "triangle": 2.2e-05
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1767571199999,
+    "expected": "triangle",
+    "openTime": 1759276800000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.043568,
+      "double_top": 0.933266,
+      "flag": 2.8e-05,
+      "head_and_shoulders": 2.3e-05,
+      "none": 0.021009,
+      "triangle": 0.002107
+    },
+    "symbol": "ETHUSDT"
+  },
+  {
+    "closeTime": 1768435199999,
+    "expected": "triangle",
+    "openTime": 1760140800000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.026001,
+      "double_top": 0.619297,
+      "flag": 0.052489,
+      "head_and_shoulders": 0.000222,
+      "none": 0.276117,
+      "triangle": 0.025873
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1768521599999,
+    "expected": "triangle",
+    "openTime": 1760227200000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.053402,
+      "double_top": 0.79117,
+      "flag": 8.6e-05,
+      "head_and_shoulders": 3e-05,
+      "none": 0.044609,
+      "triangle": 0.110703
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1772755199999,
+    "expected": "triangle",
+    "openTime": 1764460800000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.016846,
+      "double_top": 0.976502,
+      "flag": 5e-06,
+      "head_and_shoulders": 3e-06,
+      "none": 0.005574,
+      "triangle": 0.00107
+    },
+    "symbol": "PENGUUSDT"
+  },
+  {
+    "closeTime": 1773878399999,
+    "expected": "triangle",
+    "openTime": 1765584000000,
+    "predicted": "double_top",
+    "probabilities": {
+      "double_bottom": 0.002362,
+      "double_top": 0.987094,
+      "flag": 8e-06,
+      "head_and_shoulders": 8e-06,
+      "none": 0.008943,
+      "triangle": 0.001585
+    },
+    "symbol": "TONUSDT"
+  },
+  {
+    "closeTime": 1775087999999,
+    "expected": "triangle",
+    "openTime": 1766793600000,
+    "predicted": "none",
+    "probabilities": {
+      "double_bottom": 0.008842,
+      "double_top": 0.195859,
+      "flag": 6e-06,
+      "head_and_shoulders": 4.5e-05,
+      "none": 0.79371,
+      "triangle": 0.001538
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1776211199999,
+    "expected": "triangle",
+    "openTime": 1767916800000,
+    "predicted": "double_bottom",
+    "probabilities": {
+      "double_bottom": 0.61244,
+      "double_top": 0.377114,
+      "flag": 2.3e-05,
+      "head_and_shoulders": 5.9e-05,
+      "none": 0.00031,
+      "triangle": 0.010054
+    },
+    "symbol": "BONKUSDT"
+  }
+]
