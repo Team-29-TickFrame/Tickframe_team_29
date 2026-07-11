@@ -1,0 +1,44 @@
+{
+  "classCounts": {
+    "double_bottom": 10000,
+    "double_top": 10000,
+    "flag": 3281,
+    "head_and_shoulders": 6122,
+    "none": 10000,
+    "triangle": 10000
+  },
+  "dataset": "binance-public-spot-1m-weak-labels-v1",
+  "datasetPath": "data/ml/pattern_recognition/binance-public-spot-1m/prepared/features.jsonl",
+  "generatedAt": "2026-07-10T14:39:47.721129+00:00",
+  "labels": [
+    "head_and_shoulders",
+    "triangle",
+    "flag",
+    "double_top",
+    "double_bottom",
+    "none"
+  ],
+  "maxExamplesPerClass": 10000,
+  "seed": 42,
+  "testClassCounts": {
+    "double_bottom": 2000,
+    "double_top": 2000,
+    "flag": 656,
+    "head_and_shoulders": 1224,
+    "none": 2000,
+    "triangle": 2000
+  },
+  "testExamples": 9880,
+  "timeframe": "1m",
+  "totalExamples": 49403,
+  "trainClassCounts": {
+    "double_bottom": 8000,
+    "double_top": 8000,
+    "flag": 2625,
+    "head_and_shoulders": 4898,
+    "none": 8000,
+    "triangle": 8000
+  },
+  "trainExamples": 39523,
+  "windowSize": 96
+}

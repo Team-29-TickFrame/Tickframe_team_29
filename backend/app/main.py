@@ -33,22 +33,22 @@ auth_service = AuthService()
 
 
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    displayName: Optional[str] = None
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=1_024)
+    displayName: Optional[str] = Field(default=None, max_length=80)
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=1_024)
 
 
 class DisplayLatencySample(BaseModel):
-    channel: str
-    exchange: str
-    instrument_id: str = Field(alias="instrumentId")
-    timeframe: Optional[str] = None
-    price: Optional[str] = None
+    channel: str = Field(min_length=1, max_length=64)
+    exchange: str = Field(min_length=1, max_length=32)
+    instrument_id: str = Field(alias="instrumentId", min_length=1, max_length=64)
+    timeframe: Optional[str] = Field(default=None, max_length=16)
+    price: Optional[str] = Field(default=None, max_length=64)
     exchange_timestamp: Optional[int] = Field(
         default=None,
         alias="exchangeTimestamp",
@@ -67,7 +67,7 @@ class DisplayLatencySample(BaseModel):
 
 
 class DisplayLatencyRequest(BaseModel):
-    samples: list[DisplayLatencySample]
+    samples: list[DisplayLatencySample] = Field(min_length=1, max_length=200)
 
 
 def model_dump_aliases(model: BaseModel) -> dict:
@@ -91,13 +91,22 @@ def ensure_supported_market(exchange: str, instrument_id: str) -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    await auth_service.start()
-    if os.getenv("TICKFRAME_DISABLE_COLLECTORS") != "1":
-        await service.start()
-    yield
-    if os.getenv("TICKFRAME_DISABLE_COLLECTORS") != "1":
-        await service.stop()
-    await auth_service.stop()
+    auth_started = False
+    service_started = False
+    try:
+        await auth_service.start()
+        auth_started = True
+        if os.getenv("TICKFRAME_DISABLE_COLLECTORS") != "1":
+            await service.start()
+            service_started = True
+        yield
+    finally:
+        try:
+            if service_started:
+                await service.stop()
+        finally:
+            if auth_started:
+                await auth_service.stop()
 
 
 app = FastAPI(
@@ -290,14 +299,6 @@ async def ml_patterns(
     ensure_supported_market(exchange, instrument_id)
     if timeframe not in TIMEFRAME_SECONDS:
         raise HTTPException(status_code=400, detail="Unsupported timeframe")
-    if timeframe != "1m":
-        return pattern_ml_detector.predict(
-            exchange=exchange,
-            instrument_id=instrument_id,
-            timeframe=timeframe,
-            source="unsupported",
-            candles=[],
-        )
     try:
         history = await service.candle_history(
             exchange=exchange,

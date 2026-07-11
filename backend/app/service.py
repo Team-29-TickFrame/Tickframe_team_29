@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import math
 import os
 import time
 from decimal import Decimal
@@ -44,7 +46,9 @@ METRICS_24H_TIMEFRAME = "1m"
 METRICS_24H_LIMIT = 24 * 60
 METRICS_24H_WINDOW_MS = 24 * 60 * 60 * 1000
 CORRELATION_REFRESH_MS = 60_000
+DEFAULT_SHUTDOWN_TIMEOUT_MS = 15_000
 MetricScope = Tuple[str, str, str, str]
+LOGGER = logging.getLogger(__name__)
 
 
 class MarketDataService:
@@ -74,6 +78,7 @@ class MarketDataService:
         }
         self._disconnected_since: Dict[str, int] = {}
         self._tasks: List[asyncio.Task] = []
+        self._started = False
         self._pending_metric_scopes: Set[MetricScope] = set()
         self.metric_cache: Dict[MetricScope, Dict[str, object]] = {}
         self.metric_scope_revisions: Dict[MetricScope, int] = {}
@@ -111,6 +116,14 @@ class MarketDataService:
                 str(DEFAULT_BINANCE_SECOND_BACKFILL_HOURS),
             )
         )
+        self.shutdown_timeout_seconds = max(
+            1.0,
+            parse_duration_ms(
+                os.getenv("TICKFRAME_SHUTDOWN_TIMEOUT"),
+                DEFAULT_SHUTDOWN_TIMEOUT_MS,
+            )
+            / 1000.0,
+        )
         self.recovery_status: Dict[str, object] = {
             "enabled": self.recovery_enabled,
             "running": False,
@@ -130,37 +143,94 @@ class MarketDataService:
         self.revised_candles = 0
         self.computed_metric_snapshots = 0
         self.last_metric_error: Optional[str] = None
+        self.failed_trades = 0
+        self.last_trade_error: Optional[str] = None
+        self.failed_candle_cycles = 0
+        self.last_candle_error: Optional[str] = None
+        self.dropped_trades_on_shutdown = 0
+        self.dropped_metric_scopes_on_shutdown = 0
 
     async def start(self) -> None:
+        if self._started:
+            return
         await self.database.start()
-        self._tasks = [
-            asyncio.create_task(self._consume_trades(), name="trade-consumer"),
-            asyncio.create_task(self._finalize_candles(), name="candle-finalizer"),
-            asyncio.create_task(self._process_metric_updates(), name="metrics-worker"),
-        ]
-        for collector in self.collectors.values():
-            collector.start()
-        self._schedule_recovery("startup", list(self.config.exchanges))
+        try:
+            self._tasks = [
+                asyncio.create_task(self._consume_trades(), name="trade-consumer"),
+                asyncio.create_task(self._finalize_candles(), name="candle-finalizer"),
+                asyncio.create_task(
+                    self._process_metric_updates(),
+                    name="metrics-worker",
+                ),
+            ]
+            for collector in self.collectors.values():
+                collector.start()
+            self._started = True
+            self._schedule_recovery("startup", list(self.config.exchanges))
+        except BaseException:
+            self._started = False
+            for task in self._tasks:
+                task.cancel()
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+            self._tasks = []
+            await asyncio.gather(
+                *(collector.stop() for collector in self.collectors.values()),
+                return_exceptions=True,
+            )
+            await self.database.stop()
+            raise
 
     async def stop(self) -> None:
-        for collector in self.collectors.values():
-            await collector.stop()
+        collector_results = await asyncio.gather(
+            *(collector.stop() for collector in self.collectors.values()),
+            return_exceptions=True,
+        )
+        for result in collector_results:
+            if isinstance(result, Exception):
+                LOGGER.error("Collector shutdown failed: %s", result)
         if self._recovery_task is not None:
             self._recovery_task.cancel()
             try:
                 await self._recovery_task
             except asyncio.CancelledError:
                 pass
-        await self.trade_queue.join()
-        await self.metric_queue.join()
+            self._recovery_task = None
+        if self._tasks:
+            await self._wait_for_queue(self.trade_queue, "trade")
+            await self._wait_for_queue(self.metric_queue, "metric")
         for task in self._tasks:
             task.cancel()
-        for task in self._tasks:
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks = []
+        self.dropped_trades_on_shutdown += self._discard_queue(self.trade_queue)
+        self.dropped_metric_scopes_on_shutdown += self._discard_queue(self.metric_queue)
+        self._pending_metric_scopes.clear()
         await self.database.stop()
+        self._started = False
+
+    async def _wait_for_queue(self, queue: asyncio.Queue, name: str) -> None:
+        try:
+            await asyncio.wait_for(
+                queue.join(),
+                timeout=self.shutdown_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            LOGGER.error(
+                "Timed out draining %s queue with %s items remaining",
+                name,
+                queue.qsize(),
+            )
+
+    @staticmethod
+    def _discard_queue(queue: asyncio.Queue) -> int:
+        discarded = 0
+        while True:
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return discarded
+            queue.task_done()
+            discarded += 1
 
     async def enqueue_trade(self, trade: Trade) -> None:
         await self.trade_queue.put(trade)
@@ -719,22 +789,49 @@ class MarketDataService:
                     await self.database.enqueue_candle(revised)
                     await self._schedule_metrics_for_candle(revised)
                 self.processed_trades += 1
+                self.last_trade_error = None
+            except Exception as error:
+                self.failed_trades += 1
+                self.last_trade_error = str(error)
+                if self.failed_trades <= 3 or not self.failed_trades & (
+                    self.failed_trades - 1
+                ):
+                    LOGGER.exception(
+                        "Trade processing failed for %s/%s (failure #%s)",
+                        trade.exchange,
+                        trade.instrument_id,
+                        self.failed_trades,
+                    )
             finally:
                 self.trade_queue.task_done()
 
     async def _finalize_candles(self) -> None:
         while True:
-            now = unix_ms()
-            finalized = self.aggregator.finalize_due(
-                now,
-                self._active_streams(),
-            )
-            for candle in finalized:
-                await self.store.apply_candle(candle)
-                await self.database.enqueue_candle(candle)
-                await self._schedule_metrics_for_candle(candle)
-            if finalized:
-                await self._notify_streams(stable=True)
+            try:
+                now = unix_ms()
+                finalized = self.aggregator.finalize_due(
+                    now,
+                    self._active_streams(),
+                )
+                for candle in finalized:
+                    await self.store.apply_candle(candle)
+                    await self.database.enqueue_candle(candle)
+                    await self._schedule_metrics_for_candle(candle)
+                if finalized:
+                    await self._notify_streams(stable=True)
+                self.last_candle_error = None
+            except Exception as error:
+                self.failed_candle_cycles += 1
+                self.last_candle_error = str(error)
+                if self.failed_candle_cycles <= 3 or not self.failed_candle_cycles & (
+                    self.failed_candle_cycles - 1
+                ):
+                    LOGGER.exception(
+                        "Candle finalization failed (failure #%s)",
+                        self.failed_candle_cycles,
+                    )
+                await asyncio.sleep(1)
+                continue
             await asyncio.sleep(0.1)
 
     async def _schedule_metrics_for_candle(self, candle: object) -> None:
@@ -928,8 +1025,29 @@ class MarketDataService:
         connected_count = sum(
             1 for collector in self.collectors.values() if collector.connected
         )
+        task_states = {
+            task.get_name(): (
+                "cancelled"
+                if task.cancelled()
+                else "failed"
+                if task.done()
+                else "running"
+            )
+            for task in self._tasks
+        }
+        pipeline_healthy = (
+            self._started
+            and len(self._tasks) == 3
+            and all(not task.done() for task in self._tasks)
+        )
+        database_health = self.database.health()
+        healthy = (
+            connected_count == len(self.collectors)
+            and pipeline_healthy
+            and database_health["status"] != "degraded"
+        )
         payload: Dict[str, object] = {
-            "status": ("ok" if connected_count == len(self.collectors) else "degraded"),
+            "status": "ok" if healthy else "degraded",
             "configVersion": self.config.config_version,
             "collectors": collectors,
             "pipeline": {
@@ -937,6 +1055,13 @@ class MarketDataService:
                 "queueCapacity": self.trade_queue.maxsize,
                 "processedTrades": self.processed_trades,
                 "revisedCandles": self.revised_candles,
+                "failedTrades": self.failed_trades,
+                "lastTradeError": self.last_trade_error,
+                "failedCandleCycles": self.failed_candle_cycles,
+                "lastCandleError": self.last_candle_error,
+                "tasks": task_states,
+                "running": self._started,
+                "droppedTradesOnShutdown": self.dropped_trades_on_shutdown,
             },
             "streams": {
                 "marketRevision": self.market_stream_revision,
@@ -953,6 +1078,7 @@ class MarketDataService:
                 "cachedCorrelations": len(self.correlation_cache),
                 "correlationRefreshMs": CORRELATION_REFRESH_MS,
                 "lastError": self.last_metric_error,
+                "droppedScopesOnShutdown": self.dropped_metric_scopes_on_shutdown,
             },
             "chart": {
                 "stableDelayMs": self.stable_chart_delay_ms,
@@ -962,7 +1088,7 @@ class MarketDataService:
                 "secondRepairHours": self.second_repair_hours,
                 "binanceSecondBackfillHours": self.binance_second_backfill_hours,
             },
-            "database": self.database.health(),
+            "database": database_health,
             "recovery": dict(self.recovery_status),
         }
         if include_observability:
@@ -1232,9 +1358,14 @@ def parse_recovery_lookback_hours(value: Optional[str]) -> float:
                 raise ValueError(
                     "TICKFRAME_RECOVERY_BACKFILL_HOURS must include a number"
                 )
-            return float(number) * multiplier
+            hours = float(number) * multiplier
+            break
+    else:
+        hours = float(normalized)
 
-    return float(normalized)
+    if not math.isfinite(hours) or hours <= 0:
+        raise ValueError("recovery lookback must be a positive finite duration")
+    return hours
 
 
 def parse_duration_ms(value: Optional[str], default_ms: int) -> int:
@@ -1266,6 +1397,11 @@ def parse_duration_ms(value: Optional[str], default_ms: int) -> int:
             number = normalized[: -len(suffix)].strip()
             if not number:
                 raise ValueError("duration must include a number")
-            return max(0, int(float(number) * multiplier))
+            milliseconds = float(number) * multiplier
+            break
+    else:
+        milliseconds = float(normalized)
 
-    return max(0, int(float(normalized)))
+    if not math.isfinite(milliseconds) or milliseconds < 0:
+        raise ValueError("duration must be a non-negative finite value")
+    return int(milliseconds)

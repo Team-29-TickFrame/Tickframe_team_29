@@ -9,12 +9,21 @@ from typing import Dict, List, Sequence
 from . import PATTERN_MODEL_VERSION, SUPPORTED_TIMEFRAME, WINDOW_SIZE
 from .dataset import FeatureExample, dataset_summary, load_feature_dataset
 from .features import FEATURE_NAMES
-from .model import GaussianNaiveBayesClassifier, evaluate_predictions
+from .model import BoostedTreeClassifier, create_classifier, evaluate_predictions
+
+
+DATASET_PATHS_BY_TIMEFRAME = {
+    "1m": "features.jsonl",
+    "5m": "features-5m.jsonl",
+    "15m": "features-15m.jsonl",
+    "1h": "features-1h.jsonl",
+    "1d": "features-1d.jsonl",
+}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train the maintained real-data 1m chart-pattern baseline."
+        description="Train the maintained real-data chart-pattern baseline."
     )
     parser.add_argument(
         "--config",
@@ -32,6 +41,15 @@ def parse_args() -> argparse.Namespace:
         help="Override the prepared feature dataset JSONL path.",
     )
     parser.add_argument(
+        "--timeframe",
+        choices=sorted(DATASET_PATHS_BY_TIMEFRAME.keys()),
+        default=None,
+        help=(
+            "Prepared dataset timeframe to train on. When --dataset-path is not "
+            "provided, this selects the matching features*.jsonl file."
+        ),
+    )
+    parser.add_argument(
         "--max-examples-per-class",
         type=int,
         default=None,
@@ -42,6 +60,20 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=None,
         help="Kept in the resolved config for experiment reproducibility.",
+    )
+    parser.add_argument(
+        "--model-type",
+        choices=[
+            "auto",
+            "lightgbm",
+            "hist_gradient_boosting",
+            "gaussian_nb",
+        ],
+        default=None,
+        help=(
+            "Classifier to train. auto tries LightGBM first, then "
+            "scikit-learn HistGradientBoosting."
+        ),
     )
     parser.add_argument(
         "--smoke",
@@ -76,8 +108,15 @@ def main() -> None:
     test_features = [example.features for example in test_examples]
     test_labels = [example.label for example in test_examples]
 
-    model = GaussianNaiveBayesClassifier()
+    model = create_classifier(
+        str(resolved.get("modelType", "auto")),
+        seed=int(resolved["seed"]),
+    )
     model.fit(train_features, train_labels, feature_names=FEATURE_NAMES)
+    model_type = model.__class__.__name__
+    model_backend = (
+        model.resolved_backend if isinstance(model, BoostedTreeClassifier) else "baseline"
+    )
     predictions = model.predict(test_features)
     evaluation = evaluate_predictions(
         expected=test_labels,
@@ -105,12 +144,14 @@ def main() -> None:
     metrics = {
         "experiment": resolved["experiment"],
         "modelVersion": PATTERN_MODEL_VERSION,
-        "modelType": "GaussianNaiveBayesClassifier",
+        "modelType": model_type,
+        "modelBackend": model_backend,
+        "baselineModelType": "GaussianNaiveBayesClassifier",
         "dataset": resolved["dataset"],
         "timeframe": resolved["timeframe"],
         "windowSize": resolved["windowSize"],
-        "intendedInferenceCadence": "after_each_closed_1m_candle",
-        "supportedTimeframes": [SUPPORTED_TIMEFRAME],
+        "intendedInferenceCadence": f"after_each_closed_{resolved['timeframe']}_candle",
+        "supportedTimeframes": [resolved["timeframe"]],
         "confidenceThreshold": resolved["confidenceThreshold"],
         "generatedAt": generated_at,
         "trainExamples": len(train_examples),
@@ -150,6 +191,8 @@ def main() -> None:
         "trained "
         f"experiment={resolved['experiment']} "
         f"model={PATTERN_MODEL_VERSION} "
+        f"type={metrics['modelType']} "
+        f"backend={metrics['modelBackend']} "
         f"accuracy={metrics['accuracy']} "
         f"macro_f1={metrics['macroF1']} "
         f"output_dir={output_dir}"
@@ -162,24 +205,37 @@ def resolve_config(
     resolved = dict(config)
     if args.output_dir is not None:
         resolved["outputDir"] = args.output_dir
+    if args.timeframe is not None:
+        resolved["timeframe"] = args.timeframe
+        if args.dataset_path is None:
+            resolved["datasetPath"] = str(
+                dataset_path_for_timeframe(
+                    Path(str(resolved["datasetPath"])),
+                    args.timeframe,
+                )
+            )
     if args.dataset_path is not None:
         resolved["datasetPath"] = args.dataset_path
     if args.max_examples_per_class is not None:
         resolved["maxExamplesPerClass"] = args.max_examples_per_class
     if args.seed is not None:
         resolved["seed"] = args.seed
+    if args.model_type is not None:
+        resolved["modelType"] = args.model_type
     if args.smoke:
-        resolved["maxExamplesPerClass"] = min(
-            int(resolved["maxExamplesPerClass"]), 24
-        )
+        resolved["maxExamplesPerClass"] = min(int(resolved["maxExamplesPerClass"]), 24)
         resolved["outputDir"] = str(Path(str(resolved["outputDir"])) / "smoke")
     return resolved
 
 
 def validate_config(config: Dict[str, object]) -> None:
-    if config["timeframe"] != SUPPORTED_TIMEFRAME:
+    allowed_timeframes = list(
+        config.get("datasetTimeframes", DATASET_PATHS_BY_TIMEFRAME.keys())
+    )
+    if config["timeframe"] not in allowed_timeframes:
         raise ValueError(
-            f"This pipeline is maintained only for {SUPPORTED_TIMEFRAME} candles."
+            "This pipeline has prepared dataset support only for "
+            f"{', '.join(allowed_timeframes)} candles."
         )
     if int(config["windowSize"]) != WINDOW_SIZE:
         raise ValueError(f"This pipeline expects {WINDOW_SIZE} candles per example.")
@@ -189,6 +245,13 @@ def validate_config(config: Dict[str, object]) -> None:
         raise ValueError("datasetPath must point to a prepared feature JSONL file.")
     if int(config["maxExamplesPerClass"]) < 10:
         raise ValueError("maxExamplesPerClass must be at least 10.")
+    if str(config.get("modelType", "")).strip() == "":
+        config["modelType"] = "auto"
+
+
+def dataset_path_for_timeframe(current_path: Path, timeframe: str) -> Path:
+    filename = DATASET_PATHS_BY_TIMEFRAME[timeframe]
+    return current_path.parent / filename
 
 
 def load_balanced_dataset(
@@ -270,9 +333,9 @@ an offline experiment artifact, not a production trading signal.
 
 ## Supported Scope
 
-- Timeframe: `{metrics["timeframe"]}` only
+- Timeframe: `{metrics["timeframe"]}`
 - Window size: `{metrics["windowSize"]}` closed candles
-- Intended update cadence: after each newly closed 1m candle
+- Intended update cadence: after each newly closed {metrics["timeframe"]} candle
 - Supported labels: {", ".join(dataset_manifest["labels"])}
 - Confidence threshold planned for product integration: `{metrics["confidenceThreshold"]}`
 
@@ -280,11 +343,13 @@ an offline experiment artifact, not a production trading signal.
 
 - Model version: `{metrics["modelVersion"]}`
 - Model type: `{metrics["modelType"]}`
+- Model backend: `{metrics.get("modelBackend", "baseline")}`
 - Feature count: `{metrics["featureCount"]}`
 
-The classifier uses handcrafted OHLCV shape features and a Gaussian Naive Bayes
-decision rule. Each label is represented by per-feature means and variances
-learned from weak-labeled real Binance public market data.
+The classifier uses handcrafted OHLCV shape features learned from weak-labeled
+real Binance public market data. `auto` training attempts LightGBM first and
+falls back to scikit-learn HistGradientBoosting when LightGBM is unavailable.
+Gaussian Naive Bayes remains available as the baseline model.
 
 ## Dataset
 
@@ -305,7 +370,7 @@ See `metrics.json` and `confusion_matrix.json` for the full evaluation output.
 ## Limitations
 
 - Training labels are weak labels generated from rule-based chart definitions.
-- The model is maintained only for 1m candles and 96-candle windows.
+- This artifact is trained only for its listed timeframe and 96-candle windows.
 - Predictions should be displayed as experimental pattern observations, not as
   buy/sell advice.
 - Human review, cross-exchange validation, and backtesting remain required

@@ -1,8 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, Sequence
+
+
+PATTERN_LABELS = [
+    "double_top",
+    "double_bottom",
+    "head_and_shoulders",
+    "triangle",
+    "flag",
+]
 
 
 @dataclass(frozen=True)
@@ -11,11 +20,20 @@ class WeakLabel:
     score: float
     anchors: Dict[str, int]
     reason: str
+    label_scores: Dict[str, float] = field(default_factory=dict)
+    hard_negative_for: Optional[str] = None
 
 
 def label_window(candles: Sequence[Dict[str, object]]) -> WeakLabel:
+    scored = score_window(candles)
+    if scored.label != "none":
+        return scored
+    return scored
+
+
+def score_window(candles: Sequence[Dict[str, object]]) -> WeakLabel:
     if len(candles) < 32:
-        return _none("window_too_short")
+        return _none("window_too_short", label_scores=_empty_scores())
 
     highs = [_number(candle["high"]) for candle in candles]
     lows = [_number(candle["low"]) for candle in candles]
@@ -29,10 +47,39 @@ def label_window(candles: Sequence[Dict[str, object]]) -> WeakLabel:
         _triangle(highs, lows, closes),
         _flag(closes, volumes),
     ]
+    soft_scores = {
+        "double_top": max(candidates[0].score, _soft_double_top(highs, lows, closes)),
+        "double_bottom": max(
+            candidates[1].score,
+            _soft_double_bottom(highs, lows, closes),
+        ),
+        "head_and_shoulders": max(
+            candidates[2].score,
+            _soft_head_and_shoulders(highs, lows, closes),
+        ),
+        "triangle": max(candidates[3].score, _soft_triangle(highs, lows, closes)),
+        "flag": max(candidates[4].score, _soft_flag(closes, volumes)),
+    }
     detected = [candidate for candidate in candidates if candidate.label != "none"]
     if not detected:
-        return _none("no_rule_matched")
-    return max(detected, key=lambda candidate: candidate.score)
+        hard_negative_for = _hard_negative_label(soft_scores)
+        reason = "no_rule_matched"
+        if hard_negative_for:
+            reason = f"hard_negative_for={hard_negative_for}; no_confirmation"
+        return _none(
+            reason,
+            label_scores=soft_scores,
+            hard_negative_for=hard_negative_for,
+        )
+
+    label = max(detected, key=lambda candidate: candidate.score)
+    return WeakLabel(
+        label=label.label,
+        score=label.score,
+        anchors=label.anchors,
+        reason=label.reason,
+        label_scores=soft_scores,
+    )
 
 
 def _double_top(
@@ -276,13 +323,155 @@ def _flag(closes: Sequence[float], volumes: Sequence[float]) -> WeakLabel:
     return WeakLabel(
         label="flag",
         score=round(min(score, 0.95), 6),
-        anchors={"impulse_start": 0, "impulse_end": impulse_end, "flag_end": len(closes) - 1},
+        anchors={
+            "impulse_start": 0,
+            "impulse_end": impulse_end,
+            "flag_end": len(closes) - 1,
+        },
         reason=(
             f"impulse_return={impulse_return:.3f}; "
             f"post_impulse_return={post_return:.3f}; "
             f"retrace_ratio={retrace_ratio:.3f}"
         ),
     )
+
+
+def _soft_double_top(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+) -> float:
+    pivot_highs = _pivot_indices(highs, pivot_type="high")
+    best = 0.0
+    for left, right in _pivot_pairs(pivot_highs, min_span=10, max_span=72):
+        left_value = highs[left]
+        right_value = highs[right]
+        average_top = (left_value + right_value) / 2
+        if average_top <= 0:
+            continue
+        similarity = abs(left_value - right_value) / average_top * 100
+        neckline_index = _min_index(lows, left + 1, right)
+        neckline = lows[neckline_index]
+        depth = (average_top - neckline) / average_top * 100
+        breakout = _first_below(closes, neckline, start=right + 1)
+        score = 0.10
+        score += max(0.0, 1.0 - similarity / 3.0) * 0.34
+        score += min(1.0, max(0.0, depth) / 2.5) * 0.28
+        score += 0.18 if breakout is not None else 0.0
+        score += _span_score(right - left, target=36, tolerance=36) * 0.08
+        best = max(best, score)
+    return round(min(best, 0.95), 6)
+
+
+def _soft_double_bottom(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+) -> float:
+    pivot_lows = _pivot_indices(lows, pivot_type="low")
+    best = 0.0
+    for left, right in _pivot_pairs(pivot_lows, min_span=10, max_span=72):
+        left_value = lows[left]
+        right_value = lows[right]
+        average_bottom = (left_value + right_value) / 2
+        if average_bottom <= 0:
+            continue
+        similarity = abs(left_value - right_value) / average_bottom * 100
+        neckline_index = _max_index(highs, left + 1, right)
+        neckline = highs[neckline_index]
+        depth = (neckline - average_bottom) / average_bottom * 100
+        breakout = _first_above(closes, neckline, start=right + 1)
+        score = 0.10
+        score += max(0.0, 1.0 - similarity / 3.0) * 0.34
+        score += min(1.0, max(0.0, depth) / 2.5) * 0.28
+        score += 0.18 if breakout is not None else 0.0
+        score += _span_score(right - left, target=36, tolerance=36) * 0.08
+        best = max(best, score)
+    return round(min(best, 0.95), 6)
+
+
+def _soft_head_and_shoulders(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+) -> float:
+    pivot_highs = _pivot_indices(highs, pivot_type="high")
+    best = 0.0
+    for left, head, right in zip(pivot_highs, pivot_highs[1:], pivot_highs[2:]):
+        if head - left < 6 or right - head < 6 or right - left > 84:
+            continue
+        shoulders = (highs[left] + highs[right]) / 2
+        if shoulders <= 0:
+            continue
+        head_height = (highs[head] - shoulders) / shoulders * 100
+        shoulder_similarity = abs(highs[left] - highs[right]) / shoulders * 100
+        left_neck = _min_index(lows, left + 1, head)
+        right_neck = _min_index(lows, head + 1, right)
+        neckline = (lows[left_neck] + lows[right_neck]) / 2
+        breakout = _first_below(closes, neckline, start=right + 1)
+        score = 0.08
+        score += min(1.0, max(0.0, head_height) / 2.5) * 0.34
+        score += max(0.0, 1.0 - shoulder_similarity / 3.0) * 0.24
+        score += 0.18 if breakout is not None else 0.0
+        score += _span_score(right - left, target=48, tolerance=42) * 0.08
+        best = max(best, score)
+    return round(min(best, 0.95), 6)
+
+
+def _soft_triangle(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+) -> float:
+    pivot_highs = _pivot_indices(highs, pivot_type="high")
+    pivot_lows = _pivot_indices(lows, pivot_type="low")
+    if len(pivot_highs) < 2 or len(pivot_lows) < 2:
+        return 0.0
+
+    upper_slope = _slope([highs[index] for index in pivot_highs[-4:]])
+    lower_slope = _slope([lows[index] for index in pivot_lows[-4:]])
+    early_range = mean(high - low for high, low in zip(highs[:16], lows[:16]))
+    late_range = mean(high - low for high, low in zip(highs[-16:], lows[-16:]))
+    compression = _pct_change(early_range, late_range) if early_range > 0 else 0.0
+    close_span = max(closes) - min(closes)
+    if close_span <= 0:
+        return 0.0
+
+    slope_score = 0.0
+    if upper_slope < 0:
+        slope_score += 0.5
+    if lower_slope > 0:
+        slope_score += 0.5
+    if abs(upper_slope) < 0.05 and lower_slope > 0:
+        slope_score = max(slope_score, 0.75)
+    if upper_slope < 0 and abs(lower_slope) < 0.05:
+        slope_score = max(slope_score, 0.75)
+
+    compression_score = min(1.0, max(0.0, abs(min(compression, 0.0))) / 45.0)
+    pivot_score = min(1.0, (len(pivot_highs) + len(pivot_lows)) / 10.0)
+    score = 0.10 + slope_score * 0.30 + compression_score * 0.34 + pivot_score * 0.12
+    return round(min(score, 0.95), 6)
+
+
+def _soft_flag(closes: Sequence[float], volumes: Sequence[float]) -> float:
+    if len(closes) < 48:
+        return 0.0
+    impulse_end = max(12, len(closes) // 4)
+    impulse_return = _pct_change(closes[0], closes[impulse_end])
+    if abs(impulse_return) < 0.5:
+        return 0.0
+    post_return = _pct_change(closes[impulse_end], closes[-1])
+    retrace_ratio = abs(post_return) / abs(impulse_return)
+    same_direction = impulse_return * post_return > 0
+    first_volume = mean(volumes[:impulse_end]) if volumes else 0.0
+    post_volume = mean(volumes[impulse_end:]) if volumes else 0.0
+    volume_score = 0.10 if first_volume <= 0 or post_volume < first_volume * 1.35 else 0.0
+    score = 0.08
+    score += min(1.0, abs(impulse_return) / 4.0) * 0.30
+    score += max(0.0, 1.0 - retrace_ratio / 0.8) * 0.28
+    score += 0.14 if not same_direction else 0.0
+    score += volume_score
+    return round(min(score, 0.95), 6)
 
 
 def _pivot_indices(
@@ -294,10 +483,14 @@ def _pivot_indices(
         right = values[index + 1 : index + radius + 1]
         center = values[index]
         if pivot_type == "high":
-            if all(center > value for value in left) and all(center >= value for value in right):
+            if all(center > value for value in left) and all(
+                center >= value for value in right
+            ):
                 pivots.append(index)
         else:
-            if all(center < value for value in left) and all(center <= value for value in right):
+            if all(center < value for value in left) and all(
+                center <= value for value in right
+            ):
                 pivots.append(index)
     return pivots
 
@@ -355,5 +548,32 @@ def _better(left: Optional[WeakLabel], right: WeakLabel) -> WeakLabel:
     return right if left is None or right.score > left.score else left
 
 
-def _none(reason: str) -> WeakLabel:
-    return WeakLabel(label="none", score=0.0, anchors={}, reason=reason)
+def _span_score(span: int, *, target: int, tolerance: int) -> float:
+    return max(0.0, 1.0 - abs(span - target) / max(1, tolerance))
+
+
+def _hard_negative_label(label_scores: Dict[str, float]) -> Optional[str]:
+    if not label_scores:
+        return None
+    label, score = max(label_scores.items(), key=lambda item: item[1])
+    return label if score >= 0.42 else None
+
+
+def _empty_scores() -> Dict[str, float]:
+    return {label: 0.0 for label in PATTERN_LABELS}
+
+
+def _none(
+    reason: str,
+    *,
+    label_scores: Optional[Dict[str, float]] = None,
+    hard_negative_for: Optional[str] = None,
+) -> WeakLabel:
+    return WeakLabel(
+        label="none",
+        score=0.0,
+        anchors={},
+        reason=reason,
+        label_scores=label_scores or _empty_scores(),
+        hard_negative_for=hard_negative_for,
+    )

@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.app.pattern_ml import PatternMLDetector
+from backend.app.pattern_ml import PatternMLDetector, SUPPORTED_PATTERN_TIMEFRAMES
 from ml.pattern_recognition import PATTERN_MODEL_VERSION, WINDOW_SIZE
 from ml.pattern_recognition.features import FEATURE_NAMES, extract_features
 from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
@@ -71,14 +71,35 @@ class PatternMLDetectorTests(unittest.TestCase):
             result = detector.predict(
                 exchange="binance",
                 instrument_id="BTC-USDT",
-                timeframe="5m",
+                timeframe="1s",
                 source="test",
                 candles=[],
             )
 
         self.assertEqual(result["status"], "unsupported_timeframe")
-        self.assertEqual(result["supportedTimeframes"], ["1m"])
+        self.assertIn("1m", result["supportedTimeframes"])
+        self.assertIn("5m", result["supportedTimeframes"])
         self.assertIsNone(result["prediction"])
+
+    def test_five_minute_timeframe_uses_configured_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
+            candles = fixture_candles("double_top")
+
+            result = detector.predict(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="5m",
+                source="fixture-test",
+                candles=candles,
+            )
+
+        self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
+        self.assertEqual(result["timeframe"], "5m")
+        self.assertEqual(result["candleCount"], WINDOW_SIZE)
+        self.assertIsNotNone(result["prediction"])
 
     def test_insufficient_complete_candles_are_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -115,6 +136,10 @@ class PatternMLDetectorTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "pattern_detected")
         self.assertEqual(result["prediction"]["label"], "double_top")
+        self.assertIn("recommendedThreshold", result["prediction"])
+        self.assertIn("passesThreshold", result["prediction"])
+        self.assertTrue(result["prediction"]["passesThreshold"])
+        self.assertEqual(result["thresholdMode"], "dynamic")
         self.assertEqual(result["candleCount"], WINDOW_SIZE)
         self.assertEqual(result["dataFrom"], 0)
         self.assertEqual(result["dataTo"], WINDOW_SIZE * 60_000)
@@ -160,9 +185,17 @@ class PatternMLArtifactTests(unittest.TestCase):
     def test_default_real_data_model_artifact_loads(self) -> None:
         detector = PatternMLDetector()
 
-        self.assertIn("real-data-v1", str(detector.model_path))
+        self.assertIn("lightgbm-clean-1m-v1", str(detector.model_path))
         self.assertIsNotNone(detector._load_model())
-        self.assertIsNone(detector._load_error)
+        self.assertNotIn("1m", detector._load_errors)
+
+    def test_default_real_data_model_artifacts_load_for_all_timeframes(self) -> None:
+        detector = PatternMLDetector()
+
+        for timeframe in SUPPORTED_PATTERN_TIMEFRAMES:
+            with self.subTest(timeframe=timeframe):
+                self.assertIsNotNone(detector._load_model(timeframe))
+                self.assertNotIn(timeframe, detector._load_errors)
 
     def test_detector_accepts_absolute_model_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -180,6 +213,8 @@ class PatternMLArtifactTests(unittest.TestCase):
 
         self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
         self.assertIsNotNone(result["prediction"])
+        self.assertIn("recommendedThreshold", result["prediction"])
+        self.assertIn("passesThreshold", result["prediction"])
         self.assertEqual(result["modelVersion"], PATTERN_MODEL_VERSION)
 
 

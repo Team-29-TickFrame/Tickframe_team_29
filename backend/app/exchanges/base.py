@@ -32,6 +32,7 @@ class ExchangeCollector(ABC):
         self.active_endpoint: Optional[str] = None
         self.endpoint_failures = 0
         self.reconnects = 0
+        self.invalid_messages = 0
         self._task: Optional[asyncio.Task] = None
         self._stop_event = asyncio.Event()
 
@@ -45,13 +46,19 @@ class ExchangeCollector(ABC):
 
     async def stop(self) -> None:
         self._stop_event.set()
-        if self._task is None:
+        task = self._task
+        self._task = None
+        if task is None:
             return
-        self._task.cancel()
+        task.cancel()
         try:
-            await self._task
+            await task
         except asyncio.CancelledError:
             pass
+        except Exception as error:
+            self.last_error = str(error)
+            LOGGER.exception("%s collector stopped unexpectedly", self.name)
+        await self.set_connected(False)
 
     async def run(self) -> None:
         backoff_seconds = 1
@@ -79,6 +86,27 @@ class ExchangeCollector(ABC):
                 except asyncio.TimeoutError:
                     pass
                 backoff_seconds = min(backoff_seconds * 2, 30)
+            else:
+                if self._stop_event.is_set():
+                    break
+                self.reconnects += 1
+                LOGGER.info("%s connection closed; reconnecting in 1s", self.name)
+                try:
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=1)
+                except asyncio.TimeoutError:
+                    pass
+
+    def record_invalid_message(self, error: Exception) -> None:
+        self.invalid_messages += 1
+        if self.invalid_messages <= 3 or not self.invalid_messages & (
+            self.invalid_messages - 1
+        ):
+            LOGGER.warning(
+                "%s ignored malformed message #%s: %s",
+                self.name,
+                self.invalid_messages,
+                error,
+            )
 
     @abstractmethod
     async def connect_once(self) -> None:
@@ -97,7 +125,9 @@ class ExchangeCollector(ABC):
     def health(self) -> Dict[str, object]:
         now = unix_ms()
         message_age_ms = (
-            now - self.last_message_at if self.last_message_at is not None else None
+            max(0, now - self.last_message_at)
+            if self.last_message_at is not None
+            else None
         )
         return {
             "exchange": self.name,
@@ -107,5 +137,6 @@ class ExchangeCollector(ABC):
             "reconnects": self.reconnects,
             "endpoint": self.active_endpoint,
             "endpointFailures": self.endpoint_failures,
+            "invalidMessages": self.invalid_messages,
             "lastError": self.last_error,
         }

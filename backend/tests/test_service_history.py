@@ -240,6 +240,12 @@ class RecoveryConfigTests(unittest.TestCase):
         self.assertEqual(parse_recovery_lookback_hours("12d"), 288.0)
         self.assertEqual(parse_recovery_lookback_hours("12 days"), 288.0)
 
+    def test_recovery_lookback_rejects_non_positive_or_non_finite_values(self) -> None:
+        for value in ("0", "-1h", "nan", "inf"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    parse_recovery_lookback_hours(value)
+
 
 class DurationConfigTests(unittest.TestCase):
     def test_duration_parser_accepts_ms_seconds_and_minutes(self) -> None:
@@ -248,6 +254,12 @@ class DurationConfigTests(unittest.TestCase):
         self.assertEqual(parse_duration_ms("15000", 10_000), 15_000)
         self.assertEqual(parse_duration_ms("15s", 10_000), 15_000)
         self.assertEqual(parse_duration_ms("0.5 min", 10_000), 30_000)
+
+    def test_duration_parser_rejects_negative_or_non_finite_values(self) -> None:
+        for value in ("-1", "-2s", "nan", "inf"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    parse_duration_ms(value, 10_000)
 
 
 if __name__ == "__main__":
