@@ -213,7 +213,7 @@ def main() -> None:
     data_dir = Path(args.data_dir)
     raw_dir = data_dir / "raw"
     normalized_dir = data_dir / "normalized"
-    prepared_dir = data_dir / "prepared"
+    prepared_dir = Path(str(config.get("preparedDir", data_dir / "prepared")))
     raw_dir.mkdir(parents=True, exist_ok=True)
     normalized_dir.mkdir(parents=True, exist_ok=True)
     prepared_dir.mkdir(parents=True, exist_ok=True)

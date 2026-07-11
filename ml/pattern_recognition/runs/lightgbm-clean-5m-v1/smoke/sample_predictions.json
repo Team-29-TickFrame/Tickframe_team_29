@@ -1,0 +1,182 @@
+[
+  {
+    "closeTime": 1747868099999,
+    "expected": "head_and_shoulders",
+    "openTime": 1747839300000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.001727,
+      "double_top": 0.022819,
+      "flag": 0.022015,
+      "head_and_shoulders": 0.442209,
+      "none": 0.003815,
+      "triangle": 0.507416
+    },
+    "symbol": "TONUSDT"
+  },
+  {
+    "closeTime": 1754677799999,
+    "expected": "head_and_shoulders",
+    "openTime": 1754649000000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.265075,
+      "double_top": 0.024759,
+      "flag": 0.007735,
+      "head_and_shoulders": 0.512534,
+      "none": 0.017892,
+      "triangle": 0.172005
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1764363899999,
+    "expected": "head_and_shoulders",
+    "openTime": 1764335100000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.000622,
+      "double_top": 0.013713,
+      "flag": 0.003155,
+      "head_and_shoulders": 0.959078,
+      "none": 0.00049,
+      "triangle": 0.022943
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1773219599999,
+    "expected": "head_and_shoulders",
+    "openTime": 1773190800000,
+    "predicted": "head_and_shoulders",
+    "probabilities": {
+      "double_bottom": 0.000646,
+      "double_top": 0.105426,
+      "flag": 7.7e-05,
+      "head_and_shoulders": 0.891208,
+      "none": 0.000539,
+      "triangle": 0.002104
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1783022699999,
+    "expected": "head_and_shoulders",
+    "openTime": 1782993900000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.00032,
+      "double_top": 0.011683,
+      "flag": 0.009924,
+      "head_and_shoulders": 0.116857,
+      "none": 0.005533,
+      "triangle": 0.855683
+    },
+    "symbol": "XRPUSDT"
+  },
+  {
+    "closeTime": 1762554599999,
+    "expected": "triangle",
+    "openTime": 1762525800000,
+    "predicted": "flag",
+    "probabilities": {
+      "double_bottom": 0.024071,
+      "double_top": 3.5e-05,
+      "flag": 0.684908,
+      "head_and_shoulders": 0.029675,
+      "none": 5.3e-05,
+      "triangle": 0.261257
+    },
+    "symbol": "SOLUSDT"
+  },
+  {
+    "closeTime": 1768276499999,
+    "expected": "triangle",
+    "openTime": 1768247700000,
+    "predicted": "none",
+    "probabilities": {
+      "double_bottom": 0.013866,
+      "double_top": 0.001255,
+      "flag": 0.003456,
+      "head_and_shoulders": 0.005111,
+      "none": 0.929594,
+      "triangle": 0.046717
+    },
+    "symbol": "TONUSDT"
+  },
+  {
+    "closeTime": 1773435599999,
+    "expected": "triangle",
+    "openTime": 1773406800000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.001204,
+      "double_top": 0.315702,
+      "flag": 0.004887,
+      "head_and_shoulders": 0.025197,
+      "none": 2.1e-05,
+      "triangle": 0.65299
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1778272499999,
+    "expected": "triangle",
+    "openTime": 1778243700000,
+    "predicted": "none",
+    "probabilities": {
+      "double_bottom": 0.001074,
+      "double_top": 3.2e-05,
+      "flag": 0.001249,
+      "head_and_shoulders": 8.3e-05,
+      "none": 0.93433,
+      "triangle": 0.063232
+    },
+    "symbol": "BTCUSDT"
+  },
+  {
+    "closeTime": 1783036799999,
+    "expected": "triangle",
+    "openTime": 1783008000000,
+    "predicted": "triangle",
+    "probabilities": {
+      "double_bottom": 0.008122,
+      "double_top": 0.00054,
+      "flag": 6.7e-05,
+      "head_and_shoulders": 6.9e-05,
+      "none": 0.202873,
+      "triangle": 0.788329
+    },
+    "symbol": "AVAXUSDT"
+  },
+  {
+    "closeTime": 1750301699999,
+    "expected": "flag",
+    "openTime": 1750272900000,
+    "predicted": "flag",
+    "probabilities": {
+      "double_bottom": 0.006777,
+      "double_top": 0.000107,
+      "flag": 0.98565,
+      "head_and_shoulders": 0.001574,
+      "none": 1.2e-05,
+      "triangle": 0.00588
+    },
+    "symbol": "FLOKIUSDT"
+  },
+  {
+    "closeTime": 1760152799999,
+    "expected": "flag",
+    "openTime": 1760124000000,
+    "predicted": "flag",
+    "probabilities": {
+      "double_bottom": 0.050813,
+      "double_top": 0.091539,
+      "flag": 0.807948,
+      "head_and_shoulders": 0.000447,
+      "none": 0.001313,
+      "triangle": 0.04794
+    },
+    "symbol": "TRXUSDT"
+  }
+]
