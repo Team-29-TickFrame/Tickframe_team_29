@@ -1,7 +1,7 @@
 import asyncio
 import json
 from decimal import Decimal
-from typing import Dict, Iterable, List, Set
+from typing import Any, Dict, Iterable, List, Set
 
 import websockets
 
@@ -77,35 +77,61 @@ class BybitCollector(ExchangeCollector):
             ) as websocket:
                 await self.set_connected(True)
                 self.last_error = None
-                await self._subscribe(websocket)
-                heartbeat = asyncio.create_task(self._heartbeat(websocket))
                 try:
-                    async for raw_message in websocket:
-                        received_at = unix_ms()
-                        message = json.loads(raw_message)
-                        self._handle_control_message(message)
-                        trades = parse_bybit_message(
-                            message,
-                            self.config,
-                            received_at,
-                        )
-                        if trades:
-                            self.last_message_at = received_at
-                        for trade in trades:
-                            await self.on_trade(trade)
+                    await self._subscribe(websocket)
+                    await self._run_stream_tasks(websocket)
                 finally:
                     await self.set_connected(False)
-                    heartbeat.cancel()
-                    try:
-                        await heartbeat
-                    except asyncio.CancelledError:
-                        pass
         except Exception:
             self.endpoint_failures += 1
             self._rotate_websocket_url()
             raise
         else:
             self._rotate_websocket_url()
+
+    async def _run_stream_tasks(self, websocket: Any) -> None:
+        consumer = asyncio.create_task(
+            self._consume_messages(websocket),
+            name="bybit-message-consumer",
+        )
+        heartbeat = asyncio.create_task(
+            self._heartbeat(websocket),
+            name="bybit-heartbeat",
+        )
+        tasks = {consumer, heartbeat}
+        try:
+            done, _ = await asyncio.wait(
+                tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                task.result()
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _consume_messages(self, websocket: Any) -> None:
+        async for raw_message in websocket:
+            received_at = unix_ms()
+            try:
+                message = json.loads(raw_message)
+                if not isinstance(message, dict):
+                    raise ValueError("expected a JSON object")
+                self._handle_control_message(message)
+                trades = parse_bybit_message(
+                    message,
+                    self.config,
+                    received_at,
+                )
+            except (ArithmeticError, KeyError, TypeError, ValueError) as error:
+                self.record_invalid_message(error)
+                continue
+            if trades:
+                self.last_message_at = received_at
+            for trade in trades:
+                await self.on_trade(trade)
 
     async def _subscribe(self, websocket: object) -> None:
         self._pending_subscriptions = {}

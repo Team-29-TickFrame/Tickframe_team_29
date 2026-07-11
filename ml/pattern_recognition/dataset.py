@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 
 LABELS = [
@@ -32,23 +33,73 @@ def load_feature_dataset(path: Path, *, labels: Sequence[str]) -> List[FeatureEx
 
     allowed = set(labels)
     examples: List[FeatureExample] = []
+    feature_count: Optional[int] = None
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
             stripped = line.strip()
             if not stripped:
                 continue
-            payload = json.loads(stripped)
+            try:
+                payload = json.loads(stripped)
+            except json.JSONDecodeError as error:
+                raise ValueError(
+                    f"Invalid JSON in {path} at line {line_number}: {error.msg}"
+                ) from error
+            if not isinstance(payload, dict):
+                raise ValueError(
+                    f"Expected a JSON object in {path} at line {line_number}."
+                )
+
+            if "label" not in payload:
+                raise ValueError(f"Expected a label in {path} at line {line_number}.")
             label = str(payload["label"])
             if label not in allowed:
                 continue
+
+            raw_features = payload.get("features")
+            if not isinstance(raw_features, list) or not raw_features:
+                raise ValueError(
+                    f"Expected a non-empty features array in {path} at line "
+                    f"{line_number}."
+                )
+            try:
+                features = [float(value) for value in raw_features]
+                open_time = int(payload["openTime"])
+                close_time = int(payload["closeTime"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise ValueError(
+                    f"Invalid feature example in {path} at line {line_number}."
+                ) from error
+            if not all(math.isfinite(value) for value in features):
+                raise ValueError(
+                    f"Features must be finite in {path} at line {line_number}."
+                )
+            if close_time <= open_time:
+                raise ValueError(
+                    f"closeTime must be greater than openTime in {path} at line "
+                    f"{line_number}."
+                )
+            if feature_count is None:
+                feature_count = len(features)
+            elif len(features) != feature_count:
+                raise ValueError(
+                    f"Inconsistent feature count in {path} at line {line_number}: "
+                    f"expected {feature_count}, got {len(features)}."
+                )
+
+            symbol = str(payload.get("symbol", "")).strip()
+            if not symbol:
+                raise ValueError(
+                    f"Expected a non-empty symbol in {path} at line {line_number}."
+                )
             examples.append(
                 FeatureExample(
                     label=label,
-                    features=[float(value) for value in payload["features"]],
-                    symbol=str(payload["symbol"]),
-                    open_time=int(payload["openTime"]),
-                    close_time=int(payload["closeTime"]),
-                    source=str(payload.get("source", path.name)),
+                    features=features,
+                    symbol=symbol,
+                    open_time=open_time,
+                    close_time=close_time,
+                    source=str(payload.get("source") or path.name),
                 )
             )
 

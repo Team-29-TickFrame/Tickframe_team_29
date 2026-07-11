@@ -223,9 +223,7 @@ def resolve_config(
     if args.model_type is not None:
         resolved["modelType"] = args.model_type
     if args.smoke:
-        resolved["maxExamplesPerClass"] = min(
-            int(resolved["maxExamplesPerClass"]), 24
-        )
+        resolved["maxExamplesPerClass"] = min(int(resolved["maxExamplesPerClass"]), 24)
         resolved["outputDir"] = str(Path(str(resolved["outputDir"])) / "smoke")
     return resolved
 

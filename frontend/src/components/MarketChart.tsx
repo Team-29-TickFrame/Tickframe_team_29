@@ -8,6 +8,27 @@ import {
 } from "react";
 import type { CanvasRenderingTarget2D } from "fancy-canvas";
 import {
+  CandlestickChart,
+  ChartArea,
+  ChartLine,
+  ChartSpline,
+  ClipboardPaste,
+  Copy,
+  Ellipsis,
+  Eraser,
+  History,
+  Maximize2,
+  Minus,
+  MousePointer2,
+  PencilRuler,
+  Ruler,
+  ScanLine,
+  Square,
+  Trash2,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
+import {
   AreaSeries,
   CandlestickSeries,
   ColorType,
@@ -31,6 +52,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { DisplayCandle } from "../types";
+import { safeStorageGet, safeStorageSet } from "../storage";
 
 export interface ChartAlertLine {
   id: string;
@@ -145,6 +167,22 @@ const CHART_MODES: Array<{ id: ChartMode; label: string }> = [
   { id: "area", label: "Area" },
 ];
 
+const DRAWING_TOOL_ICONS: Record<DrawingTool, LucideIcon> = {
+  cursor: MousePointer2,
+  trend: TrendingUp,
+  rect: Square,
+  level: Minus,
+  vertical: ScanLine,
+  fib: ChartSpline,
+  measure: Ruler,
+};
+
+const CHART_MODE_ICONS: Record<ChartMode, LucideIcon> = {
+  candles: CandlestickChart,
+  line: ChartLine,
+  area: ChartArea,
+};
+
 function volumeColor(candle: DisplayCandle): string {
   return candle.close >= candle.open
     ? "rgba(53, 229, 138, 0.26)"
@@ -200,7 +238,7 @@ function isDrawingType(value: unknown): value is DrawingType {
 
 function loadStoredDrawings(scopeKey: string): ChartDrawing[] {
   try {
-    const raw = window.localStorage.getItem(drawingStorageKey(scopeKey));
+    const raw = safeStorageGet(drawingStorageKey(scopeKey));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as ChartDrawing[];
     if (!Array.isArray(parsed)) return [];
@@ -650,6 +688,8 @@ export default function MarketChart({
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [editingDrawing, setEditingDrawing] = useState(false);
   const [hasCopiedDrawing, setHasCopiedDrawing] = useState(false);
+  const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
+  const [drawingToolsOpen, setDrawingToolsOpen] = useState(true);
   const [inspectCandle, setInspectCandle] = useState<DisplayCandle | null>(null);
   const latestCandle = candles.at(-1) ?? null;
   const readoutCandle = inspectCandle ?? latestCandle;
@@ -728,7 +768,10 @@ export default function MarketChart({
       suppressDrawingSaveRef.current = false;
       return;
     }
-    window.localStorage.setItem(drawingStorageKey(scopeKey), JSON.stringify(drawings));
+    const timer = window.setTimeout(() => {
+      safeStorageSet(drawingStorageKey(scopeKey), JSON.stringify(drawings));
+    }, 150);
+    return () => window.clearTimeout(timer);
   }, [drawings, scopeKey]);
 
   useEffect(() => {
@@ -1089,6 +1132,7 @@ export default function MarketChart({
         return;
       }
       if (event.key === "Escape") {
+        setDrawingMenuOpen(false);
         if (activeToolRef.current !== "cursor") {
           draftPointRef.current = null;
           detachPreview();
@@ -1588,13 +1632,21 @@ export default function MarketChart({
       : `${drawings.length} drawing${drawings.length === 1 ? "" : "s"}`;
 
   return (
-    <div className="chart-stage">
+    <div
+      className="chart-stage"
+      onWheelCapture={(event) => {
+        if (!event.ctrlKey && !event.metaKey) {
+          event.stopPropagation();
+        }
+      }}
+    >
       <div ref={containerRef} className="chart-canvas" />
       {patternOverlay && (
         <div className="chart-pattern-overlay" aria-hidden="true">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none">
             <line
               className="pattern-start-line"
+              vectorEffect="non-scaling-stroke"
               x1={patternOverlay.startX}
               x2={patternOverlay.startX}
               y1="0"
@@ -1603,46 +1655,148 @@ export default function MarketChart({
           </svg>
         </div>
       )}
-      <button
-        className="chart-reset"
-        type="button"
-        disabled={candles.length === 0}
-        onClick={resetViewport}
-      >
-        AUTO FIT
-      </button>
-      {hasMore && (
-        <div className="tv-drawing-rail" aria-label={drawCountLabel}>
+      <div className="tv-chart-toolbar" aria-label="Chart controls">
+        <div className="tv-toolbar-group" aria-label="Chart style">
+          {CHART_MODES.map((mode) => {
+            const Icon = CHART_MODE_ICONS[mode.id];
+            return (
+              <button
+                aria-label={`${mode.label} chart`}
+                aria-pressed={chartMode === mode.id}
+                className={chartMode === mode.id ? "active" : ""}
+                data-tooltip={mode.label}
+                key={mode.id}
+                title={`${mode.label} chart`}
+                type="button"
+                onClick={() => setChartMode(mode.id)}
+              >
+                <Icon aria-hidden="true" size={16} strokeWidth={1.8} />
+              </button>
+            );
+          })}
+        </div>
+        <div className="tv-toolbar-group tv-toolbar-actions" aria-label="Chart actions">
           <button
+            aria-label="Toggle drawing tools"
+            aria-pressed={drawingToolsOpen}
+            className={drawingToolsOpen ? "active" : ""}
+            data-tooltip="Drawing tools"
+            title="Show or hide drawing tools"
             type="button"
-            title="Paste copied drawing"
-            disabled={!hasCopiedDrawing}
-            onClick={pasteCopiedDrawing}
+            onClick={() => {
+              if (drawingToolsOpen) setActiveTool("cursor");
+              setDrawingToolsOpen((open) => !open);
+            }}
           >
-            Paste
+            <PencilRuler aria-hidden="true" size={16} strokeWidth={1.8} />
           </button>
           <button
+            aria-label="Auto fit chart"
+            data-tooltip="Auto fit"
+            title="Fit the latest candles in view"
+            disabled={candles.length === 0}
             type="button"
-            title="Delete selected drawing"
-            disabled={selectedDrawing === null}
-            onClick={deleteSelectedDrawing}
+            onClick={resetViewport}
           >
-            Delete
+            <Maximize2 aria-hidden="true" size={16} strokeWidth={1.8} />
           </button>
-          <button type="button" title="Clear drawings" onClick={clearDrawings}>
-            Clear
+          <button
+            aria-label="Load earlier history"
+            data-tooltip={historyLoading ? "Loading history" : "History"}
+            disabled={!hasMore || historyLoading}
+            title={hasMore ? "Load older candles" : "All available history is loaded"}
+            type="button"
+            onClick={onLoadEarlier}
+          >
+            <History aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label="Drawing actions"
+            aria-expanded={drawingMenuOpen}
+            data-tooltip="Drawing actions"
+            title="Copy, paste, or clear drawings"
+            type="button"
+            onClick={() => setDrawingMenuOpen((open) => !open)}
+          >
+            <Ellipsis aria-hidden="true" size={17} strokeWidth={1.8} />
           </button>
         </div>
+      </div>
+      {drawingToolsOpen && (
+        <div className="tv-drawing-tools" aria-label="Drawing tools">
+          {DRAWING_TOOLS.map((tool) => {
+            const Icon = DRAWING_TOOL_ICONS[tool.id];
+            return (
+              <button
+                aria-label={tool.title}
+                aria-pressed={activeTool === tool.id}
+                className={activeTool === tool.id ? "active" : ""}
+                data-tooltip={tool.label}
+                key={tool.id}
+                title={tool.title}
+                type="button"
+                onClick={() => setActiveTool(tool.id)}
+              >
+                <Icon aria-hidden="true" size={17} strokeWidth={1.75} />
+              </button>
+            );
+          })}
+          <span className="drawing-count" title={drawCountLabel}>
+            {drawings.length}
+          </span>
+        </div>
       )}
-      {hasMore && (
-        <button
-          className="chart-load-earlier"
-          type="button"
-          disabled={historyLoading}
-          onClick={onLoadEarlier}
-        >
-          {historyLoading ? "Loading..." : "Load earlier"}
-        </button>
+      {drawingMenuOpen && (
+        <div className="chart-edit-menu" role="menu" aria-label="Drawing actions">
+          <button
+            disabled={selectedDrawing === null}
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              copySelectedDrawing();
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <Copy aria-hidden="true" size={14} />
+            Copy selected
+          </button>
+          <button
+            disabled={!hasCopiedDrawing}
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              pasteCopiedDrawing();
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <ClipboardPaste aria-hidden="true" size={14} />
+            Paste drawing
+          </button>
+          <button
+            disabled={selectedDrawing === null}
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              deleteSelectedDrawing();
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <Trash2 aria-hidden="true" size={14} />
+            Delete selected
+          </button>
+          <button
+            disabled={drawings.length === 0}
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              clearDrawings();
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <Eraser aria-hidden="true" size={14} />
+            Clear all drawings
+          </button>
+        </div>
       )}
 
       {readoutCandle && (

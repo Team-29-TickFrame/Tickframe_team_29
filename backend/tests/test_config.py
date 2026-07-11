@@ -46,6 +46,11 @@ class ConfigTests(unittest.TestCase):
             ("wss://example-one.test/ws", "wss://example-two.test/ws"),
         )
 
+    def test_invalid_websocket_override_is_rejected_at_startup(self) -> None:
+        with temporary_env(TICKFRAME_BYBIT_WS_URLS="https://example.test/ws"):
+            with self.assertRaisesRegex(ValueError, "Invalid WebSocket URL"):
+                load_config()
+
 
 class temporary_env:
     def __init__(self, **values: Optional[str]) -> None:
