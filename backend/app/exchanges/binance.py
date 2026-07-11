@@ -73,12 +73,24 @@ class BinanceCollector(ExchangeCollector):
                     async for raw_message in websocket:
                         received_at = unix_ms()
                         self.last_message_at = received_at
-                        message = json.loads(raw_message)
-                        for trade in parse_binance_message(
-                            message,
-                            self.config,
-                            received_at,
-                        ):
+                        try:
+                            message = json.loads(raw_message)
+                            if not isinstance(message, dict):
+                                raise ValueError("expected a JSON object")
+                            trades = parse_binance_message(
+                                message,
+                                self.config,
+                                received_at,
+                            )
+                        except (
+                            ArithmeticError,
+                            KeyError,
+                            TypeError,
+                            ValueError,
+                        ) as error:
+                            self.record_invalid_message(error)
+                            continue
+                        for trade in trades:
                             await self.on_trade(trade)
                 finally:
                     await self.set_connected(False)

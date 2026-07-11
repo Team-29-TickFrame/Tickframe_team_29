@@ -74,8 +74,9 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
             write_fixture_model(model_path)
             detector = PatternMLDetector(model_path=model_path)
 
-            with patch("backend.app.main.pattern_ml_detector", detector), patch(
-                "backend.app.main.service.candle_history", new=mock_history
+            with (
+                patch("backend.app.main.pattern_ml_detector", detector),
+                patch("backend.app.main.service.candle_history", new=mock_history),
             ):
                 result = await ml_patterns(
                     exchange="binance",

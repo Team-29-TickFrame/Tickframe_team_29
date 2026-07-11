@@ -64,6 +64,19 @@ class GaussianNaiveBayesClassifier:
             raise ValueError("features and labels must have the same length.")
         if not features:
             raise ValueError("Cannot train on an empty dataset.")
+        if not feature_names:
+            raise ValueError("feature_names must not be empty.")
+        feature_count = len(feature_names)
+        for index, row in enumerate(features):
+            if len(row) != feature_count:
+                raise ValueError(
+                    f"Feature row {index} has {len(row)} values; "
+                    f"expected {feature_count}."
+                )
+            if not all(math.isfinite(float(value)) for value in row):
+                raise ValueError(f"Feature row {index} contains a non-finite value.")
+        if any(not str(label).strip() for label in labels):
+            raise ValueError("labels must not contain empty values.")
 
         self.feature_names = list(feature_names)
         self.labels = sorted(set(labels))
@@ -94,6 +107,14 @@ class GaussianNaiveBayesClassifier:
         )
 
     def predict_proba_one(self, features: Sequence[float]) -> Dict[str, float]:
+        if not self.labels:
+            raise ValueError("The model must be fitted before prediction.")
+        if len(features) != len(self.feature_names):
+            raise ValueError(
+                f"Expected {len(self.feature_names)} features, got {len(features)}."
+            )
+        if not all(math.isfinite(float(value)) for value in features):
+            raise ValueError("Prediction features must be finite.")
         log_scores = {label: self._log_score(label, features) for label in self.labels}
         return _softmax(log_scores)
 
@@ -120,6 +141,7 @@ class GaussianNaiveBayesClassifier:
             for label, values in payload["variances"].items()
         }
         model.feature_names = list(payload["featureNames"])
+        model._validate_artifact()
         return model
 
     def to_dict(self) -> Dict[str, object]:
@@ -144,6 +166,32 @@ class GaussianNaiveBayesClassifier:
             score += -0.5 * math.log(2.0 * math.pi * variance)
             score += -((value - mean) ** 2) / (2.0 * variance)
         return score
+
+    def _validate_artifact(self) -> None:
+        if not self.labels or not self.feature_names:
+            raise ValueError("Model artifact must define labels and feature names.")
+        label_set = set(self.labels)
+        if len(label_set) != len(self.labels):
+            raise ValueError("Model artifact labels must be unique.")
+        if any(
+            set(values) != label_set
+            for values in (self.class_priors, self.means, self.variances)
+        ):
+            raise ValueError("Model artifact parameters do not match its labels.")
+
+        feature_count = len(self.feature_names)
+        for label in self.labels:
+            prior = self.class_priors[label]
+            means = self.means[label]
+            variances = self.variances[label]
+            if not math.isfinite(prior) or prior <= 0:
+                raise ValueError(f"Invalid prior for label {label}.")
+            if len(means) != feature_count or len(variances) != feature_count:
+                raise ValueError(f"Invalid feature count for label {label}.")
+            if not all(math.isfinite(value) for value in means):
+                raise ValueError(f"Invalid mean for label {label}.")
+            if not all(math.isfinite(value) and value > 0 for value in variances):
+                raise ValueError(f"Invalid variance for label {label}.")
 
 
 class BoostedTreeClassifier:
@@ -344,6 +392,12 @@ def evaluate_predictions(
 ) -> Dict[str, object]:
     if len(expected) != len(predicted):
         raise ValueError("expected and predicted must have the same length.")
+    if not labels or len(set(labels)) != len(labels):
+        raise ValueError("labels must be non-empty and unique.")
+    allowed = set(labels)
+    unknown = (set(expected) | set(predicted)).difference(allowed)
+    if unknown:
+        raise ValueError(f"Unknown labels in predictions: {sorted(unknown)}")
 
     confusion = {label: {other: 0 for other in labels} for label in labels}
     for actual, guess in zip(expected, predicted):

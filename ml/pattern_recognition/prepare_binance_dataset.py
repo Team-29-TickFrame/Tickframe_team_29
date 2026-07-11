@@ -15,11 +15,11 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Sequence
+from typing import Dict, Iterator, List, Optional, Sequence
 from xml.etree import ElementTree
 
 from .features import extract_features
-from .weak_labeling import PATTERN_LABELS, WeakLabel, label_window
+from .weak_labeling import PATTERN_LABELS, label_window
 
 
 BINANCE_BUCKET = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
@@ -934,23 +934,25 @@ def _stable_seed(value: str) -> int:
 
 
 def _urlopen_bytes(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "Tickframe ML dataset"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "Tickframe ML dataset"}
+    )
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()
 
 
 def _parse_date(value: str) -> date:
-    return datetime.strptime(value, "%Y-%m-%d").date()
+    return date.fromisoformat(value)
 
 
 def _archive_start(item: ArchiveItem) -> date:
     if item.kind == "daily":
         return _parse_date(item.period)
-    return datetime.strptime(item.period, "%Y-%m").date()
+    return date.fromisoformat(f"{item.period}-01")
 
 
 def _month_end(value: str) -> date:
-    start = datetime.strptime(value, "%Y-%m").date()
+    start = date.fromisoformat(f"{value}-01")
     if start.month == 12:
         return date(start.year, 12, 31)
     next_month = date(start.year, start.month + 1, 1)

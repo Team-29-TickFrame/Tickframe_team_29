@@ -3,7 +3,8 @@
 Assignment 5 keeps the Assignment 4 quality gates active. The maintained
 testing evidence covers backend linting, backend formatting, automated backend
 tests, coverage generation, critical-module coverage validation, frontend
-typechecking, frontend build verification, QRTs, datetime-safety QA, and
+typechecking, reconnect runtime tests, frontend build verification, QRTs,
+datetime-safety QA, and
 Markdown link checking.
 
 ## Active CI Gates
@@ -13,7 +14,7 @@ Markdown link checking.
 | Backend linting and formatting | Quality workflow backend job. |
 | Backend tests and coverage | Quality workflow backend job and coverage artifact. |
 | Critical-module coverage | `backend/scripts/check_critical_coverage.py`. |
-| Frontend typecheck and build | Quality workflow frontend job. |
+| Frontend typecheck, runtime helper tests, and build | Quality workflow frontend job. |
 | Additional QA | Ruff datetime-safety check. |
 | Markdown link health | Links workflow with Lychee. |
 

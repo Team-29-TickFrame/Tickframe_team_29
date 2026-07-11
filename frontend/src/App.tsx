@@ -2,12 +2,21 @@ import {
   type CSSProperties,
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import {
+  LayoutGrid,
+  ListFilter,
+  Maximize2,
+  RotateCcw,
+  type LucideIcon,
+} from "lucide-react";
 import {
   candleWebSocketUrl,
   fetchCandles,
@@ -25,14 +34,16 @@ import {
   register,
   stableCandleWebSocketUrl,
 } from "./api";
-import MarketChart, { type ChartAlertLine } from "./components/MarketChart";
+import type { ChartAlertLine } from "./components/MarketChart";
+import { toDisplayCandles } from "./market-utils";
+import { safeStorageGet, safeStorageRemove, safeStorageSet } from "./storage";
+import { connectResilientWebSocket } from "./websocket";
 import type {
   AuthResponse,
   AuthUser,
   Candle,
   CandleStreamResponse,
   CandlesResponse,
-  DisplayCandle,
   DisplayTelemetrySample,
   Exchange,
   HealthResponse,
@@ -47,6 +58,8 @@ import type {
   StreamStatus,
   Timeframe,
 } from "./types";
+
+const MarketChart = lazy(() => import("./components/MarketChart"));
 
 const EXCHANGES: Exchange[] = ["binance", "bybit"];
 const TIMEFRAMES: Timeframe[] = [
@@ -87,18 +100,6 @@ const GUEST_AUTH_RESPONSE: AuthResponse = {
     createdAt: "2026-01-01T00:00:00.000Z",
   },
 };
-const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
-  "1s": 1,
-  "5s": 5,
-  "15s": 15,
-  "1m": 60,
-  "5m": 5 * 60,
-  "15m": 15 * 60,
-  "1h": 60 * 60,
-  "1d": 24 * 60 * 60,
-};
-const MAX_VISUAL_BRIDGE_CANDLES = 5000;
-
 interface AuthSession {
   token: string;
   user: AuthUser;
@@ -126,8 +127,10 @@ type MainPanelId = "chart" | "metrics";
 type SidePanelId = "ml" | "alerts" | "signals";
 type WorkspacePanelGroup = "main" | "side";
 type WorkspaceResizeHandleId =
+  | "main-bottom"
   | "main-split"
   | "rail-width"
+  | "side-bottom"
   | "side-middle"
   | "side-top";
 
@@ -153,6 +156,7 @@ interface WorkspaceResizeStart {
   startX: number;
   startY: number;
   startLayout: DashboardLayout;
+  target: HTMLDivElement;
 }
 
 interface UserAlert {
@@ -184,8 +188,10 @@ interface AlertDraft {
 interface DashboardLayout {
   rightColumnWidth: number;
   topPanelHeight: number;
+  mainBottomPanelHeight: number;
   sideTopPanelHeight: number;
   sideMiddlePanelHeight: number;
+  sideBottomPanelHeight: number;
   mainOrder: MainPanelId[];
   sideOrder: SidePanelId[];
 }
@@ -209,7 +215,8 @@ interface AlertPreset {
 }
 
 const USER_ALERTS_STORAGE_KEY = "tickframe.userAlerts.v1";
-const DASHBOARD_LAYOUT_STORAGE_KEY = "tickframe.dashboardLayout.v3";
+const DASHBOARD_LAYOUT_STORAGE_KEY = "tickframe.dashboardLayout.v4";
+const MAX_PANEL_HEIGHT = 5_000;
 const ALERT_TOAST_TTL_MS = 8_000;
 const ALERT_TOAST_EXIT_MS = 260;
 const ALERT_BEEP_DATA_URI =
@@ -292,59 +299,135 @@ const DEFAULT_ALERT_DRAFT: AlertDraft = {
 };
 
 const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
-  rightColumnWidth: 390,
-  topPanelHeight: 570,
-  sideTopPanelHeight: 300,
-  sideMiddlePanelHeight: 320,
+  rightColumnWidth: 420,
+  topPanelHeight: 760,
+  mainBottomPanelHeight: 680,
+  sideTopPanelHeight: 320,
+  sideMiddlePanelHeight: 440,
+  sideBottomPanelHeight: 620,
   mainOrder: ["chart", "metrics"],
   sideOrder: ["ml", "alerts", "signals"],
 };
 
 const MAIN_PANEL_IDS: MainPanelId[] = ["chart", "metrics"];
 const SIDE_PANEL_IDS: SidePanelId[] = ["ml", "alerts", "signals"];
-const MAIN_PANEL_LABELS: Record<MainPanelId, string> = {
-  chart: "Chart",
-  metrics: "Metrics",
-};
-const SIDE_PANEL_LABELS: Record<SidePanelId, string> = {
-  ml: "ML pattern",
-  alerts: "Alerts",
-  signals: "Signals",
-};
 const DASHBOARD_LAYOUT_PRESETS: Array<{
   id: string;
   label: string;
+  icon: LucideIcon;
   layout: DashboardLayout;
 }> = [
   {
     id: "balanced",
     label: "Balanced",
+    icon: LayoutGrid,
     layout: DEFAULT_DASHBOARD_LAYOUT,
   },
   {
     id: "chart",
     label: "Chart focus",
+    icon: Maximize2,
     layout: {
       ...DEFAULT_DASHBOARD_LAYOUT,
-      rightColumnWidth: 320,
-      topPanelHeight: 720,
-      sideTopPanelHeight: 280,
-      sideMiddlePanelHeight: 300,
+      rightColumnWidth: 360,
+      topPanelHeight: 960,
+      mainBottomPanelHeight: 640,
+      sideTopPanelHeight: 320,
+      sideMiddlePanelHeight: 400,
+      sideBottomPanelHeight: 520,
     },
   },
   {
     id: "signals",
     label: "Signals first",
+    icon: ListFilter,
     layout: {
       ...DEFAULT_DASHBOARD_LAYOUT,
-      rightColumnWidth: 430,
-      topPanelHeight: 560,
-      sideTopPanelHeight: 280,
-      sideMiddlePanelHeight: 380,
+      rightColumnWidth: 460,
+      topPanelHeight: 820,
+      mainBottomPanelHeight: 650,
+      sideTopPanelHeight: 620,
+      sideMiddlePanelHeight: 440,
+      sideBottomPanelHeight: 320,
       sideOrder: ["signals", "alerts", "ml"],
     },
   },
 ];
+
+type DashboardSizeField = Exclude<
+  keyof DashboardLayout,
+  "mainOrder" | "sideOrder"
+>;
+
+interface WorkspaceResizeConfig {
+  field: DashboardSizeField;
+  label: string;
+  orientation: "horizontal" | "vertical";
+  min: number;
+  max: number;
+  step: number;
+  dragMultiplier: 1 | -1;
+}
+
+const WORKSPACE_RESIZE_CONFIG: Record<
+  WorkspaceResizeHandleId,
+  WorkspaceResizeConfig
+> = {
+  "main-split": {
+    field: "topPanelHeight",
+    label: "Resize chart height",
+    orientation: "horizontal",
+    min: 480,
+    max: MAX_PANEL_HEIGHT,
+    step: 20,
+    dragMultiplier: 1,
+  },
+  "main-bottom": {
+    field: "mainBottomPanelHeight",
+    label: "Resize metrics height",
+    orientation: "horizontal",
+    min: 360,
+    max: MAX_PANEL_HEIGHT,
+    step: 20,
+    dragMultiplier: 1,
+  },
+  "rail-width": {
+    field: "rightColumnWidth",
+    label: "Resize dashboard columns",
+    orientation: "vertical",
+    min: 300,
+    max: 760,
+    step: 20,
+    dragMultiplier: -1,
+  },
+  "side-top": {
+    field: "sideTopPanelHeight",
+    label: "Resize top right panel height",
+    orientation: "horizontal",
+    min: 180,
+    max: MAX_PANEL_HEIGHT,
+    step: 20,
+    dragMultiplier: 1,
+  },
+  "side-middle": {
+    field: "sideMiddlePanelHeight",
+    label: "Resize middle right panel height",
+    orientation: "horizontal",
+    min: 180,
+    max: MAX_PANEL_HEIGHT,
+    step: 20,
+    dragMultiplier: 1,
+  },
+  "side-bottom": {
+    field: "sideBottomPanelHeight",
+    label: "Resize bottom right panel height",
+    orientation: "horizontal",
+    min: 180,
+    max: MAX_PANEL_HEIGHT,
+    step: 20,
+    dragMultiplier: 1,
+  },
+};
 
 function TickframeLogo({ className = "" }: { className?: string }) {
   return (
@@ -418,168 +501,95 @@ function CoinLogo({
   );
 }
 
-function DashboardLayoutMenu({
+function DashboardPresetMenu({
   open,
-  layout,
-  onToggle,
-  onPreset,
+  activePresetId,
+  onOpenChange,
+  onSelect,
   onReset,
-  onMainSlotChange,
-  onSideSlotChange,
-  onChartHeightChange,
-  onRailWidthChange,
-  onSideMiddleHeightChange,
-  onSideTopHeightChange,
 }: {
   open: boolean;
-  layout: DashboardLayout;
-  onToggle: () => void;
-  onPreset: (layout: DashboardLayout) => void;
+  activePresetId: string | null;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (layout: DashboardLayout) => void;
   onReset: () => void;
-  onMainSlotChange: (slot: number, panel: MainPanelId) => void;
-  onSideSlotChange: (slot: number, panel: SidePanelId) => void;
-  onChartHeightChange: (value: number) => void;
-  onRailWidthChange: (value: number) => void;
-  onSideMiddleHeightChange: (value: number) => void;
-  onSideTopHeightChange: (value: number) => void;
 }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        onOpenChange(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onOpenChange(false);
+      triggerRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onOpenChange, open]);
+
   return (
-    <div className="layout-menu-wrap">
+    <div className="layout-menu-wrap" ref={rootRef}>
       <button
+        aria-controls="dashboard-layout-presets"
         className="layout-menu-trigger"
         type="button"
         aria-expanded={open}
-        onClick={onToggle}
+        aria-haspopup="dialog"
+        aria-label="Layout presets"
+        title="Layout presets"
+        ref={triggerRef}
+        onClick={() => onOpenChange(!open)}
       >
-        Layout
+        <LayoutGrid aria-hidden="true" size={16} strokeWidth={1.8} />
       </button>
       {open && (
-        <div className="layout-menu" role="dialog" aria-label="Dashboard layout">
-          <div className="layout-menu-head">
-            <span>Workspace</span>
-            <strong>Arrange dashboard</strong>
-          </div>
-
+        <div
+          className="layout-menu"
+          id="dashboard-layout-presets"
+          role="dialog"
+          aria-label="Dashboard layout presets"
+        >
           <div className="layout-presets">
             {DASHBOARD_LAYOUT_PRESETS.map((preset) => (
               <button
+                aria-pressed={activePresetId === preset.id}
+                className={activePresetId === preset.id ? "active" : ""}
                 key={preset.id}
                 type="button"
-                onClick={() => onPreset(preset.layout)}
+                onClick={() => {
+                  onSelect(preset.layout);
+                  onOpenChange(false);
+                }}
               >
-                {preset.label}
+                <preset.icon aria-hidden="true" size={16} strokeWidth={1.8} />
+                <span>{preset.label}</span>
               </button>
             ))}
+            <button
+              className="layout-reset-button"
+              type="button"
+              onClick={() => {
+                onReset();
+                onOpenChange(false);
+              }}
+            >
+              <RotateCcw aria-hidden="true" size={16} strokeWidth={1.8} />
+              <span>Reset layout</span>
+            </button>
           </div>
-
-          <div className="layout-fieldset">
-            <span>Main stack</span>
-            {layout.mainOrder.map((panel, index) => (
-              <label key={`main-${index}`}>
-                <small>{index === 0 ? "Top" : "Bottom"}</small>
-                <select
-                  value={panel}
-                  onChange={(event) =>
-                    onMainSlotChange(index, event.target.value as MainPanelId)
-                  }
-                >
-                  {MAIN_PANEL_IDS.map((item) => (
-                    <option key={item} value={item}>
-                      {MAIN_PANEL_LABELS[item]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-
-          <div className="layout-fieldset">
-            <span>Right rail</span>
-            {layout.sideOrder.map((panel, index) => (
-              <label key={`side-${index}`}>
-                <small>Slot {index + 1}</small>
-                <select
-                  value={panel}
-                  onChange={(event) =>
-                    onSideSlotChange(index, event.target.value as SidePanelId)
-                  }
-                >
-                  {SIDE_PANEL_IDS.map((item) => (
-                    <option key={item} value={item}>
-                      {SIDE_PANEL_LABELS[item]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-
-          <div className="layout-fieldset sliders">
-            <label>
-              <span>
-                Chart height
-                <b>{layout.topPanelHeight}px</b>
-              </span>
-              <input
-                type="range"
-                min="380"
-                max="980"
-                step="10"
-                value={layout.topPanelHeight}
-                onChange={(event) => onChartHeightChange(Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>
-                Right rail
-                <b>{layout.rightColumnWidth}px</b>
-              </span>
-              <input
-                type="range"
-                min="300"
-                max="760"
-                step="10"
-                value={layout.rightColumnWidth}
-                onChange={(event) => onRailWidthChange(Number(event.target.value))}
-              />
-            </label>
-            <label>
-              <span>
-                Right top
-                <b>{layout.sideTopPanelHeight}px</b>
-              </span>
-              <input
-                type="range"
-                min="180"
-                max="680"
-                step="10"
-                value={layout.sideTopPanelHeight}
-                onChange={(event) =>
-                  onSideTopHeightChange(Number(event.target.value))
-                }
-              />
-            </label>
-            <label>
-              <span>
-                Right middle
-                <b>{layout.sideMiddlePanelHeight}px</b>
-              </span>
-              <input
-                type="range"
-                min="180"
-                max="760"
-                step="10"
-                value={layout.sideMiddlePanelHeight}
-                onChange={(event) =>
-                  onSideMiddleHeightChange(Number(event.target.value))
-                }
-              />
-            </label>
-          </div>
-
-          <button className="layout-reset-button" type="button" onClick={onReset}>
-            Reset layout
-          </button>
         </div>
       )}
     </div>
@@ -657,73 +667,6 @@ function coerceNumber(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function toDisplayCandles(candles: Candle[]): DisplayCandle[] {
-  const values = [...candles].sort((a, b) => a.openTime - b.openTime);
-  const result: DisplayCandle[] = [];
-  let previousClose: number | null = null;
-  let previousTime: number | null = null;
-  let bridgeCount = 0;
-
-  for (const candle of values) {
-    const intervalSeconds = TIMEFRAME_SECONDS[candle.timeframe] ?? null;
-    if (
-      previousClose !== null &&
-      previousTime !== null &&
-      intervalSeconds !== null
-    ) {
-      const intervalMs = intervalSeconds * 1000;
-      for (
-        let openTime = previousTime + intervalMs;
-        openTime < candle.openTime && bridgeCount < MAX_VISUAL_BRIDGE_CANDLES;
-        openTime += intervalMs
-      ) {
-        result.push({
-          time: openTime / 1000,
-          open: previousClose,
-          high: previousClose,
-          low: previousClose,
-          close: previousClose,
-          volume: 0,
-          tradeCount: 0,
-        });
-        bridgeCount += 1;
-      }
-    }
-
-    const open = coerceNumber(candle.open);
-    const high = coerceNumber(candle.high);
-    const low = coerceNumber(candle.low);
-    const close = coerceNumber(candle.close);
-    if (open === null || high === null || low === null || close === null) {
-      if (previousClose !== null) {
-        result.push({
-          time: candle.openTime / 1000,
-          open: previousClose,
-          high: previousClose,
-          low: previousClose,
-          close: previousClose,
-          volume: 0,
-          tradeCount: 0,
-        });
-        previousTime = candle.openTime;
-      }
-      continue;
-    }
-    result.push({
-      time: candle.openTime / 1000,
-      open,
-      high,
-      low,
-      close,
-      volume: Number(candle.baseVolume),
-      tradeCount: candle.tradeCount,
-    });
-    previousClose = close;
-    previousTime = candle.openTime;
-  }
-  return result;
-}
-
 function mergeCandles(current: Candle[], incoming: Candle[]): Candle[] {
   const merged = new Map(
     current.map((candle) => [candle.openTime, candle]),
@@ -792,6 +735,48 @@ function metricTone(value: number | null | undefined): "positive" | "negative" |
 function formatConfidence(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "--";
   return `${Math.round(value * 100)}%`;
+}
+
+function rsiState(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "waiting for data";
+  }
+  if (value >= 70) return "overbought zone";
+  if (value <= 30) return "oversold zone";
+  return "neutral momentum";
+}
+
+function volumeState(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "waiting for data";
+  }
+  if (value >= 2) return "high participation";
+  if (value >= 1) return "above baseline";
+  if (value < 0.5) return "quiet tape";
+  return "near baseline";
+}
+
+function metricDisplayLabel(metric: string): string {
+  const definition = ALERT_METRICS.find((item) => item.id === metric);
+  if (definition) return definition.shortLabel;
+  return metric
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\bpct\b/gi, "%")
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function formatMetricEventValue(event: MetricEvent): string {
+  if (event.value === null || !Number.isFinite(event.value)) return "--";
+  if (event.metric.endsWith("Pct")) {
+    return formatMetricPercent(event.value, true);
+  }
+  if (event.metric.endsWith("Ratio")) return formatRatio(event.value);
+  if (event.metric === "close" || event.metric === "price") {
+    return formatPrice(event.value);
+  }
+  if (event.metric === "rsi") return event.value.toFixed(1);
+  return formatSignedNumber(event.value, 2);
 }
 
 function formatScore(value: number | null | undefined): string {
@@ -869,6 +854,46 @@ function clampNumber(value: number, min: number, max: number, fallback = min): n
   return Math.min(Math.max(value, min), max);
 }
 
+function dashboardLayoutsEqual(
+  first: DashboardLayout,
+  second: DashboardLayout,
+): boolean {
+  return (
+    first.rightColumnWidth === second.rightColumnWidth &&
+    first.topPanelHeight === second.topPanelHeight &&
+    first.mainBottomPanelHeight === second.mainBottomPanelHeight &&
+    first.sideTopPanelHeight === second.sideTopPanelHeight &&
+    first.sideMiddlePanelHeight === second.sideMiddlePanelHeight &&
+    first.sideBottomPanelHeight === second.sideBottomPanelHeight &&
+    first.mainOrder.every((panel, index) => panel === second.mainOrder[index]) &&
+    first.sideOrder.every((panel, index) => panel === second.sideOrder[index])
+  );
+}
+
+function workspaceResizeValue(
+  layout: DashboardLayout,
+  handle: WorkspaceResizeHandleId,
+): number {
+  return layout[WORKSPACE_RESIZE_CONFIG[handle].field];
+}
+
+function withWorkspaceResizeValue(
+  layout: DashboardLayout,
+  handle: WorkspaceResizeHandleId,
+  value: number,
+): DashboardLayout {
+  const config = WORKSPACE_RESIZE_CONFIG[handle];
+  return {
+    ...layout,
+    [config.field]: clampNumber(
+      value,
+      config.min,
+      config.max,
+      workspaceResizeValue(layout, handle),
+    ),
+  };
+}
+
 function orderedPanels<T extends string>(value: unknown, fallback: T[], allowed: T[]): T[] {
   if (!Array.isArray(value)) return fallback;
   const requested = value.filter((item): item is T => allowed.includes(item as T));
@@ -936,6 +961,7 @@ function getWorkspaceDropTarget(
 function WorkspaceHeaderDragZone({
   label,
   payload,
+  onKeyboardMove,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
@@ -943,22 +969,35 @@ function WorkspaceHeaderDragZone({
 }: {
   label: string;
   payload: WorkspaceDragPayload;
-  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onKeyboardMove: (
+    payload: WorkspaceDragPayload,
+    direction: -1 | 1,
+  ) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerDown: (
     payload: WorkspaceDragPayload,
-    event: ReactPointerEvent<HTMLDivElement>,
+    event: ReactPointerEvent<HTMLButtonElement>,
   ) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <div
-      aria-label={`Move ${label} panel`}
+    <button
+      aria-keyshortcuts="ArrowUp ArrowDown"
+      aria-label={`Move ${label} panel; use up and down arrow keys`}
       className="workspace-header-drag-zone"
+      draggable={false}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        event.preventDefault();
+        onKeyboardMove(payload, event.key === "ArrowUp" ? -1 : 1);
+      }}
       onPointerCancel={onPointerCancel}
       onPointerDown={(event) => onPointerDown(payload, event)}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      title={`Move ${label} panel`}
+      type="button"
     />
   );
 }
@@ -966,38 +1005,50 @@ function WorkspaceHeaderDragZone({
 function WorkspaceResizeHandle({
   active = false,
   handle,
-  label,
-  orientation,
-  onPointerCancel,
+  value,
+  onKeyboardNudge,
   onPointerDown,
-  onPointerMove,
-  onPointerUp,
   style,
 }: {
   active?: boolean;
   handle: WorkspaceResizeHandleId;
-  label: string;
-  orientation: "horizontal" | "vertical";
-  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  value: number;
+  onKeyboardNudge: (
+    handle: WorkspaceResizeHandleId,
+    physicalDirection: number,
+  ) => void;
   onPointerDown: (
     handle: WorkspaceResizeHandleId,
     event: ReactPointerEvent<HTMLDivElement>,
   ) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
 }) {
+  const config = WORKSPACE_RESIZE_CONFIG[handle];
+
   return (
     <div
-      aria-label={label}
-      aria-orientation={orientation}
-      className={`workspace-resize-handle ${orientation}${active ? " is-active" : ""}`}
-      onPointerCancel={onPointerCancel}
+      aria-label={config.label}
+      aria-orientation={config.orientation}
+      aria-valuemax={config.max}
+      aria-valuemin={config.min}
+      aria-valuenow={value}
+      aria-valuetext={`${value}px`}
+      className={`workspace-resize-handle ${config.orientation}${active ? " is-active" : ""}`}
       onPointerDown={(event) => onPointerDown(handle, event)}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onKeyDown={(event) => {
+        const negativeKey =
+          config.orientation === "horizontal" ? "ArrowUp" : "ArrowLeft";
+        const positiveKey =
+          config.orientation === "horizontal" ? "ArrowDown" : "ArrowRight";
+        if (event.key !== negativeKey && event.key !== positiveKey) return;
+        event.preventDefault();
+        const direction = event.key === negativeKey ? -1 : 1;
+        onKeyboardNudge(handle, direction * (event.shiftKey ? 5 : 1));
+      }}
       role="separator"
       style={style}
+      tabIndex={0}
+      title="Drag to resize; use arrow keys for precise control"
     />
   );
 }
@@ -1005,7 +1056,7 @@ function WorkspaceResizeHandle({
 function safeStoredDashboardLayout(): DashboardLayout {
   if (typeof window === "undefined") return DEFAULT_DASHBOARD_LAYOUT;
   try {
-    const raw = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
+    const raw = safeStorageGet(DASHBOARD_LAYOUT_STORAGE_KEY);
     if (!raw) return DEFAULT_DASHBOARD_LAYOUT;
     const parsed = JSON.parse(raw) as Partial<DashboardLayout>;
     return {
@@ -1017,21 +1068,33 @@ function safeStoredDashboardLayout(): DashboardLayout {
       ),
       topPanelHeight: clampNumber(
         Number(parsed.topPanelHeight),
-        380,
-        980,
+        480,
+        MAX_PANEL_HEIGHT,
         DEFAULT_DASHBOARD_LAYOUT.topPanelHeight,
+      ),
+      mainBottomPanelHeight: clampNumber(
+        Number(parsed.mainBottomPanelHeight),
+        360,
+        MAX_PANEL_HEIGHT,
+        DEFAULT_DASHBOARD_LAYOUT.mainBottomPanelHeight,
       ),
       sideTopPanelHeight: clampNumber(
         Number(parsed.sideTopPanelHeight),
         180,
-        680,
+        MAX_PANEL_HEIGHT,
         DEFAULT_DASHBOARD_LAYOUT.sideTopPanelHeight,
       ),
       sideMiddlePanelHeight: clampNumber(
         Number(parsed.sideMiddlePanelHeight),
         180,
-        760,
+        MAX_PANEL_HEIGHT,
         DEFAULT_DASHBOARD_LAYOUT.sideMiddlePanelHeight,
+      ),
+      sideBottomPanelHeight: clampNumber(
+        Number(parsed.sideBottomPanelHeight),
+        180,
+        MAX_PANEL_HEIGHT,
+        DEFAULT_DASHBOARD_LAYOUT.sideBottomPanelHeight,
       ),
       mainOrder: orderedPanels(
         parsed.mainOrder,
@@ -1052,7 +1115,7 @@ function safeStoredDashboardLayout(): DashboardLayout {
 function safeStoredAlerts(): UserAlert[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(USER_ALERTS_STORAGE_KEY);
+    const raw = safeStorageGet(USER_ALERTS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as UserAlert[];
     if (!Array.isArray(parsed)) return [];
@@ -1210,7 +1273,6 @@ function useMarketFeed() {
   const [streamStatus, setStreamStatus] =
     useState<StreamStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
-  const reconnectAttempt = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1241,22 +1303,15 @@ function useMarketFeed() {
   }, []);
 
   useEffect(() => {
-    let socket: WebSocket | null = null;
-    let retryTimer: number | undefined;
-    let closed = false;
-
-    const connect = () => {
-      if (closed) return;
-      setStreamStatus(reconnectAttempt.current ? "reconnecting" : "connecting");
-      socket = new WebSocket(marketWebSocketUrl());
-
-      socket.addEventListener("open", () => {
-        reconnectAttempt.current = 0;
+    return connectResilientWebSocket(marketWebSocketUrl(), {
+      onConnecting: (attempt) => {
+        setStreamStatus(attempt > 0 ? "reconnecting" : "connecting");
+      },
+      onOpen: () => {
         setStreamStatus("live");
         setError(null);
-      });
-
-      socket.addEventListener("message", (event) => {
+      },
+      onMessage: (event) => {
         try {
           const frontendReceivedAt = Date.now();
           const snapshot = JSON.parse(event.data) as MarketsResponse;
@@ -1268,38 +1323,31 @@ function useMarketFeed() {
         } catch {
           setError("A malformed market snapshot was ignored.");
         }
-      });
-
-      socket.addEventListener("close", () => {
-        if (closed) return;
-        reconnectAttempt.current += 1;
-        setStreamStatus("reconnecting");
-        const delay = Math.min(1_000 * 2 ** reconnectAttempt.current, 10_000);
-        retryTimer = window.setTimeout(connect, delay);
-      });
-
-      socket.addEventListener("error", () => {
-        socket?.close();
-      });
-    };
-
-    connect();
-    return () => {
-      closed = true;
-      if (retryTimer) window.clearTimeout(retryTimer);
-      socket?.close();
-      setStreamStatus("offline");
-    };
+      },
+      onClose: (event) => {
+        setStreamStatus(event.code === 1008 ? "offline" : "reconnecting");
+      },
+      onError: () => setStreamStatus("reconnecting"),
+      maxReconnectDelayMs: 10_000,
+    });
   }, []);
 
   useEffect(() => {
+    let controller: AbortController | null = null;
     const loadHealth = () => {
-      fetchHealth()
+      controller?.abort();
+      controller = new AbortController();
+      fetchHealth(controller.signal)
         .then(setHealth)
-        .catch(() => setHealth(null));
+        .catch((requestError: Error) => {
+          if (requestError.name !== "AbortError") setHealth(null);
+        });
     };
     const interval = window.setInterval(loadHealth, 5_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      controller?.abort();
+      window.clearInterval(interval);
+    };
   }, []);
 
   return { instruments, markets, health, streamStatus, error };
@@ -1344,6 +1392,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [mlPatternError, setMlPatternError] = useState<string | null>(null);
   const [instrumentMenuOpen, setInstrumentMenuOpen] = useState(false);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [userAlerts, setUserAlerts] = useState<UserAlert[]>(safeStoredAlerts);
   const [alertDraft, setAlertDraft] =
     useState<AlertDraft>(DEFAULT_ALERT_DRAFT);
@@ -1381,17 +1431,20 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const workspaceResizeStartRef = useRef<WorkspaceResizeStart | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(
+    safeStorageSet(
       USER_ALERTS_STORAGE_KEY,
       JSON.stringify(userAlerts),
     );
   }, [userAlerts]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      DASHBOARD_LAYOUT_STORAGE_KEY,
-      JSON.stringify(dashboardLayout),
-    );
+    const timer = window.setTimeout(() => {
+      safeStorageSet(
+        DASHBOARD_LAYOUT_STORAGE_KEY,
+        JSON.stringify(dashboardLayout),
+      );
+    }, 150);
+    return () => window.clearTimeout(timer);
   }, [dashboardLayout]);
 
   useEffect(
@@ -1508,68 +1561,25 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     setDashboardLayout(layout);
   }, []);
 
-  const setMainPanelSlot = useCallback((slot: number, panel: MainPanelId) => {
-    setDashboardLayout((current) => {
-      const order = [...current.mainOrder];
-      const existingIndex = order.indexOf(panel);
-      if (existingIndex < 0 || slot < 0 || slot >= order.length) return current;
-      [order[slot], order[existingIndex]] = [order[existingIndex], order[slot]];
-      return { ...current, mainOrder: order };
-    });
-  }, []);
-
-  const setSidePanelSlot = useCallback((slot: number, panel: SidePanelId) => {
-    setDashboardLayout((current) => {
-      const order = [...current.sideOrder];
-      const existingIndex = order.indexOf(panel);
-      if (existingIndex < 0 || slot < 0 || slot >= order.length) return current;
-      [order[slot], order[existingIndex]] = [order[existingIndex], order[slot]];
-      return { ...current, sideOrder: order };
-    });
-  }, []);
-
-  const setDashboardChartHeight = useCallback((value: number) => {
-    setDashboardLayout((current) => ({
-      ...current,
-      topPanelHeight: clampNumber(value, 380, 980, current.topPanelHeight),
-    }));
-  }, []);
-
-  const setDashboardRailWidth = useCallback((value: number) => {
-    setDashboardLayout((current) => ({
-      ...current,
-      rightColumnWidth: clampNumber(value, 300, 760, current.rightColumnWidth),
-    }));
-  }, []);
-
-  const setDashboardSideTopHeight = useCallback((value: number) => {
-    setDashboardLayout((current) => ({
-      ...current,
-      sideTopPanelHeight: clampNumber(
-        value,
-        180,
-        680,
-        current.sideTopPanelHeight,
-      ),
-    }));
-  }, []);
-
-  const setDashboardSideMiddleHeight = useCallback((value: number) => {
-    setDashboardLayout((current) => ({
-      ...current,
-      sideMiddlePanelHeight: clampNumber(
-        value,
-        180,
-        760,
-        current.sideMiddlePanelHeight,
-      ),
-    }));
-  }, []);
+  const nudgeWorkspaceResize = useCallback(
+    (handle: WorkspaceResizeHandleId, physicalDirection: number) => {
+      const config = WORKSPACE_RESIZE_CONFIG[handle];
+      setDashboardLayout((current) =>
+        withWorkspaceResizeValue(
+          current,
+          handle,
+          workspaceResizeValue(current, handle) +
+            physicalDirection * config.step * config.dragMultiplier,
+        ),
+      );
+      setLayoutMenuOpen(false);
+    },
+    [],
+  );
 
   const startWorkspaceResize = useCallback(
     (handle: WorkspaceResizeHandleId, event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
-      event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       workspaceResizeStartRef.current = {
         handle,
@@ -1577,6 +1587,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
         startX: event.clientX,
         startY: event.clientY,
         startLayout: dashboardLayout,
+        target: event.currentTarget,
       };
       setWorkspaceResizeHandle(handle);
       setLayoutMenuOpen(false);
@@ -1585,66 +1596,32 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   );
 
   const moveWorkspaceResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (pointerId: number, clientX: number, clientY: number) => {
       const resize = workspaceResizeStartRef.current;
-      if (!resize || resize.pointerId !== event.pointerId) return;
-      event.preventDefault();
+      if (!resize || resize.pointerId !== pointerId) return;
 
-      const dx = event.clientX - resize.startX;
-      const dy = event.clientY - resize.startY;
-      setDashboardLayout((current) => {
-        if (resize.handle === "rail-width") {
-          return {
-            ...current,
-            rightColumnWidth: clampNumber(
-              resize.startLayout.rightColumnWidth - dx,
-              300,
-              760,
-              current.rightColumnWidth,
-            ),
-          };
-        }
-        if (resize.handle === "main-split") {
-          return {
-            ...current,
-            topPanelHeight: clampNumber(
-              resize.startLayout.topPanelHeight + dy,
-              380,
-              980,
-              current.topPanelHeight,
-            ),
-          };
-        }
-        if (resize.handle === "side-top") {
-          return {
-            ...current,
-            sideTopPanelHeight: clampNumber(
-              resize.startLayout.sideTopPanelHeight + dy,
-              180,
-              680,
-              current.sideTopPanelHeight,
-            ),
-          };
-        }
-        return {
-          ...current,
-          sideMiddlePanelHeight: clampNumber(
-            resize.startLayout.sideMiddlePanelHeight + dy,
-            180,
-            760,
-            current.sideMiddlePanelHeight,
-          ),
-        };
-      });
+      const dx = clientX - resize.startX;
+      const dy = clientY - resize.startY;
+      const config = WORKSPACE_RESIZE_CONFIG[resize.handle];
+      const pointerDelta = config.orientation === "horizontal" ? dy : dx;
+      const nextValue =
+        workspaceResizeValue(resize.startLayout, resize.handle) +
+        pointerDelta * config.dragMultiplier;
+      setDashboardLayout((current) =>
+        withWorkspaceResizeValue(current, resize.handle, nextValue),
+      );
     },
     [],
   );
 
   const finishWorkspaceResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (pointerId?: number) => {
       const resize = workspaceResizeStartRef.current;
-      if (resize && event.currentTarget.hasPointerCapture(resize.pointerId)) {
-        event.currentTarget.releasePointerCapture(resize.pointerId);
+      if (!resize || (pointerId !== undefined && resize.pointerId !== pointerId)) {
+        return;
+      }
+      if (resize.target.hasPointerCapture(resize.pointerId)) {
+        resize.target.releasePointerCapture(resize.pointerId);
       }
       workspaceResizeStartRef.current = null;
       setWorkspaceResizeHandle(null);
@@ -1652,14 +1629,44 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     [],
   );
 
+  useEffect(() => {
+    if (workspaceResizeHandle === null) return;
+
+    document.documentElement.dataset.workspaceResize =
+      WORKSPACE_RESIZE_CONFIG[workspaceResizeHandle].orientation;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" && event.buttons === 0) {
+        finishWorkspaceResize(event.pointerId);
+        return;
+      }
+      event.preventDefault();
+      moveWorkspaceResize(event.pointerId, event.clientX, event.clientY);
+    };
+    const handlePointerEnd = (event: PointerEvent) => {
+      finishWorkspaceResize(event.pointerId);
+    };
+    const handleWindowBlur = () => finishWorkspaceResize();
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerEnd);
+    window.addEventListener("pointercancel", handlePointerEnd);
+    window.addEventListener("blur", handleWindowBlur);
+    return () => {
+      delete document.documentElement.dataset.workspaceResize;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [finishWorkspaceResize, moveWorkspaceResize, workspaceResizeHandle]);
+
   const workspaceResizeProps = useMemo(
     () => ({
-      onPointerCancel: finishWorkspaceResize,
+      onKeyboardNudge: nudgeWorkspaceResize,
       onPointerDown: startWorkspaceResize,
-      onPointerMove: moveWorkspaceResize,
-      onPointerUp: finishWorkspaceResize,
     }),
-    [finishWorkspaceResize, moveWorkspaceResize, startWorkspaceResize],
+    [nudgeWorkspaceResize, startWorkspaceResize],
   );
 
   const clearWorkspaceDragSettleTimer = useCallback(() => {
@@ -1677,13 +1684,56 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     setWorkspaceDropTarget(null);
   }, []);
 
+  const moveWorkspacePanelByKeyboard = useCallback(
+    (payload: WorkspaceDragPayload, direction: -1 | 1) => {
+      setDashboardLayout((current) => {
+        if (payload.group === "main") {
+          const index = current.mainOrder.indexOf(payload.id);
+          const targetIndex = clampNumber(
+            index + direction,
+            0,
+            current.mainOrder.length - 1,
+            index,
+          );
+          if (targetIndex === index) return current;
+          return {
+            ...current,
+            mainOrder: reorderPanel(
+              current.mainOrder,
+              payload.id,
+              current.mainOrder[targetIndex],
+            ),
+          };
+        }
+
+        const index = current.sideOrder.indexOf(payload.id);
+        const targetIndex = clampNumber(
+          index + direction,
+          0,
+          current.sideOrder.length - 1,
+          index,
+        );
+        if (targetIndex === index) return current;
+        return {
+          ...current,
+          sideOrder: reorderPanel(
+            current.sideOrder,
+            payload.id,
+            current.sideOrder[targetIndex],
+          ),
+        };
+      });
+      setLayoutMenuOpen(false);
+    },
+    [],
+  );
+
   const startWorkspacePanelDrag = useCallback(
     (
       payload: WorkspaceDragPayload,
-      event: ReactPointerEvent<HTMLDivElement>,
+      event: ReactPointerEvent<HTMLButtonElement>,
     ) => {
       if (event.button !== 0) return;
-      event.preventDefault();
       clearWorkspaceDragSettleTimer();
       event.currentTarget.setPointerCapture(event.pointerId);
       workspaceDragStartRef.current = {
@@ -1702,7 +1752,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   );
 
   const moveWorkspacePanelDrag = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
       const drag = workspaceDragStartRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
 
@@ -1723,7 +1773,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   );
 
   const finishWorkspacePanelDrag = useCallback(
-    (event?: ReactPointerEvent<HTMLDivElement>) => {
+    (event?: ReactPointerEvent<HTMLButtonElement>) => {
       const drag = workspaceDragStartRef.current;
       if (!drag) {
         clearWorkspaceDrag();
@@ -1790,7 +1840,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   );
 
   const cancelWorkspacePanelDrag = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
       const drag = workspaceDragStartRef.current;
       if (drag && event.currentTarget.hasPointerCapture(drag.pointerId)) {
         event.currentTarget.releasePointerCapture(drag.pointerId);
@@ -1819,6 +1869,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
 
   const workspaceDragZoneProps = useMemo(
     () => ({
+      onKeyboardMove: moveWorkspacePanelByKeyboard,
       onPointerCancel: cancelWorkspacePanelDrag,
       onPointerDown: startWorkspacePanelDrag,
       onPointerMove: moveWorkspacePanelDrag,
@@ -1827,6 +1878,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     [
       cancelWorkspacePanelDrag,
       finishWorkspacePanelDrag,
+      moveWorkspacePanelByKeyboard,
       moveWorkspacePanelDrag,
       startWorkspacePanelDrag,
     ],
@@ -1844,8 +1896,17 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     [workspaceDrag, workspaceDropTarget],
   );
 
+  const activeDashboardPresetId = useMemo(
+    () =>
+      DASHBOARD_LAYOUT_PRESETS.find((preset) =>
+        dashboardLayoutsEqual(dashboardLayout, preset.layout),
+      )?.id ?? null,
+    [dashboardLayout],
+  );
   const dashboardLayoutStyle = {
     "--events-column-width": `${dashboardLayout.rightColumnWidth}px`,
+    "--main-bottom-panel-height": `${dashboardLayout.mainBottomPanelHeight}px`,
+    "--side-bottom-panel-height": `${dashboardLayout.sideBottomPanelHeight}px`,
     "--side-middle-panel-height": `${dashboardLayout.sideMiddlePanelHeight}px`,
     "--side-top-panel-height": `${dashboardLayout.sideTopPanelHeight}px`,
     "--top-panel-height": `${dashboardLayout.topPanelHeight}px`,
@@ -1959,76 +2020,80 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   useEffect(() => {
     const scope = `${exchange}:${instrumentId}:${timeframe}`;
     let closed = false;
-    const socket = new WebSocket(
+    const disconnect = connectResilientWebSocket(
       stableCandleWebSocketUrl(exchange, instrumentId, timeframe, 20),
+      {
+        onMessage: (event) => {
+          if (closed) return;
+          try {
+            const frontendReceivedAt = Date.now();
+            const snapshot = JSON.parse(event.data) as CandlesResponse;
+            setCandleData((current) =>
+              current.scope === scope
+                ? {
+                    ...current,
+                    values: mergeCandles(current.values, snapshot.candles),
+                    source: current.source ?? snapshot.source,
+                    latency: snapshot.chartLatency,
+                  }
+                : current,
+            );
+            setCandleError(null);
+            const sample = candleDisplaySample(
+              "stable_candles",
+              snapshot,
+              frontendReceivedAt,
+            );
+            if (sample) {
+              scheduleDisplayTelemetry(`stable:${scope}:stream`, [sample]);
+            }
+          } catch {
+            setCandleError("A malformed stable candle snapshot was ignored.");
+          }
+        },
+        onError: () => setCandleError("Stable candle stream is reconnecting."),
+      },
     );
-
-    socket.addEventListener("message", (event) => {
-      if (closed) return;
-      try {
-        const frontendReceivedAt = Date.now();
-        const snapshot = JSON.parse(event.data) as CandlesResponse;
-        setCandleData((current) =>
-          current.scope === scope
-            ? {
-                ...current,
-                values: mergeCandles(current.values, snapshot.candles),
-                source: current.source ?? snapshot.source,
-                latency: snapshot.chartLatency,
-              }
-            : current,
-        );
-        setCandleError(null);
-        const sample = candleDisplaySample(
-          "stable_candles",
-          snapshot,
-          frontendReceivedAt,
-        );
-        if (sample) {
-          scheduleDisplayTelemetry(`stable:${scope}:stream`, [sample]);
-        }
-      } catch {
-        setCandleError("A malformed stable candle snapshot was ignored.");
-      }
-    });
 
     return () => {
       closed = true;
-      socket.close();
+      disconnect();
     };
   }, [exchange, instrumentId, timeframe]);
 
   useEffect(() => {
     const scope = `${exchange}:${instrumentId}:${timeframe}`;
     let closed = false;
-    const socket = new WebSocket(
-      candleWebSocketUrl(exchange, instrumentId, timeframe),
-    );
-
     setProvisionalData({ scope, values: [] });
-    socket.addEventListener("message", (event) => {
-      if (closed) return;
-      try {
-        const frontendReceivedAt = Date.now();
-        const snapshot = JSON.parse(event.data) as CandleStreamResponse;
-        setProvisionalData({ scope, values: snapshot.candles });
-        setCandleError(null);
-        const sample = candleDisplaySample(
-          "provisional_candles",
-          snapshot,
-          frontendReceivedAt,
-        );
-        if (sample) {
-          scheduleDisplayTelemetry(`provisional:${scope}:stream`, [sample]);
-        }
-      } catch {
-        setCandleError("A malformed live candle snapshot was ignored.");
-      }
-    });
+    const disconnect = connectResilientWebSocket(
+      candleWebSocketUrl(exchange, instrumentId, timeframe),
+      {
+        onMessage: (event) => {
+          if (closed) return;
+          try {
+            const frontendReceivedAt = Date.now();
+            const snapshot = JSON.parse(event.data) as CandleStreamResponse;
+            setProvisionalData({ scope, values: snapshot.candles });
+            setCandleError(null);
+            const sample = candleDisplaySample(
+              "provisional_candles",
+              snapshot,
+              frontendReceivedAt,
+            );
+            if (sample) {
+              scheduleDisplayTelemetry(`provisional:${scope}:stream`, [sample]);
+            }
+          } catch {
+            setCandleError("A malformed live candle snapshot was ignored.");
+          }
+        },
+        onError: () => setCandleError("Live candle stream is reconnecting."),
+      },
+    );
 
     return () => {
       closed = true;
-      socket.close();
+      disconnect();
     };
   }, [exchange, instrumentId, timeframe]);
 
@@ -2131,58 +2196,62 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   useEffect(() => {
     const scope = `${exchange}:${instrumentId}:${timeframe}`;
     let closed = false;
-    const socket = new WebSocket(
+    const disconnect = connectResilientWebSocket(
       metricsWebSocketUrl(exchange, instrumentId, timeframe, "default"),
+      {
+        onMessage: (event) => {
+          if (closed) return;
+          try {
+            const frontendReceivedAt = Date.now();
+            const snapshot = JSON.parse(event.data) as MetricsResponse;
+            setMetricsData({ scope, value: snapshot });
+            setMetricsLoading(false);
+            setMetricsError(null);
+            scheduleDisplayTelemetry(`metrics:${scope}:stream`, [
+              metricsDisplaySample("metrics", snapshot, frontendReceivedAt),
+            ]);
+          } catch {
+            setMetricsError("A malformed metrics snapshot was ignored.");
+          }
+        },
+        onError: () => setMetricsError("Metrics stream is reconnecting."),
+      },
     );
-
-    socket.addEventListener("message", (event) => {
-      if (closed) return;
-      try {
-        const frontendReceivedAt = Date.now();
-        const snapshot = JSON.parse(event.data) as MetricsResponse;
-        setMetricsData({ scope, value: snapshot });
-        setMetricsLoading(false);
-        setMetricsError(null);
-        scheduleDisplayTelemetry(`metrics:${scope}:stream`, [
-          metricsDisplaySample("metrics", snapshot, frontendReceivedAt),
-        ]);
-      } catch {
-        setMetricsError("A malformed metrics snapshot was ignored.");
-      }
-    });
 
     return () => {
       closed = true;
-      socket.close();
+      disconnect();
     };
   }, [exchange, instrumentId, timeframe]);
 
   useEffect(() => {
     const scope = `${exchange}:${instrumentId}:24h`;
     let closed = false;
-    const socket = new WebSocket(
+    const disconnect = connectResilientWebSocket(
       metricsWebSocketUrl(exchange, instrumentId, STATS_TIMEFRAME, "24h"),
+      {
+        onMessage: (event) => {
+          if (closed) return;
+          try {
+            const frontendReceivedAt = Date.now();
+            const snapshot = JSON.parse(event.data) as MetricsResponse;
+            setStatsData({ scope, value: snapshot });
+            setStatsLoading(false);
+            setStatsError(null);
+            scheduleDisplayTelemetry(`stats:${scope}:stream`, [
+              metricsDisplaySample("stats", snapshot, frontendReceivedAt),
+            ]);
+          } catch {
+            setStatsError("A malformed 24h statistics snapshot was ignored.");
+          }
+        },
+        onError: () => setStatsError("24h statistics stream is reconnecting."),
+      },
     );
-
-    socket.addEventListener("message", (event) => {
-      if (closed) return;
-      try {
-        const frontendReceivedAt = Date.now();
-        const snapshot = JSON.parse(event.data) as MetricsResponse;
-        setStatsData({ scope, value: snapshot });
-        setStatsLoading(false);
-        setStatsError(null);
-        scheduleDisplayTelemetry(`stats:${scope}:stream`, [
-          metricsDisplaySample("stats", snapshot, frontendReceivedAt),
-        ]);
-      } catch {
-        setStatsError("A malformed 24h statistics snapshot was ignored.");
-      }
-    });
 
     return () => {
       closed = true;
-      socket.close();
+      disconnect();
     };
   }, [exchange, instrumentId]);
 
@@ -2305,6 +2374,25 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       setInstrumentId(availableInstruments[0].instrumentId);
     }
   }, [availableInstruments, selectedInstrument]);
+
+  const searchedInstruments = useMemo(() => {
+    const query = assetSearch.trim().toLowerCase();
+    if (!query) return availableInstruments.slice(0, 8);
+    return availableInstruments
+      .filter((item) =>
+        [item.base, item.quote, item.name, item.instrumentId].some((value) =>
+          value.toLowerCase().includes(query),
+        ),
+      )
+      .slice(0, 8);
+  }, [assetSearch, availableInstruments]);
+
+  const selectInstrument = useCallback((nextInstrumentId: string) => {
+    setInstrumentId(nextInstrumentId);
+    setInstrumentMenuOpen(false);
+    setAssetSearchOpen(false);
+    setAssetSearch("");
+  }, []);
 
   const marketMap = useMemo(
     () => new Map(markets.map((market) => [marketKey(market), market])),
@@ -2607,8 +2695,74 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <span className="product-kicker">TICKFRAME ANALYTICS</span>
             <p>Crypto pattern analytics - public market data</p>
           </div>
-          <div className="topbar-search" aria-hidden="true">
-            Search assets
+          <div
+            className={`topbar-search ${assetSearchOpen ? "open" : ""}`}
+            onBlur={(event) => {
+              const nextTarget = event.relatedTarget;
+              if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+                setAssetSearchOpen(false);
+              }
+            }}
+          >
+            <input
+              aria-label="Search assets"
+              autoComplete="off"
+              name="asset-search"
+              placeholder="Search BTC, ETH, SOL…"
+              spellCheck={false}
+              type="search"
+              value={assetSearch}
+              onChange={(event) => {
+                setAssetSearch(event.target.value);
+                setAssetSearchOpen(true);
+              }}
+              onFocus={() => setAssetSearchOpen(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setAssetSearchOpen(false);
+                  event.currentTarget.blur();
+                }
+                if (event.key === "Enter" && searchedInstruments[0]) {
+                  event.preventDefault();
+                  selectInstrument(searchedInstruments[0].instrumentId);
+                }
+              }}
+            />
+            {assetSearchOpen && (
+              <div
+                className="asset-search-results"
+                role="listbox"
+                aria-label="Matching assets"
+              >
+                {searchedInstruments.length > 0 ? (
+                  searchedInstruments.map((item) => {
+                    const itemMarket = marketMap.get(
+                      `${exchange}:${item.instrumentId}`,
+                    );
+                    return (
+                      <button
+                        aria-selected={item.instrumentId === instrumentId}
+                        key={item.instrumentId}
+                        role="option"
+                        type="button"
+                        onClick={() => selectInstrument(item.instrumentId)}
+                      >
+                        <CoinLogo base={item.base} className="coin-logo-xs" />
+                        <span>
+                          <strong>{item.base}/{item.quote}</strong>
+                          <small>{item.name}</small>
+                        </span>
+                        <b>
+                          {formatPrice(coerceNumber(itemMarket?.price ?? null))}
+                        </b>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p>No assets match “{assetSearch.trim()}”.</p>
+                )}
+              </div>
+            )}
           </div>
           <div className="topbar-meta">
             <span className="user-chip">
@@ -2673,8 +2827,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                         item.instrumentId === instrumentId ? "selected" : ""
                       }
                       onClick={() => {
-                        setInstrumentId(item.instrumentId);
-                        setInstrumentMenuOpen(false);
+                        selectInstrument(item.instrumentId);
                       }}
                     >
                       <span className="instrument-token">
@@ -2694,7 +2847,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <span className="eyebrow">LAST TRADE - {exchange.toUpperCase()}</span>
             <strong>{formatPrice(livePrice)}</strong>
             <span className={viewportChange !== null && viewportChange < 0 ? "negative" : "positive"}>
-              {formatPercent(viewportChange)} viewport
+              {formatPercent(viewportChange)} chart range
             </span>
           </div>
 
@@ -2779,30 +2932,36 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                       </button>
                     ))}
                   </div>
-                  <DashboardLayoutMenu
+                  <DashboardPresetMenu
+                    activePresetId={activeDashboardPresetId}
                     open={layoutMenuOpen}
-                    layout={dashboardLayout}
-                    onToggle={() => setLayoutMenuOpen((open) => !open)}
-                    onPreset={applyDashboardLayoutPreset}
+                    onOpenChange={setLayoutMenuOpen}
+                    onSelect={applyDashboardLayoutPreset}
                     onReset={resetDashboardLayout}
-                    onMainSlotChange={setMainPanelSlot}
-                    onSideSlotChange={setSidePanelSlot}
-                    onChartHeightChange={setDashboardChartHeight}
-                    onRailWidthChange={setDashboardRailWidth}
-                    onSideMiddleHeightChange={setDashboardSideMiddleHeight}
-                    onSideTopHeightChange={setDashboardSideTopHeight}
                   />
                 </div>
               </div>
-              <MarketChart
-                candles={chartBootstrapping ? [] : displayCandles}
-                scopeKey={candleScope}
-                loading={chartBootstrapping}
-                historyLoading={historyLoading}
-                hasMore={hasMoreHistory}
-                onLoadEarlier={loadEarlier}
-                alertLines={chartAlertLines}
-              />
+              <Suspense
+                fallback={
+                  <div className="chart-stage">
+                    <div className="chart-empty chart-loading">
+                      <span className="loading-line" />
+                      <span className="loading-line short" />
+                      <span className="loading-line" />
+                    </div>
+                  </div>
+                }
+              >
+                <MarketChart
+                  candles={chartBootstrapping ? [] : displayCandles}
+                  scopeKey={candleScope}
+                  loading={chartBootstrapping}
+                  historyLoading={historyLoading}
+                  hasMore={hasMoreHistory}
+                  onLoadEarlier={loadEarlier}
+                  alertLines={chartAlertLines}
+                />
+              </Suspense>
               <div className="chart-foot">
                 <span>
                   <i className="legend-box up" /> Up
@@ -2810,7 +2969,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 <span>
                   <i className="legend-box down" /> Down
                 </span>
-                <span>{displayCandles.length} bars</span>
+                <span>{chartCandles.length} bars</span>
                 <span>{gapCount} gaps</span>
                 <span>{candleData.source ?? "loading"} history</span>
                 {provisionalCandles.length > 0 && <span>live overlay</span>}
@@ -2824,9 +2983,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "main-split"}
               handle="main-split"
-              label="Resize main panels"
-              orientation="horizontal"
               style={{ order: 1 }}
+              value={dashboardLayout.topPanelHeight}
               {...workspaceResizeProps}
             />
 
@@ -2894,7 +3052,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                         ? "--"
                         : latestMetrics.rsi.toFixed(1)}
                     </strong>
-                    <small>momentum state</small>
+                    <small>{rsiState(latestMetrics?.rsi)}</small>
                   </div>
                   <div className="metric-card">
                     <span>Short momentum</span>
@@ -2904,12 +3062,12 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                         true,
                       )}
                     </strong>
-                    <small>{statsMetrics?.windows.momentum ?? "--"} bar window</small>
+                    <small>{statsMetrics?.windows.shortMomentum ?? "--"} bar window</small>
                   </div>
                   <div className="metric-card">
                     <span>Volume spike</span>
                     <strong>{formatRatio(latestMetrics?.volumeSpikeRatio ?? null)}</strong>
-                    <small>{metricEvents.length} live events</small>
+                    <small>{volumeState(latestMetrics?.volumeSpikeRatio)}</small>
                   </div>
                 </div>
 
@@ -3038,13 +3196,19 @@ function Dashboard({ session, onLogout }: DashboardProps) {
               </div>
               </div>
             </article>
+            <WorkspaceResizeHandle
+              active={workspaceResizeHandle === "main-bottom"}
+              handle="main-bottom"
+              style={{ order: 3 }}
+              value={dashboardLayout.mainBottomPanelHeight}
+              {...workspaceResizeProps}
+            />
           </div>
 
           <WorkspaceResizeHandle
             active={workspaceResizeHandle === "rail-width"}
             handle="rail-width"
-            label="Resize right rail"
-            orientation="vertical"
+            value={dashboardLayout.rightColumnWidth}
             {...workspaceResizeProps}
           />
 
@@ -3124,16 +3288,38 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                       </div>
                     )}
                 </div>
-
+                <div className="ml-pattern-meta" aria-label="ML detector details">
+                  <span>
+                    Window
+                    <strong>
+                      {mlPattern?.candleCount ?? "--"}/{mlPattern?.windowSize ?? 96}
+                    </strong>
+                  </span>
+                  <span>
+                    Threshold
+                    <strong>
+                      {formatConfidence(mlPattern?.confidenceThreshold ?? null)}
+                    </strong>
+                  </span>
+                  <span>
+                    Confidence
+                    <strong>
+                      {formatConfidence(
+                        mlPattern?.status === "pattern_detected"
+                          ? mlPattern.prediction?.confidence ?? null
+                          : null,
+                      )}
+                    </strong>
+                  </span>
+                </div>
               </div>
             </article>
 
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "side-top"}
               handle="side-top"
-              label="Resize top right panel"
-              orientation="horizontal"
               style={{ order: 1 }}
+              value={dashboardLayout.sideTopPanelHeight}
               {...workspaceResizeProps}
             />
 
@@ -3327,9 +3513,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "side-middle"}
               handle="side-middle"
-              label="Resize middle right panel"
-              orientation="horizontal"
               style={{ order: 3 }}
+              value={dashboardLayout.sideMiddlePanelHeight}
               {...workspaceResizeProps}
             />
             <article
@@ -3381,8 +3566,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                       </div>
                       <p>{event.description}</p>
                       <footer>
-                        <span>{event.metric}</span>
-                        <b>{event.value === null ? "--" : event.value.toFixed(2)}</b>
+                        <span>{metricDisplayLabel(event.metric)}</span>
+                        <b>{formatMetricEventValue(event)}</b>
                         <span>{formatConfidence(event.confidence)}</span>
                       </footer>
                     </article>
@@ -3400,6 +3585,13 @@ function Dashboard({ session, onLogout }: DashboardProps) {
               )}
               </div>
             </article>
+            <WorkspaceResizeHandle
+              active={workspaceResizeHandle === "side-bottom"}
+              handle="side-bottom"
+              style={{ order: 5 }}
+              value={dashboardLayout.sideBottomPanelHeight}
+              {...workspaceResizeProps}
+            />
           </aside>
         </section>
         ) : (
@@ -3671,8 +3863,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                       </div>
                       <p>{event.description}</p>
                       <footer>
-                        <span>{event.metric}</span>
-                        <b>{event.value === null ? "--" : event.value.toFixed(2)}</b>
+                        <span>{metricDisplayLabel(event.metric)}</span>
+                        <b>{formatMetricEventValue(event)}</b>
                         <span>{formatConfidence(event.confidence)}</span>
                       </footer>
                     </article>
@@ -3780,7 +3972,7 @@ function AuthScreen({
             displayName: displayName.trim() || undefined,
           })
         : await login({ email, password });
-      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, response.token);
+      safeStorageSet(AUTH_TOKEN_STORAGE_KEY, response.token);
       onAuthenticated(response);
     } catch (requestError) {
       setError(readableError(requestError));
@@ -3791,7 +3983,7 @@ function AuthScreen({
 
   const handleGuest = () => {
     setError(null);
-    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, GUEST_AUTH_TOKEN);
+    safeStorageSet(AUTH_TOKEN_STORAGE_KEY, GUEST_AUTH_TOKEN);
     onAuthenticated(GUEST_AUTH_RESPONSE);
   };
 
@@ -3893,7 +4085,7 @@ function AuthScreen({
 
             <button className="auth-submit" type="submit" disabled={loading}>
               {loading
-                ? "Please wait..."
+                ? "Please wait…"
                 : isRegister
                   ? "Create account"
                   : "Sign in"}
@@ -3919,7 +4111,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    const token = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    const token = safeStorageGet(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
       setAuthLoading(false);
       return;
@@ -3936,7 +4128,7 @@ export default function App() {
         setSession({ token, user: response.user });
       })
       .catch(() => {
-        window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+        safeStorageRemove(AUTH_TOKEN_STORAGE_KEY);
         setSession(null);
       })
       .finally(() => setAuthLoading(false));
@@ -3950,7 +4142,7 @@ export default function App() {
 
   const handleLogout = useCallback(() => {
     const token = session?.token;
-    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    safeStorageRemove(AUTH_TOKEN_STORAGE_KEY);
     setSession(null);
     if (token && token !== GUEST_AUTH_TOKEN) {
       void logout(token).catch(() => undefined);
