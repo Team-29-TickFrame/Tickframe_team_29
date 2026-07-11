@@ -25,7 +25,10 @@ import {
   register,
   stableCandleWebSocketUrl,
 } from "./api";
-import MarketChart, { type ChartAlertLine } from "./components/MarketChart";
+import MarketChart, {
+  type ChartAlertLine,
+  type ChartPatternLine,
+} from "./components/MarketChart";
 import type {
   AuthResponse,
   AuthUser,
@@ -806,6 +809,171 @@ function patternLabel(value: string): string {
     .split("_")
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+type MlPatternAnchor = NonNullable<
+  MlPatternResponse["ruleBased"]
+>["anchors"][number];
+
+function buildPatternLines(pattern: MlPatternResponse | null): ChartPatternLine[] {
+  if (
+    !pattern?.prediction ||
+    !pattern.ruleBased ||
+    pattern.status !== "pattern_detected" ||
+    pattern.prediction.label !== pattern.ruleBased.label
+  ) {
+    return [];
+  }
+
+  const anchors = new Map(
+    pattern.ruleBased.anchors.map((anchor) => [anchor.name, anchor]),
+  );
+  const lines: ChartPatternLine[] = [];
+  const windowStartTime =
+    pattern.dataFrom !== null && pattern.dataFrom !== undefined
+      ? pattern.dataFrom / 1000
+      : null;
+  const windowEndTime =
+    pattern.dataTo !== null && pattern.dataTo !== undefined
+      ? pattern.dataTo / 1000
+      : null;
+  const point = (
+    name: string,
+    priceField: "high" | "low" | "close",
+  ): { time: number; price: number } | null => {
+    const anchor = anchors.get(name);
+    if (!anchor) return null;
+    const price = anchor[priceField];
+    if (price === null || !Number.isFinite(price)) return null;
+    return {
+      time: anchor.openTime / 1000,
+      price,
+    };
+  };
+  const horizontalPoint = (
+    timeAnchor: MlPatternAnchor | undefined,
+    price: number | null,
+  ): { time: number; price: number } | null => {
+    if (!timeAnchor || price === null || !Number.isFinite(price)) return null;
+    return {
+      time: timeAnchor.openTime / 1000,
+      price,
+    };
+  };
+  const windowPoint = (
+    time: number | null,
+    price: number | null,
+  ): { time: number; price: number } | null => {
+    if (time === null || price === null || !Number.isFinite(price)) return null;
+    return { time, price };
+  };
+  const projectedPoint = (
+    start: { time: number; price: number } | null,
+    end: { time: number; price: number } | null,
+    time: number | null,
+  ): { time: number; price: number } | null => {
+    if (!start || !end || time === null) return null;
+    const span = end.time - start.time;
+    if (span === 0) return { time, price: start.price };
+    const progress = (time - start.time) / span;
+    return {
+      time,
+      price: start.price + (end.price - start.price) * progress,
+    };
+  };
+  const pushLine = (
+    id: string,
+    start: { time: number; price: number } | null,
+    end: { time: number; price: number } | null,
+  ) => {
+    if (!start || !end) return;
+    lines.push({ id, points: [start, end] });
+  };
+
+  if (pattern.prediction.label === "double_bottom") {
+    const left = anchors.get("left_bottom");
+    const neckline = anchors.get("neckline");
+    const breakout = anchors.get("breakout") ?? anchors.get("right_bottom");
+    const supportPrice =
+      left?.low !== null && left?.low !== undefined
+        ? (left.low + (anchors.get("right_bottom")?.low ?? left.low)) / 2
+        : null;
+    pushLine(
+      "pattern-double-bottom-support",
+      windowPoint(windowStartTime, supportPrice),
+      windowPoint(windowEndTime, supportPrice),
+    );
+    pushLine(
+      "pattern-double-bottom-neckline",
+      windowPoint(windowStartTime, neckline?.high ?? null),
+      horizontalPoint(breakout, neckline?.high ?? null),
+    );
+  } else if (pattern.prediction.label === "double_top") {
+    const left = anchors.get("left_top");
+    const neckline = anchors.get("neckline");
+    const breakout = anchors.get("breakout") ?? anchors.get("right_top");
+    const resistancePrice =
+      left?.high !== null && left?.high !== undefined
+        ? (left.high + (anchors.get("right_top")?.high ?? left.high)) / 2
+        : null;
+    pushLine(
+      "pattern-double-top-resistance",
+      windowPoint(windowStartTime, resistancePrice),
+      windowPoint(windowEndTime, resistancePrice),
+    );
+    pushLine(
+      "pattern-double-top-neckline",
+      windowPoint(windowStartTime, neckline?.low ?? null),
+      horizontalPoint(breakout, neckline?.low ?? null),
+    );
+  } else if (pattern.prediction.label === "head_and_shoulders") {
+    pushLine(
+      "pattern-hs-left-head",
+      point("left_shoulder", "high"),
+      point("head", "high"),
+    );
+    pushLine(
+      "pattern-hs-head-right",
+      point("head", "high"),
+      point("right_shoulder", "high"),
+    );
+    pushLine(
+      "pattern-hs-neckline",
+      projectedPoint(
+        point("left_neckline", "low"),
+        point("right_neckline", "low"),
+        windowStartTime,
+      ),
+      projectedPoint(
+        point("left_neckline", "low"),
+        point("right_neckline", "low"),
+        windowEndTime,
+      ),
+    );
+  } else if (pattern.prediction.label === "triangle") {
+    const firstHigh = point("first_pivot_high", "high");
+    const lastHigh = point("last_pivot_high", "high");
+    const firstLow = point("first_pivot_low", "low");
+    const lastLow = point("last_pivot_low", "low");
+    pushLine(
+      "pattern-triangle-upper",
+      projectedPoint(firstHigh, lastHigh, windowStartTime),
+      projectedPoint(firstHigh, lastHigh, windowEndTime),
+    );
+    pushLine(
+      "pattern-triangle-lower",
+      projectedPoint(firstLow, lastLow, windowStartTime),
+      projectedPoint(firstLow, lastLow, windowEndTime),
+    );
+  } else if (pattern.prediction.label === "flag") {
+    pushLine(
+      "pattern-flag-impulse",
+      point("impulse_start", "close"),
+      point("impulse_end", "close"),
+    );
+  }
+
+  return lines;
 }
 
 function formatAge(value: number | null | undefined): string {
@@ -2206,6 +2374,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const mlPatternScope = `${exchange}:${instrumentId}:${timeframe}:${latestClosedCandleTime ?? "none"}`;
   const mlPattern =
     mlPatternData.scope === mlPatternScope ? mlPatternData.value : null;
+  const patternLines = useMemo(() => buildPatternLines(mlPattern), [mlPattern]);
 
   useEffect(() => {
     let active = true;
@@ -2802,6 +2971,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 hasMore={hasMoreHistory}
                 onLoadEarlier={loadEarlier}
                 alertLines={chartAlertLines}
+                patternLines={patternLines}
               />
               <div className="chart-foot">
                 <span>
