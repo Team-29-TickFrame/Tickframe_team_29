@@ -1,4 +1,6 @@
+import asyncio
 import unittest
+from unittest.mock import patch
 from decimal import Decimal
 
 from backend.app.config import load_config
@@ -115,6 +117,19 @@ class FakeWebsocket:
         self.sent.append(payload)
 
 
+class ScriptedWebsocket(FakeWebsocket):
+    def __init__(self, messages: list[str]) -> None:
+        super().__init__()
+        self.messages = messages
+
+    def __aiter__(self):
+        return self._messages()
+
+    async def _messages(self):
+        for message in self.messages:
+            yield message
+
+
 class BybitCollectorTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.config = load_config()
@@ -157,6 +172,51 @@ class BybitCollectorTests(unittest.IsolatedAsyncioTestCase):
             "Invalid symbol :[publicTrade.GRAMUSDT]",
         )
         self.assertFalse(self.collector.is_instrument_active("GRAM-USDT"))
+
+    async def test_malformed_message_does_not_stop_bybit_consumer(self) -> None:
+        trades = []
+
+        async def capture(trade):
+            trades.append(trade)
+
+        self.collector.on_trade = capture
+        websocket = ScriptedWebsocket(
+            [
+                "{invalid-json",
+                '{"topic":"publicTrade.BTCUSDT","data":'
+                '[{"s":"BTCUSDT","i":"trade-1","T":1700000000000,'
+                '"p":"64000","v":"0.01","S":"Buy"}]}',
+            ]
+        )
+
+        with self.assertLogs("backend.app.exchanges.base", level="WARNING"):
+            await self.collector._consume_messages(websocket)
+
+        self.assertEqual(self.collector.invalid_messages, 1)
+        self.assertEqual(len(trades), 1)
+        self.assertEqual(trades[0].instrument_id, "BTC-USDT")
+
+    async def test_heartbeat_failure_cancels_message_consumer(self) -> None:
+        consumer_cancelled = asyncio.Event()
+
+        async def blocking_consumer(_websocket):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                consumer_cancelled.set()
+
+        async def broken_heartbeat(_websocket):
+            await asyncio.sleep(0)
+            raise RuntimeError("heartbeat failed")
+
+        with (
+            patch.object(self.collector, "_consume_messages", blocking_consumer),
+            patch.object(self.collector, "_heartbeat", broken_heartbeat),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "heartbeat failed"):
+                await self.collector._run_stream_tasks(FakeWebsocket())
+
+        self.assertTrue(consumer_cancelled.is_set())
 
 
 if __name__ == "__main__":

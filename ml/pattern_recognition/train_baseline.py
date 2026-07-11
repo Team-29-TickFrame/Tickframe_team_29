@@ -169,9 +169,7 @@ def resolve_config(
     if args.seed is not None:
         resolved["seed"] = args.seed
     if args.smoke:
-        resolved["maxExamplesPerClass"] = min(
-            int(resolved["maxExamplesPerClass"]), 24
-        )
+        resolved["maxExamplesPerClass"] = min(int(resolved["maxExamplesPerClass"]), 24)
         resolved["outputDir"] = str(Path(str(resolved["outputDir"])) / "smoke")
     return resolved
 

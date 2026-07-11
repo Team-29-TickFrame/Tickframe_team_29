@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+import asyncio
 import unittest
+from unittest.mock import AsyncMock
 
 from backend.app.database import DatabaseWriter
 
@@ -106,6 +108,58 @@ class RawTradeRepairTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(repaired, 0)
+
+
+class DatabaseWriterLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shutdown_does_not_hang_when_database_keeps_failing(self) -> None:
+        class FakeEngine:
+            def __init__(self) -> None:
+                self.dispose = AsyncMock()
+
+        writer = DatabaseWriter(
+            database_url="postgresql+asyncpg://unused",
+            shutdown_timeout_seconds=0.01,
+        )
+        writer.engine = FakeEngine()  # type: ignore[assignment]
+        writer._accepting_events = True
+        writer._write_batch = AsyncMock(side_effect=RuntimeError("database down"))
+        writer._task = asyncio.create_task(writer._run())
+        await writer.queue.put(("metrics", {}))
+        await asyncio.sleep(0)
+
+        with self.assertLogs("backend.app.database", level="ERROR"):
+            await asyncio.wait_for(writer.stop(), timeout=0.5)
+
+        self.assertIsNone(writer._task)
+        self.assertIsNone(writer.engine)
+        self.assertGreaterEqual(writer.dropped_events, 1)
+        self.assertIn("timed out", writer.last_error)
+
+    async def test_enqueue_rejects_events_when_writer_task_is_dead(self) -> None:
+        writer = DatabaseWriter(database_url="postgresql+asyncpg://unused")
+        writer.engine = object()  # type: ignore[assignment]
+        writer._accepting_events = True
+
+        await writer.enqueue_metrics({})
+
+        self.assertEqual(writer.queue.qsize(), 0)
+        self.assertEqual(writer.dropped_events, 1)
+
+    async def test_invalid_batch_is_dropped_without_poisoning_writer(self) -> None:
+        writer = DatabaseWriter(database_url="postgresql+asyncpg://unused")
+        writer._write_batch = AsyncMock(side_effect=ValueError("invalid payload"))
+        writer._task = asyncio.create_task(writer._run())
+        await writer.queue.put(("metrics", {}))
+
+        with self.assertLogs("backend.app.database", level="ERROR"):
+            await asyncio.wait_for(writer.queue.join(), timeout=0.5)
+
+        self.assertFalse(writer._task.done())
+        self.assertEqual(writer.dropped_events, 1)
+        self.assertIn("Discarded invalid database batch", writer.last_error)
+        writer._task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await writer._task
 
 
 class HistorySourceTests(unittest.TestCase):

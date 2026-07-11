@@ -13,12 +13,14 @@ import type {
 } from "./types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 interface RequestOptions {
   signal?: AbortSignal;
   method?: "GET" | "POST";
   body?: unknown;
   token?: string;
+  timeoutMs?: number;
 }
 
 async function request<T>(
@@ -35,19 +37,36 @@ async function request<T>(
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    signal: options.signal,
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with ${response.status}`);
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) {
+    abortFromCaller();
+  } else {
+    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
   }
+  const timeout = window.setTimeout(
+    () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+    Math.max(1, options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
+  );
 
-  return (await response.json()) as T;
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Request failed with ${response.status}`);
+    }
+
+    return (await response.json()) as T;
+  } finally {
+    window.clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
 }
 
 export function fetchInstruments(signal?: AbortSignal) {

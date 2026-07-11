@@ -1,4 +1,6 @@
+import asyncio
 import base64
+import binascii
 import hashlib
 import hmac
 import os
@@ -15,6 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 PASSWORD_ITERATIONS = 260_000
 MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_LENGTH = 1_024
+MAX_EMAIL_LENGTH = 320
+MAX_DISPLAY_NAME_LENGTH = 80
+MAX_HASH_ITERATIONS = 2_000_000
+DUMMY_PASSWORD_HASH = (
+    "pbkdf2_sha256$260000$dGlja2ZyYW1lLWR1bW15LXNhbHQ="
+    "$9n0k2vqmFStbaI4CAqV5KmBWmUuRWj2/KqmdSZKUA9g="
+)
 
 
 class AuthError(Exception):
@@ -60,7 +70,15 @@ class _SessionRecord:
 
 def normalize_email(email: str) -> str:
     value = email.strip().lower()
-    if "@" not in value or value.startswith("@") or value.endswith("@"):
+    local, separator, domain = value.rpartition("@")
+    if (
+        not separator
+        or value.count("@") != 1
+        or not local
+        or not domain
+        or len(value) > MAX_EMAIL_LENGTH
+        or any(character.isspace() for character in value)
+    ):
         raise ValueError("A valid email address is required")
     return value
 
@@ -68,6 +86,8 @@ def normalize_email(email: str) -> str:
 def validate_password(password: str) -> None:
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at most {MAX_PASSWORD_LENGTH} characters")
 
 
 def hash_password(password: str) -> str:
@@ -93,15 +113,18 @@ def verify_password(password: str, stored_hash: str) -> bool:
         algorithm, iterations, salt_value, digest_value = stored_hash.split("$")
         if algorithm != "pbkdf2_sha256":
             return False
-        salt = base64.b64decode(salt_value.encode("ascii"))
-        expected = base64.b64decode(digest_value.encode("ascii"))
+        parsed_iterations = int(iterations)
+        if not 1 <= parsed_iterations <= MAX_HASH_ITERATIONS:
+            return False
+        salt = base64.b64decode(salt_value.encode("ascii"), validate=True)
+        expected = base64.b64decode(digest_value.encode("ascii"), validate=True)
         actual = hashlib.pbkdf2_hmac(
             "sha256",
             password.encode("utf-8"),
             salt,
-            int(iterations),
+            parsed_iterations,
         )
-    except (ValueError, TypeError):
+    except (binascii.Error, OverflowError, TypeError, ValueError):
         return False
     return hmac.compare_digest(actual, expected)
 
@@ -117,9 +140,14 @@ class AuthService:
         session_ttl_days: Optional[int] = None,
     ) -> None:
         self.database_url = database_url or os.getenv("DATABASE_URL")
-        self.session_ttl = timedelta(
-            days=session_ttl_days or int(os.getenv("TICKFRAME_AUTH_SESSION_DAYS", "7"))
+        ttl_days = (
+            session_ttl_days
+            if session_ttl_days is not None
+            else int(os.getenv("TICKFRAME_AUTH_SESSION_DAYS", "7"))
         )
+        if not 1 <= ttl_days <= 365:
+            raise ValueError("TICKFRAME_AUTH_SESSION_DAYS must be between 1 and 365")
+        self.session_ttl = timedelta(days=ttl_days)
         self.engine: Optional[AsyncEngine] = None
         self._users_by_email: Dict[str, _UserRecord] = {}
         self._users_by_id: Dict[str, _UserRecord] = {}
@@ -128,12 +156,20 @@ class AuthService:
     async def start(self) -> None:
         if not self.database_url:
             return
+        if self.engine is not None:
+            return
         self.engine = create_async_engine(self.database_url, pool_pre_ping=True)
-        await self.ensure_schema()
+        try:
+            await self.ensure_schema()
+        except Exception:
+            await self.engine.dispose()
+            self.engine = None
+            raise
 
     async def stop(self) -> None:
         if self.engine is not None:
             await self.engine.dispose()
+            self.engine = None
 
     async def ensure_schema(self) -> None:
         if self.engine is None:
@@ -185,11 +221,15 @@ class AuthService:
         normalized_email = normalize_email(email)
         validate_password(password)
         public_name = (
-            display_name.strip()
+            " ".join(display_name.split())
             if display_name and display_name.strip()
             else normalized_email.split("@", 1)[0]
         )
-        password_hash = hash_password(password)
+        if len(public_name) > MAX_DISPLAY_NAME_LENGTH:
+            raise ValueError(
+                f"Display name must be at most {MAX_DISPLAY_NAME_LENGTH} characters"
+            )
+        password_hash = await asyncio.to_thread(hash_password, password)
 
         if self.engine is not None:
             user = await self._register_database_user(
@@ -208,7 +248,12 @@ class AuthService:
     async def login(self, *, email: str, password: str) -> Dict[str, object]:
         normalized_email = normalize_email(email)
         record = await self._get_user_record_by_email(normalized_email)
-        if record is None or not verify_password(password, record.password_hash):
+        valid_password = await asyncio.to_thread(
+            verify_password,
+            password,
+            record.password_hash if record is not None else DUMMY_PASSWORD_HASH,
+        )
+        if record is None or not valid_password:
             raise AuthInvalidCredentials("Invalid email or password")
         return await self._issue_auth_response(record.user)
 
@@ -240,6 +285,7 @@ class AuthService:
             or session.revoked_at is not None
             or session.expires_at <= now
         ):
+            self._sessions.pop(token_hash, None)
             return None
         record = self._users_by_id.get(session.user_id)
         return None if record is None else record.user
@@ -366,6 +412,12 @@ class AuthService:
                     },
                 )
         else:
+            now = datetime.now(timezone.utc)
+            self._sessions = {
+                key: session
+                for key, session in self._sessions.items()
+                if session.revoked_at is None and session.expires_at > now
+            }
             self._sessions[token_hash] = _SessionRecord(
                 user_id=user.id,
                 expires_at=expires_at,

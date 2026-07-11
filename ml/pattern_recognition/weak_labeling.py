@@ -276,7 +276,11 @@ def _flag(closes: Sequence[float], volumes: Sequence[float]) -> WeakLabel:
     return WeakLabel(
         label="flag",
         score=round(min(score, 0.95), 6),
-        anchors={"impulse_start": 0, "impulse_end": impulse_end, "flag_end": len(closes) - 1},
+        anchors={
+            "impulse_start": 0,
+            "impulse_end": impulse_end,
+            "flag_end": len(closes) - 1,
+        },
         reason=(
             f"impulse_return={impulse_return:.3f}; "
             f"post_impulse_return={post_return:.3f}; "
@@ -294,10 +298,14 @@ def _pivot_indices(
         right = values[index + 1 : index + radius + 1]
         center = values[index]
         if pivot_type == "high":
-            if all(center > value for value in left) and all(center >= value for value in right):
+            if all(center > value for value in left) and all(
+                center >= value for value in right
+            ):
                 pivots.append(index)
         else:
-            if all(center < value for value in left) and all(center <= value for value in right):
+            if all(center < value for value in left) and all(
+                center <= value for value in right
+            ):
                 pivots.append(index)
     return pivots
 

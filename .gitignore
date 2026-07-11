@@ -12,6 +12,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .hypothesis/
+.coverage
+coverage.json
+coverage.xml
+htmlcov/
 .DS_Store
 Thumbs.db
 

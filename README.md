@@ -223,6 +223,7 @@ Useful checks:
 
 ```bash
 cd frontend
+npm test
 npm run build
 
 cd ..

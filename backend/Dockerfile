@@ -8,9 +8,14 @@ WORKDIR /app
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN python -m pip install --no-cache-dir -r /app/backend/requirements.txt
 
-COPY backend /app/backend
-COPY ml /app/ml
+RUN addgroup --system tickframe \
+    && adduser --system --ingroup tickframe --home /app tickframe
+
+COPY --chown=tickframe:tickframe backend /app/backend
+COPY --chown=tickframe:tickframe ml /app/ml
+
+USER tickframe
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "alembic -c backend/alembic.ini upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic -c backend/alembic.ini upgrade head && exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]

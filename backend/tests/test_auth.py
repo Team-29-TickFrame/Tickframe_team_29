@@ -15,6 +15,27 @@ class AuthTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(verify_password("correct-horse", stored))
         self.assertFalse(verify_password("wrong-password", stored))
+        self.assertFalse(verify_password("password", "not-a-valid-hash"))
+        self.assertFalse(verify_password("password", "pbkdf2_sha256$999999999$bad$bad"))
+
+    async def test_registration_rejects_oversized_inputs(self) -> None:
+        service = AuthService(database_url=None)
+
+        with self.assertRaisesRegex(ValueError, "at most"):
+            await service.register(
+                email="user@example.com",
+                password="x" * 1_025,
+            )
+        with self.assertRaisesRegex(ValueError, "Display name"):
+            await service.register(
+                email="user@example.com",
+                password="strong-password",
+                display_name="x" * 81,
+            )
+
+    def test_session_ttl_is_bounded(self) -> None:
+        with self.assertRaisesRegex(ValueError, "between 1 and 365"):
+            AuthService(database_url=None, session_ttl_days=0)
 
     async def test_memory_register_login_and_current_user(self) -> None:
         service = AuthService(database_url=None)

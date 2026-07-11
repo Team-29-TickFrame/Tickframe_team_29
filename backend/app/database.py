@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 from datetime import datetime
 from decimal import Decimal
@@ -29,6 +30,7 @@ SQL_INTERVALS = {
     "5s": "5 seconds",
     "15s": "15 seconds",
 }
+LOGGER = logging.getLogger(__name__)
 
 
 class DatabaseWriter:
@@ -37,9 +39,11 @@ class DatabaseWriter:
         database_url: Optional[str] = None,
         queue_size: int = 200_000,
         batch_size: int = 1000,
+        shutdown_timeout_seconds: float = 15.0,
     ) -> None:
         self.database_url = database_url or os.getenv("DATABASE_URL")
         self.batch_size = batch_size
+        self.shutdown_timeout_seconds = max(0.1, float(shutdown_timeout_seconds))
         self.queue: "asyncio.Queue[DatabaseEvent]" = asyncio.Queue(maxsize=queue_size)
         self.engine: Optional[AsyncEngine] = None
         self.connected = False
@@ -49,10 +53,15 @@ class DatabaseWriter:
         self.written_metric_points = 0
         self.written_metric_events = 0
         self.written_metric_summaries = 0
+        self.dropped_events = 0
+        self._inflight_events = 0
         self._task: Optional[asyncio.Task] = None
+        self._accepting_events = False
 
     async def start(self) -> None:
         if not self.database_url:
+            return
+        if self._task is not None and not self._task.done():
             return
         self.engine = create_async_engine(
             self.database_url,
@@ -60,34 +69,67 @@ class DatabaseWriter:
             pool_size=5,
             max_overflow=5,
         )
-        async with self.engine.connect() as connection:
-            await connection.execute(text("SELECT 1"))
+        try:
+            async with self.engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+        except Exception as error:
+            self.connected = False
+            self.last_error = str(error)
+            await self.engine.dispose()
+            self.engine = None
+            raise
         self.connected = True
+        self.last_error = None
+        self._accepting_events = True
         self._task = asyncio.create_task(self._run(), name="database-writer")
 
     async def stop(self) -> None:
-        if self._task is not None:
-            await self.queue.join()
-            self._task.cancel()
+        self._accepting_events = False
+        task = self._task
+        self._task = None
+        if task is not None:
             try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+                await asyncio.wait_for(
+                    self.queue.join(),
+                    timeout=self.shutdown_timeout_seconds,
+                )
+            except asyncio.TimeoutError:
+                self.last_error = (
+                    "Database writer shutdown timed out with "
+                    f"{self.queue.qsize() + self._inflight_events} pending events"
+                )
+                LOGGER.error(self.last_error)
+            finally:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                except Exception as error:
+                    self.last_error = f"Database writer stopped unexpectedly: {error}"
+                    LOGGER.exception(self.last_error)
+                self.dropped_events += self._discard_pending_events()
         if self.engine is not None:
             await self.engine.dispose()
+            self.engine = None
         self.connected = False
 
     async def enqueue_trade(self, trade: Trade) -> None:
-        if self.engine is not None:
-            await self.queue.put(("trade", trade))
+        await self._enqueue(("trade", trade))
 
     async def enqueue_candle(self, candle: Candle) -> None:
-        if self.engine is not None:
-            await self.queue.put(("candle", candle))
+        await self._enqueue(("candle", candle))
 
     async def enqueue_metrics(self, payload: Dict[str, Any]) -> None:
-        if self.engine is not None:
-            await self.queue.put(("metrics", payload))
+        await self._enqueue(("metrics", payload))
+
+    async def _enqueue(self, event: DatabaseEvent) -> None:
+        if self.engine is None:
+            return
+        if not self._accepting_events or self._task is None or self._task.done():
+            self.dropped_events += 1
+            return
+        await self.queue.put(event)
 
     async def candle_history(
         self,
@@ -256,20 +298,32 @@ class DatabaseWriter:
                     batch.append(self.queue.get_nowait())
                 except asyncio.QueueEmpty:
                     break
+            self._inflight_events = len(batch)
 
+            committed = False
             try:
-                await self._write_batch(batch)
-                self.last_error = None
-                self.connected = True
-            except Exception as error:
-                self.last_error = str(error)
-                self.connected = False
-                await asyncio.sleep(1)
-                for event in batch:
-                    await self.queue.put(event)
+                while True:
+                    try:
+                        await self._write_batch(batch)
+                    except (KeyError, TypeError, ValueError) as error:
+                        self.last_error = f"Discarded invalid database batch: {error}"
+                        LOGGER.exception(self.last_error)
+                        break
+                    except Exception as error:
+                        self.last_error = str(error)
+                        self.connected = False
+                        await asyncio.sleep(1)
+                    else:
+                        committed = True
+                        self.last_error = None
+                        self.connected = True
+                        break
             finally:
+                if not committed:
+                    self.dropped_events += len(batch)
                 for _ in batch:
                     self.queue.task_done()
+                self._inflight_events = 0
 
     async def _write_batch(self, batch: List[DatabaseEvent]) -> None:
         if self.engine is None:
@@ -291,6 +345,9 @@ class DatabaseWriter:
             if kind == "metrics" and isinstance(value, dict)
         ]
 
+        metric_point_count = 0
+        metric_event_count = 0
+        metric_summary_count = 0
         async with self.engine.begin() as connection:
             if trades:
                 await connection.execute(
@@ -311,8 +368,6 @@ class DatabaseWriter:
                     ),
                     trades,
                 )
-                self.written_trades += len(trades)
-
             for candle in candles:
                 params = self._candle_params(candle)
                 await connection.execute(
@@ -369,10 +424,20 @@ class DatabaseWriter:
                     ),
                     params,
                 )
-                self.written_candles += 1
-
             for snapshot in metric_snapshots:
-                await self._write_metric_snapshot(connection, snapshot)
+                points, events, summaries = await self._write_metric_snapshot(
+                    connection,
+                    snapshot,
+                )
+                metric_point_count += points
+                metric_event_count += events
+                metric_summary_count += summaries
+
+        self.written_trades += len(trades)
+        self.written_candles += len(candles)
+        self.written_metric_points += metric_point_count
+        self.written_metric_events += metric_event_count
+        self.written_metric_summaries += metric_summary_count
 
     @staticmethod
     def _trade_params(trade: Trade) -> Dict[str, Any]:
@@ -428,19 +493,33 @@ class DatabaseWriter:
             "status": status,
             "queueSize": self.queue.qsize(),
             "queueCapacity": self.queue.maxsize,
+            "inFlight": self._inflight_events,
             "writtenTrades": self.written_trades,
             "writtenCandles": self.written_candles,
             "writtenMetricPoints": self.written_metric_points,
             "writtenMetricEvents": self.written_metric_events,
             "writtenMetricSummaries": self.written_metric_summaries,
+            "droppedEvents": self.dropped_events,
+            "acceptingEvents": self._accepting_events,
+            "writerRunning": self._task is not None and not self._task.done(),
             "lastError": self.last_error,
         }
+
+    def _discard_pending_events(self) -> int:
+        discarded = 0
+        while True:
+            try:
+                self.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return discarded
+            self.queue.task_done()
+            discarded += 1
 
     async def _write_metric_snapshot(
         self,
         connection: Any,
         snapshot: Dict[str, Any],
-    ) -> None:
+    ) -> Tuple[int, int, int]:
         response = snapshot["response"]
         source_candles = {
             int(candle["openTime"]): candle
@@ -525,8 +604,6 @@ class DatabaseWriter:
                 ),
                 points,
             )
-            self.written_metric_points += len(points)
-
         events = snapshot.get("allEvents", response.get("events", []))
         event_params = [
             self._metric_event_params(response, event, calculated_at)
@@ -591,8 +668,6 @@ class DatabaseWriter:
                 ),
                 event_params,
             )
-            self.written_metric_events += len(event_params)
-
         summary = self._metric_summary_params(snapshot)
         await connection.execute(
             text(
@@ -637,7 +712,7 @@ class DatabaseWriter:
             ),
             summary,
         )
-        self.written_metric_summaries += 1
+        return len(points), len(event_params), 1
 
     @staticmethod
     def _metric_point_params(

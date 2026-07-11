@@ -14,11 +14,11 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Sequence
+from typing import Dict, Iterator, List, Optional, Sequence
 from xml.etree import ElementTree
 
 from .features import extract_features
-from .weak_labeling import WeakLabel, label_window
+from .weak_labeling import label_window
 
 
 BINANCE_BUCKET = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
@@ -142,7 +142,9 @@ def main() -> None:
     feature_path = prepared_dir / "features.jsonl"
     temporary_feature_path = feature_path.with_suffix(".jsonl.tmp")
     totals: Dict[str, int] = defaultdict(int)
-    with temporary_feature_path.open("w", encoding="utf-8", newline="\n") as feature_file:
+    with temporary_feature_path.open(
+        "w", encoding="utf-8", newline="\n"
+    ) as feature_file:
         for symbol in symbols:
             monthly_archives = list_monthly_archives(symbol)
             daily_archives = list_daily_archives(symbol)
@@ -461,23 +463,25 @@ def _normalize_row(row: Sequence[str]) -> Dict[str, object]:
 
 
 def _urlopen_bytes(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "Tickframe ML dataset"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "Tickframe ML dataset"}
+    )
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()
 
 
 def _parse_date(value: str) -> date:
-    return datetime.strptime(value, "%Y-%m-%d").date()
+    return date.fromisoformat(value)
 
 
 def _archive_start(item: ArchiveItem) -> date:
     if item.kind == "daily":
         return _parse_date(item.period)
-    return datetime.strptime(item.period, "%Y-%m").date()
+    return date.fromisoformat(f"{item.period}-01")
 
 
 def _month_end(value: str) -> date:
-    start = datetime.strptime(value, "%Y-%m").date()
+    start = date.fromisoformat(f"{value}-01")
     if start.month == 12:
         return date(start.year, 12, 31)
     next_month = date(start.year, start.month + 1, 1)

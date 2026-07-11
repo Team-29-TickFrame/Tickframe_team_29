@@ -8,13 +8,37 @@ project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- No entries yet.
+- Pipeline task, malformed-message, in-flight database, and dropped-event
+  diagnostics in the health response.
+- Functional asset search plus candlestick, line, area, drawing, history, and
+  viewport controls in the live chart workspace.
 
 ### Changed
-- No entries yet.
+- Split the chart engine into a lazy-loaded frontend chunk and debounced
+  browser storage writes for faster startup and smoother chart interaction.
+- Reduced Docker build context size and hardened the runtime with a non-root
+  backend user, frontend healthcheck, graceful shutdown limits, and safer Nginx
+  proxy defaults.
+- Indexed instrument configuration lookups used by the high-frequency trade
+  parsers and added fail-fast validation for invalid market configuration.
+- Reworked the analytics workspace into a denser graphite market terminal with
+  readable metric states, compact ML context, formatted event values, and
+  responsive source navigation.
 
 ### Fixed
-- No entries yet.
+- Restored the frontend production build after conflicting chart alert-line
+  references were merged.
+- Reconnected market, candle, and metrics WebSockets automatically after
+  transient network failures and bounded stalled REST requests with timeouts.
+- Prevented Bybit heartbeat failures, malformed exchange messages, and isolated
+  trade/candle processing errors from permanently stopping live-data workers.
+- Prevented shutdown hangs and full-queue database writer deadlocks during
+  database outages, and stopped counting rolled-back writes as successful.
+- Validated ML datasets and model artifacts before training or inference so
+  malformed, non-finite, or inconsistent feature vectors fail clearly.
+- Fixed collapsed mobile panels, overlapping chart controls, missing dashboard
+  alert styles, and long market-data outages creating thousands of empty visual
+  candles.
 
 ### Removed
 - No entries yet.
@@ -23,7 +47,8 @@ project uses [Semantic Versioning](https://semver.org/).
 - No entries yet.
 
 ### Security
-- No entries yet.
+- Bounded authentication and telemetry payload sizes, hardened password-hash
+  parsing, and moved expensive password hashing off the async event loop.
 
 ## [1.2.0] - 2026-07-06
 
