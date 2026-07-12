@@ -127,7 +127,6 @@ type MainPanelId = "chart" | "metrics";
 type SidePanelId = "ml" | "alerts" | "signals";
 type WorkspacePanelGroup = "main" | "side";
 type WorkspaceResizeHandleId =
-  | "main-bottom"
   | "main-split"
   | "rail-width"
   | "side-bottom"
@@ -187,11 +186,11 @@ interface AlertDraft {
 
 interface DashboardLayout {
   rightColumnWidth: number;
-  topPanelHeight: number;
-  mainBottomPanelHeight: number;
-  sideTopPanelHeight: number;
-  sideMiddlePanelHeight: number;
-  sideBottomPanelHeight: number;
+  chartPanelHeight: number;
+  metricsPanelHeight: number;
+  mlPanelHeight: number;
+  alertsPanelHeight: number;
+  signalsPanelHeight: number;
   mainOrder: MainPanelId[];
   sideOrder: SidePanelId[];
 }
@@ -215,8 +214,7 @@ interface AlertPreset {
 }
 
 const USER_ALERTS_STORAGE_KEY = "tickframe.userAlerts.v1";
-const DASHBOARD_LAYOUT_STORAGE_KEY = "tickframe.dashboardLayout.v4";
-const MAX_PANEL_HEIGHT = 5_000;
+const DASHBOARD_LAYOUT_STORAGE_KEY = "tickframe.dashboardLayout.v7";
 const ALERT_TOAST_TTL_MS = 8_000;
 const ALERT_TOAST_EXIT_MS = 260;
 const ALERT_BEEP_DATA_URI =
@@ -300,11 +298,11 @@ const DEFAULT_ALERT_DRAFT: AlertDraft = {
 
 const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
   rightColumnWidth: 420,
-  topPanelHeight: 760,
-  mainBottomPanelHeight: 680,
-  sideTopPanelHeight: 320,
-  sideMiddlePanelHeight: 440,
-  sideBottomPanelHeight: 620,
+  chartPanelHeight: 760,
+  metricsPanelHeight: 500,
+  mlPanelHeight: 320,
+  alertsPanelHeight: 440,
+  signalsPanelHeight: 620,
   mainOrder: ["chart", "metrics"],
   sideOrder: ["ml", "alerts", "signals"],
 };
@@ -330,11 +328,11 @@ const DASHBOARD_LAYOUT_PRESETS: Array<{
     layout: {
       ...DEFAULT_DASHBOARD_LAYOUT,
       rightColumnWidth: 360,
-      topPanelHeight: 960,
-      mainBottomPanelHeight: 640,
-      sideTopPanelHeight: 320,
-      sideMiddlePanelHeight: 400,
-      sideBottomPanelHeight: 520,
+      chartPanelHeight: 960,
+      metricsPanelHeight: 500,
+      mlPanelHeight: 320,
+      alertsPanelHeight: 400,
+      signalsPanelHeight: 520,
     },
   },
   {
@@ -344,24 +342,23 @@ const DASHBOARD_LAYOUT_PRESETS: Array<{
     layout: {
       ...DEFAULT_DASHBOARD_LAYOUT,
       rightColumnWidth: 460,
-      topPanelHeight: 820,
-      mainBottomPanelHeight: 650,
-      sideTopPanelHeight: 620,
-      sideMiddlePanelHeight: 440,
-      sideBottomPanelHeight: 320,
-      sideOrder: ["signals", "alerts", "ml"],
+      chartPanelHeight: 820,
+      metricsPanelHeight: 500,
+      mlPanelHeight: 320,
+      alertsPanelHeight: 440,
+      signalsPanelHeight: 320,
+      sideOrder: ["ml", "signals", "alerts"],
     },
   },
 ];
 
-type DashboardSizeField = Exclude<
+type WorkspacePanelId = MainPanelId | SidePanelId;
+type DashboardPanelSizeField = Exclude<
   keyof DashboardLayout,
-  "mainOrder" | "sideOrder"
+  "mainOrder" | "rightColumnWidth" | "sideOrder"
 >;
 
 interface WorkspaceResizeConfig {
-  field: DashboardSizeField;
-  label: string;
   orientation: "horizontal" | "vertical";
   min: number;
   max: number;
@@ -369,31 +366,34 @@ interface WorkspaceResizeConfig {
   dragMultiplier: 1 | -1;
 }
 
+const PANEL_HEIGHT_LIMITS: Record<MainPanelId | SidePanelId, { min: number; max: number }> = {
+  chart: { min: 480, max: 1_600 },
+  metrics: { min: 500, max: 1_600 },
+  ml: { min: 320, max: 320 },
+  alerts: { min: 180, max: 960 },
+  signals: { min: 180, max: 1_200 },
+};
+
+const WORKSPACE_PANEL_LABELS: Record<WorkspacePanelId, string> = {
+  chart: "chart",
+  metrics: "metrics",
+  ml: "ML pattern",
+  alerts: "alerts",
+  signals: "signals",
+};
+
 const WORKSPACE_RESIZE_CONFIG: Record<
   WorkspaceResizeHandleId,
   WorkspaceResizeConfig
 > = {
   "main-split": {
-    field: "topPanelHeight",
-    label: "Resize chart height",
     orientation: "horizontal",
     min: 480,
-    max: MAX_PANEL_HEIGHT,
-    step: 20,
-    dragMultiplier: 1,
-  },
-  "main-bottom": {
-    field: "mainBottomPanelHeight",
-    label: "Resize metrics height",
-    orientation: "horizontal",
-    min: 360,
-    max: MAX_PANEL_HEIGHT,
+    max: 1_600,
     step: 20,
     dragMultiplier: 1,
   },
   "rail-width": {
-    field: "rightColumnWidth",
-    label: "Resize dashboard columns",
     orientation: "vertical",
     min: 300,
     max: 760,
@@ -401,29 +401,23 @@ const WORKSPACE_RESIZE_CONFIG: Record<
     dragMultiplier: -1,
   },
   "side-top": {
-    field: "sideTopPanelHeight",
-    label: "Resize top right panel height",
     orientation: "horizontal",
     min: 180,
-    max: MAX_PANEL_HEIGHT,
+    max: 1_200,
     step: 20,
     dragMultiplier: 1,
   },
   "side-middle": {
-    field: "sideMiddlePanelHeight",
-    label: "Resize middle right panel height",
     orientation: "horizontal",
     min: 180,
-    max: MAX_PANEL_HEIGHT,
+    max: 1_200,
     step: 20,
     dragMultiplier: 1,
   },
   "side-bottom": {
-    field: "sideBottomPanelHeight",
-    label: "Resize bottom right panel height",
     orientation: "horizontal",
     min: 180,
-    max: MAX_PANEL_HEIGHT,
+    max: 1_200,
     step: 20,
     dragMultiplier: 1,
   },
@@ -860,21 +854,89 @@ function dashboardLayoutsEqual(
 ): boolean {
   return (
     first.rightColumnWidth === second.rightColumnWidth &&
-    first.topPanelHeight === second.topPanelHeight &&
-    first.mainBottomPanelHeight === second.mainBottomPanelHeight &&
-    first.sideTopPanelHeight === second.sideTopPanelHeight &&
-    first.sideMiddlePanelHeight === second.sideMiddlePanelHeight &&
-    first.sideBottomPanelHeight === second.sideBottomPanelHeight &&
+    first.chartPanelHeight === second.chartPanelHeight &&
+    first.metricsPanelHeight === second.metricsPanelHeight &&
+    first.mlPanelHeight === second.mlPanelHeight &&
+    first.alertsPanelHeight === second.alertsPanelHeight &&
+    first.signalsPanelHeight === second.signalsPanelHeight &&
     first.mainOrder.every((panel, index) => panel === second.mainOrder[index]) &&
     first.sideOrder.every((panel, index) => panel === second.sideOrder[index])
   );
+}
+
+function dashboardPanelSizeField(
+  panel: WorkspacePanelId,
+): DashboardPanelSizeField {
+  switch (panel) {
+    case "chart":
+      return "chartPanelHeight";
+    case "metrics":
+      return "metricsPanelHeight";
+    case "ml":
+      return "mlPanelHeight";
+    case "alerts":
+      return "alertsPanelHeight";
+    case "signals":
+      return "signalsPanelHeight";
+  }
+}
+
+function workspacePanelAtResizeHandle(
+  layout: DashboardLayout,
+  handle: Exclude<WorkspaceResizeHandleId, "rail-width">,
+): WorkspacePanelId {
+  if (handle === "main-split") return "chart";
+  if (handle === "side-top") return layout.sideOrder[0];
+  if (handle === "side-middle") return layout.sideOrder[1];
+  return layout.sideOrder[2];
+}
+
+function workspaceResizeDragMultiplier(
+  layout: DashboardLayout,
+  handle: WorkspaceResizeHandleId,
+): 1 | -1 {
+  if (handle === "main-split") {
+    return layout.mainOrder[0] === "chart" ? 1 : -1;
+  }
+  return WORKSPACE_RESIZE_CONFIG[handle].dragMultiplier;
+}
+
+function dashboardPanelHeight(
+  layout: DashboardLayout,
+  panel: WorkspacePanelId,
+): number {
+  return layout[dashboardPanelSizeField(panel)];
 }
 
 function workspaceResizeValue(
   layout: DashboardLayout,
   handle: WorkspaceResizeHandleId,
 ): number {
-  return layout[WORKSPACE_RESIZE_CONFIG[handle].field];
+  if (handle === "rail-width") return layout.rightColumnWidth;
+  return dashboardPanelHeight(
+    layout,
+    workspacePanelAtResizeHandle(layout, handle),
+  );
+}
+
+function workspaceResizeLimits(
+  layout: DashboardLayout,
+  handle: WorkspaceResizeHandleId,
+): { min: number; max: number } {
+  if (handle === "rail-width") {
+    const { min, max } = WORKSPACE_RESIZE_CONFIG[handle];
+    return { min, max };
+  }
+  return PANEL_HEIGHT_LIMITS[workspacePanelAtResizeHandle(layout, handle)];
+}
+
+function workspaceResizeLabel(
+  layout: DashboardLayout,
+  handle: WorkspaceResizeHandleId,
+): string {
+  if (handle === "rail-width") return "Resize dashboard columns";
+  const panel = workspacePanelAtResizeHandle(layout, handle);
+  return `Resize ${WORKSPACE_PANEL_LABELS[panel]} height`;
 }
 
 function withWorkspaceResizeValue(
@@ -882,13 +944,17 @@ function withWorkspaceResizeValue(
   handle: WorkspaceResizeHandleId,
   value: number,
 ): DashboardLayout {
-  const config = WORKSPACE_RESIZE_CONFIG[handle];
+  const limits = workspaceResizeLimits(layout, handle);
+  const field =
+    handle === "rail-width"
+      ? "rightColumnWidth"
+      : dashboardPanelSizeField(workspacePanelAtResizeHandle(layout, handle));
   return {
     ...layout,
-    [config.field]: clampNumber(
+    [field]: clampNumber(
       value,
-      config.min,
-      config.max,
+      limits.min,
+      limits.max,
       workspaceResizeValue(layout, handle),
     ),
   };
@@ -1005,6 +1071,8 @@ function WorkspaceHeaderDragZone({
 function WorkspaceResizeHandle({
   active = false,
   handle,
+  label,
+  limits,
   value,
   onKeyboardNudge,
   onPointerDown,
@@ -1012,6 +1080,8 @@ function WorkspaceResizeHandle({
 }: {
   active?: boolean;
   handle: WorkspaceResizeHandleId;
+  label: string;
+  limits: { min: number; max: number };
   value: number;
   onKeyboardNudge: (
     handle: WorkspaceResizeHandleId,
@@ -1025,12 +1095,16 @@ function WorkspaceResizeHandle({
 }) {
   const config = WORKSPACE_RESIZE_CONFIG[handle];
 
+  if (limits.min === limits.max) {
+    return <div aria-hidden="true" className="workspace-fixed-divider" style={style} />;
+  }
+
   return (
     <div
-      aria-label={config.label}
+      aria-label={label}
       aria-orientation={config.orientation}
-      aria-valuemax={config.max}
-      aria-valuemin={config.min}
+      aria-valuemax={limits.max}
+      aria-valuemin={limits.min}
       aria-valuenow={value}
       aria-valuetext={`${value}px`}
       className={`workspace-resize-handle ${config.orientation}${active ? " is-active" : ""}`}
@@ -1048,7 +1122,7 @@ function WorkspaceResizeHandle({
       role="separator"
       style={style}
       tabIndex={0}
-      title="Drag to resize; use arrow keys for precise control"
+      title={`${label}. Drag to resize; use arrow keys for precise control`}
     />
   );
 }
@@ -1059,42 +1133,42 @@ function safeStoredDashboardLayout(): DashboardLayout {
     const raw = safeStorageGet(DASHBOARD_LAYOUT_STORAGE_KEY);
     if (!raw) return DEFAULT_DASHBOARD_LAYOUT;
     const parsed = JSON.parse(raw) as Partial<DashboardLayout>;
-    return {
+    const storedLayout: DashboardLayout = {
       rightColumnWidth: clampNumber(
         Number(parsed.rightColumnWidth),
         300,
         760,
         DEFAULT_DASHBOARD_LAYOUT.rightColumnWidth,
       ),
-      topPanelHeight: clampNumber(
-        Number(parsed.topPanelHeight),
-        480,
-        MAX_PANEL_HEIGHT,
-        DEFAULT_DASHBOARD_LAYOUT.topPanelHeight,
+      chartPanelHeight: clampNumber(
+        Number(parsed.chartPanelHeight),
+        PANEL_HEIGHT_LIMITS.chart.min,
+        PANEL_HEIGHT_LIMITS.chart.max,
+        DEFAULT_DASHBOARD_LAYOUT.chartPanelHeight,
       ),
-      mainBottomPanelHeight: clampNumber(
-        Number(parsed.mainBottomPanelHeight),
-        360,
-        MAX_PANEL_HEIGHT,
-        DEFAULT_DASHBOARD_LAYOUT.mainBottomPanelHeight,
+      metricsPanelHeight: clampNumber(
+        Number(parsed.metricsPanelHeight),
+        PANEL_HEIGHT_LIMITS.metrics.min,
+        PANEL_HEIGHT_LIMITS.metrics.max,
+        DEFAULT_DASHBOARD_LAYOUT.metricsPanelHeight,
       ),
-      sideTopPanelHeight: clampNumber(
-        Number(parsed.sideTopPanelHeight),
-        180,
-        MAX_PANEL_HEIGHT,
-        DEFAULT_DASHBOARD_LAYOUT.sideTopPanelHeight,
+      mlPanelHeight: clampNumber(
+        Number(parsed.mlPanelHeight),
+        PANEL_HEIGHT_LIMITS.ml.min,
+        PANEL_HEIGHT_LIMITS.ml.max,
+        DEFAULT_DASHBOARD_LAYOUT.mlPanelHeight,
       ),
-      sideMiddlePanelHeight: clampNumber(
-        Number(parsed.sideMiddlePanelHeight),
-        180,
-        MAX_PANEL_HEIGHT,
-        DEFAULT_DASHBOARD_LAYOUT.sideMiddlePanelHeight,
+      alertsPanelHeight: clampNumber(
+        Number(parsed.alertsPanelHeight),
+        PANEL_HEIGHT_LIMITS.alerts.min,
+        PANEL_HEIGHT_LIMITS.alerts.max,
+        DEFAULT_DASHBOARD_LAYOUT.alertsPanelHeight,
       ),
-      sideBottomPanelHeight: clampNumber(
-        Number(parsed.sideBottomPanelHeight),
-        180,
-        MAX_PANEL_HEIGHT,
-        DEFAULT_DASHBOARD_LAYOUT.sideBottomPanelHeight,
+      signalsPanelHeight: clampNumber(
+        Number(parsed.signalsPanelHeight),
+        PANEL_HEIGHT_LIMITS.signals.min,
+        PANEL_HEIGHT_LIMITS.signals.max,
+        DEFAULT_DASHBOARD_LAYOUT.signalsPanelHeight,
       ),
       mainOrder: orderedPanels(
         parsed.mainOrder,
@@ -1107,6 +1181,7 @@ function safeStoredDashboardLayout(): DashboardLayout {
         SIDE_PANEL_IDS,
       ),
     };
+    return storedLayout;
   } catch {
     return DEFAULT_DASHBOARD_LAYOUT;
   }
@@ -1420,6 +1495,9 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     useState<WorkspaceDragPayload | null>(null);
   const [workspaceResizeHandle, setWorkspaceResizeHandle] =
     useState<WorkspaceResizeHandleId | null>(null);
+  const [metricsPanelHeight, setMetricsPanelHeight] = useState(
+    DEFAULT_DASHBOARD_LAYOUT.metricsPanelHeight,
+  );
   const historyLoadingRef = useRef(false);
   const alertAudioRef = useRef<AudioContext | null>(null);
   const previousAlertValuesRef = useRef<Record<string, number | null>>({});
@@ -1469,6 +1547,52 @@ function Dashboard({ session, onLogout }: DashboardProps) {
     const frame = window.requestAnimationFrame(resetMetricsScroll);
     return () => window.cancelAnimationFrame(frame);
   }, [exchange, instrumentId]);
+
+  useEffect(() => {
+    const shell = metricsPanelShellRef.current;
+    const dashboard = shell?.querySelector<HTMLElement>(".metrics-dashboard");
+    const header = shell?.querySelector<HTMLElement>(".panel-head");
+    if (!shell || !dashboard || !header) return;
+
+    let frame = 0;
+    const measure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const dashboardRect = dashboard.getBoundingClientRect();
+        const dashboardStyle = window.getComputedStyle(dashboard);
+        const contentBottom = Array.from(dashboard.children).reduce(
+          (bottom, child) =>
+            Math.max(bottom, (child as HTMLElement).getBoundingClientRect().bottom),
+          dashboardRect.top,
+        );
+        const contentHeight =
+          contentBottom -
+          dashboardRect.top +
+          Number.parseFloat(dashboardStyle.paddingBottom || "0");
+        const requiredHeight = Math.ceil(header.offsetHeight + contentHeight + 2);
+        const nextHeight = clampNumber(requiredHeight, 500, 1_600, 500);
+        setMetricsPanelHeight((current) =>
+          Math.abs(current - nextHeight) < 2 ? current : nextHeight,
+        );
+      });
+    };
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(shell);
+    observer.observe(dashboard);
+    for (const child of dashboard.children) observer.observe(child);
+    const mutationObserver = new MutationObserver(() => {
+      for (const child of dashboard.children) observer.observe(child);
+      measure();
+    });
+    mutationObserver.observe(dashboard, { childList: true, subtree: true });
+    measure();
+    return () => {
+      window.cancelAnimationFrame(frame);
+      mutationObserver.disconnect();
+      observer.disconnect();
+    };
+  }, [activeView]);
 
   const dismissAlertToast = useCallback((id: string) => {
     setDismissingToastIds((current) => {
@@ -1569,7 +1693,9 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           current,
           handle,
           workspaceResizeValue(current, handle) +
-            physicalDirection * config.step * config.dragMultiplier,
+            physicalDirection *
+              config.step *
+              workspaceResizeDragMultiplier(current, handle),
         ),
       );
       setLayoutMenuOpen(false);
@@ -1606,7 +1732,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       const pointerDelta = config.orientation === "horizontal" ? dy : dx;
       const nextValue =
         workspaceResizeValue(resize.startLayout, resize.handle) +
-        pointerDelta * config.dragMultiplier;
+        pointerDelta *
+          workspaceResizeDragMultiplier(resize.startLayout, resize.handle);
       setDashboardLayout((current) =>
         withWorkspaceResizeValue(current, resize.handle, nextValue),
       );
@@ -1903,13 +2030,27 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       )?.id ?? null,
     [dashboardLayout],
   );
+  const renderedPanelHeight = (panel: WorkspacePanelId) =>
+    panel === "metrics"
+      ? metricsPanelHeight
+      : dashboardPanelHeight(dashboardLayout, panel);
   const dashboardLayoutStyle = {
     "--events-column-width": `${dashboardLayout.rightColumnWidth}px`,
-    "--main-bottom-panel-height": `${dashboardLayout.mainBottomPanelHeight}px`,
-    "--side-bottom-panel-height": `${dashboardLayout.sideBottomPanelHeight}px`,
-    "--side-middle-panel-height": `${dashboardLayout.sideMiddlePanelHeight}px`,
-    "--side-top-panel-height": `${dashboardLayout.sideTopPanelHeight}px`,
-    "--top-panel-height": `${dashboardLayout.topPanelHeight}px`,
+    "--main-bottom-panel-height": `${renderedPanelHeight(
+      dashboardLayout.mainOrder[1],
+    )}px`,
+    "--side-bottom-panel-height": `${renderedPanelHeight(
+      dashboardLayout.sideOrder[2],
+    )}px`,
+    "--side-middle-panel-height": `${renderedPanelHeight(
+      dashboardLayout.sideOrder[1],
+    )}px`,
+    "--side-top-panel-height": `${renderedPanelHeight(
+      dashboardLayout.sideOrder[0],
+    )}px`,
+    "--top-panel-height": `${renderedPanelHeight(
+      dashboardLayout.mainOrder[0],
+    )}px`,
   } as CSSProperties;
   const mainPanelOrder = useCallback(
     (id: MainPanelId) => dashboardLayout.mainOrder.indexOf(id),
@@ -2983,8 +3124,10 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "main-split"}
               handle="main-split"
+              label={workspaceResizeLabel(dashboardLayout, "main-split")}
+              limits={workspaceResizeLimits(dashboardLayout, "main-split")}
               style={{ order: 1 }}
-              value={dashboardLayout.topPanelHeight}
+              value={workspaceResizeValue(dashboardLayout, "main-split")}
               {...workspaceResizeProps}
             />
 
@@ -3071,7 +3214,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </div>
                 </div>
 
-                <section className="metric-section">
+                <section className="metric-section metric-section-volatility">
                   <header>
                     <span>Volatility estimators</span>
                   </header>
@@ -3103,7 +3246,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </div>
                 </section>
 
-                <section className="metric-section">
+                <section className="metric-section metric-section-momentum">
                   <header>
                     <span>Momentum & mean reversion</span>
                   </header>
@@ -3144,7 +3287,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </div>
                 </section>
 
-                <section className="metric-section">
+                <section className="metric-section metric-section-anomalies">
                   <header>
                     <span>Anomalies & 24h market</span>
                   </header>
@@ -3196,24 +3339,30 @@ function Dashboard({ session, onLogout }: DashboardProps) {
               </div>
               </div>
             </article>
-            <WorkspaceResizeHandle
-              active={workspaceResizeHandle === "main-bottom"}
-              handle="main-bottom"
-              style={{ order: 3 }}
-              value={dashboardLayout.mainBottomPanelHeight}
-              {...workspaceResizeProps}
-            />
           </div>
 
           <WorkspaceResizeHandle
             active={workspaceResizeHandle === "rail-width"}
             handle="rail-width"
+            label={workspaceResizeLabel(dashboardLayout, "rail-width")}
+            limits={workspaceResizeLimits(dashboardLayout, "rail-width")}
             value={dashboardLayout.rightColumnWidth}
             {...workspaceResizeProps}
           />
 
           <aside className="events-column">
-            <article className="panel ml-pattern-panel">
+            <article
+              className={`panel ml-pattern-panel ${workspacePanelClass({
+                group: "side",
+                id: "ml",
+              })}`}
+              data-workspace-panel={workspacePanelKey({ group: "side", id: "ml" })}
+              style={workspacePanelStyle(sidePanelOrder("ml"), {
+                group: "side",
+                id: "ml",
+              })}
+            >
+              <div className="workspace-panel-shell">
               <div className="panel-head compact">
                 <div className="panel-title-with-logo">
                   <CoinLogo base={instrument?.base} className="coin-logo-xs" />
@@ -3313,13 +3462,16 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   </span>
                 </div>
               </div>
+              </div>
             </article>
 
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "side-top"}
               handle="side-top"
+              label={workspaceResizeLabel(dashboardLayout, "side-top")}
+              limits={workspaceResizeLimits(dashboardLayout, "side-top")}
               style={{ order: 1 }}
-              value={dashboardLayout.sideTopPanelHeight}
+              value={workspaceResizeValue(dashboardLayout, "side-top")}
               {...workspaceResizeProps}
             />
 
@@ -3386,6 +3538,22 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 </div>
               </div>
 
+              <div className="dashboard-alert-templates">
+                <span>Quick templates</span>
+                <div className="dashboard-alert-presets">
+                  {dashboardAlertPresets.map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => createPresetAlert(preset)}
+                    >
+                      <strong>{preset.label}</strong>
+                      <span>{preset.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {currentScopeAlerts.length > 0 ? (
                 <div className="dashboard-alert-list">
                   {currentScopeAlerts.slice(0, 4).map((alert) => (
@@ -3422,22 +3590,6 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   )}
                 </div>
               ) : null}
-
-              <div className="dashboard-alert-templates">
-                <span>Quick templates</span>
-                <div className="dashboard-alert-presets">
-                  {dashboardAlertPresets.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => createPresetAlert(preset)}
-                    >
-                      <strong>{preset.label}</strong>
-                      <span>{preset.description}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {dashboardAlertComposerOpen && (
                 <form
@@ -3513,8 +3665,10 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "side-middle"}
               handle="side-middle"
+              label={workspaceResizeLabel(dashboardLayout, "side-middle")}
+              limits={workspaceResizeLimits(dashboardLayout, "side-middle")}
               style={{ order: 3 }}
-              value={dashboardLayout.sideMiddlePanelHeight}
+              value={workspaceResizeValue(dashboardLayout, "side-middle")}
               {...workspaceResizeProps}
             />
             <article
@@ -3588,8 +3742,10 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <WorkspaceResizeHandle
               active={workspaceResizeHandle === "side-bottom"}
               handle="side-bottom"
+              label={workspaceResizeLabel(dashboardLayout, "side-bottom")}
+              limits={workspaceResizeLimits(dashboardLayout, "side-bottom")}
               style={{ order: 5 }}
-              value={dashboardLayout.sideBottomPanelHeight}
+              value={workspaceResizeValue(dashboardLayout, "side-bottom")}
               {...workspaceResizeProps}
             />
           </aside>
