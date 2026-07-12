@@ -10,7 +10,9 @@ from ml.pattern_recognition import WINDOW_SIZE
 
 
 class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_multi_timeframe_endpoint_uses_history_service_and_detector(self) -> None:
+    async def test_multi_timeframe_endpoint_uses_history_service_and_detector(
+        self,
+    ) -> None:
         for timeframe in ("5m", "15m", "1h", "1d"):
             with self.subTest(timeframe=timeframe):
                 candles = fixture_candles("double_top")
@@ -25,9 +27,12 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     write_fixture_model(model_path)
                     detector = PatternMLDetector(model_path=model_path)
 
-                    with patch(
-                        "backend.app.main.pattern_ml_detector", detector
-                    ), patch("backend.app.main.service.candle_history", new=mock_history):
+                    with (
+                        patch("backend.app.main.pattern_ml_detector", detector),
+                        patch(
+                            "backend.app.main.service.candle_history", new=mock_history
+                        ),
+                    ):
                         result = await ml_patterns(
                             exchange="binance",
                             instrument_id="BTC-USDT",

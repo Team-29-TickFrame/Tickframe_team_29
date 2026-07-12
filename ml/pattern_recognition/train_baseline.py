@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Sequence
 
-from . import PATTERN_MODEL_VERSION, SUPPORTED_TIMEFRAME, WINDOW_SIZE
+from . import PATTERN_MODEL_VERSION, WINDOW_SIZE
 from .dataset import FeatureExample, dataset_summary, load_feature_dataset
 from .features import FEATURE_NAMES
 from .model import BoostedTreeClassifier, create_classifier, evaluate_predictions
@@ -115,7 +115,9 @@ def main() -> None:
     model.fit(train_features, train_labels, feature_names=FEATURE_NAMES)
     model_type = model.__class__.__name__
     model_backend = (
-        model.resolved_backend if isinstance(model, BoostedTreeClassifier) else "baseline"
+        model.resolved_backend
+        if isinstance(model, BoostedTreeClassifier)
+        else "baseline"
     )
     predictions = model.predict(test_features)
     evaluation = evaluate_predictions(

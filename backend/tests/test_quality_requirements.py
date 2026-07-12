@@ -152,6 +152,15 @@ class QualityRequirementCoverageGateTests(unittest.TestCase):
 
         run_coverage_gate(payload)
 
+    def test_qrt_003_critical_coverage_gate_accepts_windows_paths(self) -> None:
+        payload = coverage_payload(check_critical_coverage.MINIMUM_COVERAGE)
+        payload["files"] = {
+            module.replace("/", "\\"): entry
+            for module, entry in payload["files"].items()
+        }
+
+        run_coverage_gate(payload)
+
     def test_qrt_003_critical_coverage_gate_fails_below_threshold(self) -> None:
         payload = coverage_payload(check_critical_coverage.MINIMUM_COVERAGE)
         payload["files"]["backend/app/aggregation.py"]["summary"]["percent_covered"] = (

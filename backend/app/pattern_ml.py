@@ -47,17 +47,10 @@ class PatternMLDetector:
     ) -> None:
         root = Path(__file__).resolve().parents[2]
         configured_model = os.getenv("TICKFRAME_PATTERN_MODEL_PATH")
-        fallback_model_path = (
-            Path(configured_model) if configured_model else model_path
-        )
+        fallback_model_path = Path(configured_model) if configured_model else model_path
         self.model_paths = {
             timeframe: fallback_model_path
-            or root
-            / "ml"
-            / "pattern_recognition"
-            / "runs"
-            / run_name
-            / "model.json"
+            or root / "ml" / "pattern_recognition" / "runs" / run_name / "model.json"
             for timeframe, run_name in DEFAULT_MODEL_RUNS.items()
         }
         self.model_path = self.model_paths["1m"]
@@ -164,11 +157,7 @@ class PatternMLDetector:
             prediction.label != "none"
             and prediction.confidence >= threshold["recommendedThreshold"]
         )
-        status = (
-            "pattern_detected"
-            if passes_threshold
-            else "no_reliable_pattern"
-        )
+        status = "pattern_detected" if passes_threshold else "no_reliable_pattern"
         return {
             "status": status,
             "message": (
