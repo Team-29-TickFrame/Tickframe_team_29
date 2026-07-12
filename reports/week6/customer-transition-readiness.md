@@ -40,7 +40,7 @@ Review result summary:
 
 ## Trial-release access check
 
-- Trial access artifact reviewed: [Tickframe MVP v2.0.0 release](https://github.com/Team-29-TickFrame/Tickframe_team_29/releases/tag/v2.0.0)
+- Trial access artifact reviewed: [Tickframe MVP v3.0.0 release](https://github.com/Team-29-TickFrame/Tickframe_team_29/releases/tag/v3.0.0)
 - Trial mode in this session: guided customer try
 - Customer was able to view and discuss trial behavior during guided session: yes
 - Independent customer use in this session: not confirmed
