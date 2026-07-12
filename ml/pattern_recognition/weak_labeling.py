@@ -465,7 +465,9 @@ def _soft_flag(closes: Sequence[float], volumes: Sequence[float]) -> float:
     same_direction = impulse_return * post_return > 0
     first_volume = mean(volumes[:impulse_end]) if volumes else 0.0
     post_volume = mean(volumes[impulse_end:]) if volumes else 0.0
-    volume_score = 0.10 if first_volume <= 0 or post_volume < first_volume * 1.35 else 0.0
+    volume_score = (
+        0.10 if first_volume <= 0 or post_volume < first_volume * 1.35 else 0.0
+    )
     score = 0.08
     score += min(1.0, abs(impulse_return) / 4.0) * 0.30
     score += max(0.0, 1.0 - retrace_ratio / 0.8) * 0.28

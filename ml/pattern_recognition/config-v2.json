@@ -1,0 +1,47 @@
+{
+  "experiment": "pattern-real-data-v2",
+  "dataset": "binance-public-spot-1m-weak-labels-v2",
+  "seed": 42,
+  "modelType": "auto",
+  "timeframe": "1m",
+  "datasetTimeframes": [
+    "1m",
+    "5m",
+    "15m"
+  ],
+  "windowSize": 96,
+  "preparedDir": "data/ml/pattern_recognition/binance-public-spot-1m/prepared-v2",
+  "datasetPath": "data/ml/pattern_recognition/binance-public-spot-1m/prepared-v2/features.jsonl",
+  "maxExamplesPerClass": 14000,
+  "testFraction": 0.2,
+  "confidenceThreshold": 0.65,
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "AVAXUSDT",
+    "TONUSDT",
+    "TRXUSDT",
+    "BONKUSDT",
+    "PENGUUSDT",
+    "FLOKIUSDT"
+  ],
+  "labeling": {
+    "stride": 6,
+    "noneStrideMultiplier": 8,
+    "maxExamplesPerLabel": 5000,
+    "candidateCapPerLabelYear": 1500,
+    "minPatternScore": 0.56,
+    "hardNegativeMinScore": 0.38
+  },
+  "labels": [
+    "head_and_shoulders",
+    "triangle",
+    "flag",
+    "double_top",
+    "double_bottom",
+    "none"
+  ],
+  "outputDir": "ml/pattern_recognition/runs/real-data-v2"
+}

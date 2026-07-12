@@ -76,6 +76,20 @@ export interface ChartAlertLine {
   tone: "above" | "below";
 }
 
+export interface ChartPatternLine {
+  id: string;
+  points: [
+    {
+      time: number;
+      price: number;
+    },
+    {
+      time: number;
+      price: number;
+    },
+  ];
+}
+
 interface MarketChartProps {
   candles: DisplayCandle[];
   scopeKey: string;
@@ -84,6 +98,7 @@ interface MarketChartProps {
   hasMore: boolean;
   onLoadEarlier: () => void;
   alertLines?: ChartAlertLine[];
+  patternLines?: ChartPatternLine[];
 }
 
 type ChartMode = "candles" | "bars" | "line" | "area";
@@ -118,6 +133,8 @@ interface PrimitiveStyle {
   preview: boolean;
   precision: number;
   selected: boolean;
+  showPoints?: boolean;
+  lineWidth?: number;
 }
 
 interface ScreenPoint {
@@ -495,7 +512,8 @@ class DrawingPaneRenderer implements IPrimitivePaneRenderer {
           ? "#63d8ff"
           : this.style.color;
       ctx.save();
-      ctx.lineWidth = (this.style.selected ? 1.9 : 1.35) * ratio;
+      ctx.lineWidth =
+        (this.style.lineWidth ?? (this.style.selected ? 1.9 : 1.35)) * ratio;
       ctx.strokeStyle = color;
       ctx.fillStyle = this.style.fillColor;
       if (this.style.preview) ctx.setLineDash([5 * ratio, 4 * ratio]);
@@ -590,11 +608,13 @@ class DrawingPaneRenderer implements IPrimitivePaneRenderer {
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(x1, y1, 3 * ratio, 0, Math.PI * 2);
-        ctx.arc(x2, y2, 3 * ratio, 0, Math.PI * 2);
-        ctx.fill();
+        if (this.style.showPoints !== false) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x1, y1, 3 * ratio, 0, Math.PI * 2);
+          ctx.arc(x2, y2, 3 * ratio, 0, Math.PI * 2);
+          ctx.fill();
+        }
         if (this.style.selected) {
           drawHandle(ctx, x1, y1, color, ratio);
           drawHandle(ctx, x2, y2, color, ratio);
@@ -718,6 +738,7 @@ export default function MarketChart({
   hasMore,
   onLoadEarlier,
   alertLines = [],
+  patternLines = [],
 }: MarketChartProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -757,6 +778,9 @@ export default function MarketChart({
     primitive: DrawingPrimitive;
   } | null>(null);
   const drawingPrimitiveRefs = useRef<
+    Array<{ series: PriceLineSeries; primitive: DrawingPrimitive }>
+  >([]);
+  const patternPrimitiveRefs = useRef<
     Array<{ series: PriceLineSeries; primitive: DrawingPrimitive }>
   >([]);
   const drawingLevelRefs = useRef<
@@ -1778,6 +1802,9 @@ export default function MarketChart({
       for (const item of drawingPrimitiveRefs.current) {
         item.series.detachPrimitive(item.primitive);
       }
+      for (const item of patternPrimitiveRefs.current) {
+        item.series.detachPrimitive(item.primitive);
+      }
       for (const item of drawingLevelRefs.current) {
         item.series.removePriceLine(item.line);
       }
@@ -1796,6 +1823,7 @@ export default function MarketChart({
       bollingerLowerRef.current = null;
       alertLineRefs.current = [];
       drawingPrimitiveRefs.current = [];
+      patternPrimitiveRefs.current = [];
       drawingLevelRefs.current = [];
       renderedTimesRef.current = [];
       renderedSignaturesRef.current = [];
@@ -1991,6 +2019,45 @@ export default function MarketChart({
       drawingLevelRefs.current = [];
     };
   }, [chartMode, drawingSeries, drawings, precision, selectedDrawingId]);
+
+  useEffect(() => {
+    const series = drawingSeries();
+    if (!series) return;
+
+    for (const item of patternPrimitiveRefs.current) {
+      item.series.detachPrimitive(item.primitive);
+    }
+    patternPrimitiveRefs.current = [];
+
+    for (const line of patternLines) {
+      const drawing: ChartDrawing = {
+        id: line.id,
+        type: "trend",
+        points: line.points.map((point) => ({
+          time: point.time as UTCTimestamp,
+          price: point.price,
+        })),
+      };
+      const primitive = new DrawingPrimitive(drawing, {
+        color: "#2f7cff",
+        fillColor: "rgba(47, 124, 255, 0.10)",
+        preview: false,
+        precision,
+        selected: false,
+        showPoints: false,
+        lineWidth: 2,
+      });
+      series.attachPrimitive(primitive);
+      patternPrimitiveRefs.current.push({ series, primitive });
+    }
+
+    return () => {
+      for (const item of patternPrimitiveRefs.current) {
+        item.series.detachPrimitive(item.primitive);
+      }
+      patternPrimitiveRefs.current = [];
+    };
+  }, [chartMode, drawingSeries, patternLines, precision]);
 
   useEffect(() => {
     const candleSeries = candleSeriesRef.current;

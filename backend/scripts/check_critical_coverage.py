@@ -20,13 +20,17 @@ CRITICAL_MODULES = [
 ]
 
 
+def normalized_coverage_files(files: dict[str, object]) -> dict[str, object]:
+    return {path.replace("\\", "/"): entry for path, entry in files.items()}
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: check_critical_coverage.py coverage.json")
 
     coverage_path = Path(sys.argv[1])
     payload = json.loads(coverage_path.read_text(encoding="utf-8"))
-    files = payload.get("files", {})
+    files = normalized_coverage_files(payload.get("files", {}))
     failures: list[str] = []
 
     for module in CRITICAL_MODULES:
