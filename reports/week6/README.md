@@ -59,15 +59,9 @@ Public summary:
 
 ## Screenshots
 
-Place screenshots in `reports/week6/images/`:
+Screenshots are currently stored in the repository root (temporary location):
+
 1. Sprint 4 milestone page
 2. Release `v3.0.0` page
 3. One reviewed issue-linked PR page
 4. Week 6 report page preview
-
-### Week 6 Screenshots
-
-- Sprint 4 milestone: [sprint4-milestone](../../sprint4-milestone.png.jpg)
-- Release v3.0.0: [release-v3](../../release-v3.png.jpg)
-- Reviewed issue-linked PR: [reviewed-pr](../../reviewed-pr.png.jpg)
-- Week 6 report preview: [week6-report-preview](../../week6-report-preview.png.jpg)
