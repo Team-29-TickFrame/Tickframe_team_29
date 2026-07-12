@@ -67,7 +67,7 @@ Place screenshots in `reports/week6/images/`:
 
 ### Week 6 Screenshots
 
-- Sprint 4 milestone: `reports/week6/images/sprint4-milestone.png`
-- Release v3.0.0: `reports/week6/images/release-v3.png`
-- Reviewed issue-linked PR: `reports/week6/images/reviewed-pr.png`
-- Week 6 report preview: `reports/week6/images/week6-report-preview.png`
+- Sprint 4 milestone screenshot captured.
+- Release v3.0.0 screenshot captured.
+- Reviewed issue-linked PR screenshot captured.
+- Week 6 report preview screenshot captured.
