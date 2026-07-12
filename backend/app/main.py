@@ -116,11 +116,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+frontend_port = os.getenv("FRONTEND_PORT", "4173")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:4173",
-        "http://127.0.0.1:4173",
+        f"http://localhost:{frontend_port}",
+        f"http://127.0.0.1:{frontend_port}",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://tickframe.h1n.ru",

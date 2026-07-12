@@ -5,10 +5,12 @@ services:
       POSTGRES_DB: tickframe
       POSTGRES_USER: tickframe
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGPORT: ${POSTGRES_PORT:-5432}
+    command: ["postgres", "-p", "${POSTGRES_PORT:-5432}"]
     volumes:
       - tickframe-timescale-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tickframe -d tickframe"]
+      test: ["CMD-SHELL", "pg_isready -U tickframe -d tickframe -p ${POSTGRES_PORT:-5432}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -20,7 +22,9 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://tickframe:${POSTGRES_PASSWORD}@timescaledb:5432/tickframe
+      DATABASE_URL: postgresql+asyncpg://tickframe:${POSTGRES_PASSWORD}@timescaledb:${POSTGRES_PORT:-5432}/tickframe
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      FRONTEND_PORT: ${FRONTEND_PORT:-4173}
       TICKFRAME_BINANCE_REST_URLS: ${TICKFRAME_BINANCE_REST_URLS:-}
       TICKFRAME_BINANCE_WS_URLS: ${TICKFRAME_BINANCE_WS_URLS:-}
       TICKFRAME_BYBIT_REST_URLS: ${TICKFRAME_BYBIT_REST_URLS:-}
@@ -36,14 +40,14 @@ services:
       timescaledb:
         condition: service_healthy
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:-8000}:${BACKEND_PORT:-8000}"
     healthcheck:
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+          "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['BACKEND_PORT'] + '/health', timeout=3)",
         ]
       interval: 10s
       timeout: 5s
@@ -60,10 +64,14 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      FRONTEND_PORT: ${FRONTEND_PORT:-4173}
+      NGINX_ENVSUBST_FILTER: BACKEND_PORT|FRONTEND_PORT
     ports:
-      - "${FRONTEND_PORT:-4173}:80"
+      - "${FRONTEND_PORT:-4173}:${FRONTEND_PORT:-4173}"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$${FRONTEND_PORT}/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -73,19 +81,28 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9090}
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - >-
+        sed "s/BACKEND_PORT_PLACEHOLDER/$${BACKEND_PORT}/g"
+        /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml
+        && exec /bin/prometheus
+        --config.file=/tmp/prometheus.yml
+        --storage.tsdb.path=/prometheus
+        --web.console.libraries=/usr/share/prometheus/console_libraries
+        --web.console.templates=/usr/share/prometheus/consoles
+        --web.listen-address=:$${PROMETHEUS_PORT}
     volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml.template:ro
       - tickframe-prometheus-data:/prometheus
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+      - "${PROMETHEUS_PORT:-9090}:${PROMETHEUS_PORT:-9090}"
     restart: unless-stopped
 
   grafana:
@@ -95,6 +112,8 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-tickframe}
+      GF_SERVER_HTTP_PORT: ${GRAFANA_PORT:-3000}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9090}
       GF_USERS_DEFAULT_THEME: light
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -104,7 +123,7 @@ services:
       prometheus:
         condition: service_started
     ports:
-      - "${GRAFANA_PORT:-3000}:3000"
+      - "${GRAFANA_PORT:-3000}:${GRAFANA_PORT:-3000}"
     restart: unless-stopped
 
 volumes:

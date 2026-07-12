@@ -9,13 +9,18 @@ import {
 import type { CanvasRenderingTarget2D } from "fancy-canvas";
 import {
   CandlestickChart,
+  Camera,
   ChartArea,
   ChartLine,
+  ChartNoAxesCombined,
   ChartSpline,
   ClipboardPaste,
   Copy,
+  CopyPlus,
   Ellipsis,
   Eraser,
+  Expand,
+  Grid3X3,
   History,
   Maximize2,
   Minus,
@@ -26,16 +31,20 @@ import {
   Square,
   Trash2,
   TrendingUp,
+  Undo2,
+  Volume2,
   type LucideIcon,
 } from "lucide-react";
 import {
   AreaSeries,
+  BarSeries,
   CandlestickSeries,
   ColorType,
   CrosshairMode,
   HistogramSeries,
   LineSeries,
   LineStyle,
+  PriceScaleMode,
   createChart,
   type AutoscaleInfo,
   type Coordinate,
@@ -53,6 +62,12 @@ import {
 } from "lightweight-charts";
 import type { DisplayCandle } from "../types";
 import { safeStorageGet, safeStorageSet } from "../storage";
+import {
+  bollingerBands,
+  exponentialMovingAverage,
+  rollingVwap,
+  simpleMovingAverage,
+} from "../chart-indicators";
 
 export interface ChartAlertLine {
   id: string;
@@ -86,11 +101,13 @@ interface MarketChartProps {
   patternLines?: ChartPatternLine[];
 }
 
-type ChartMode = "candles" | "line" | "area";
+type ChartMode = "candles" | "bars" | "line" | "area";
+type IndicatorId = "ema20" | "sma50" | "bollinger20" | "vwap100";
 type DrawingTool = "cursor" | "trend" | "rect" | "level" | "vertical" | "fib" | "measure";
 type DrawingType = Exclude<DrawingTool, "cursor">;
 type PriceLineSeries =
   | ISeriesApi<"Candlestick">
+  | ISeriesApi<"Bar">
   | ISeriesApi<"Line">
   | ISeriesApi<"Area">;
 
@@ -144,7 +161,9 @@ interface DrawingEditSession {
 }
 
 const DEFAULT_VISIBLE_BARS = 120;
+const INDICATOR_MAX_BARS = 5_000;
 const DRAWINGS_STORAGE_PREFIX = "tickframe.chartDrawings.v2:";
+const CHART_PREFERENCES_STORAGE_KEY = "tickframe.chartPreferences.v1";
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
 const DRAWING_TOOLS: Array<{
@@ -163,6 +182,7 @@ const DRAWING_TOOLS: Array<{
 
 const CHART_MODES: Array<{ id: ChartMode; label: string }> = [
   { id: "candles", label: "Candles" },
+  { id: "bars", label: "Bars" },
   { id: "line", label: "Line" },
   { id: "area", label: "Area" },
 ];
@@ -179,9 +199,74 @@ const DRAWING_TOOL_ICONS: Record<DrawingTool, LucideIcon> = {
 
 const CHART_MODE_ICONS: Record<ChartMode, LucideIcon> = {
   candles: CandlestickChart,
+  bars: ChartNoAxesCombined,
   line: ChartLine,
   area: ChartArea,
 };
+
+interface ChartPreferences {
+  chartMode: ChartMode;
+  indicators: Record<IndicatorId, boolean>;
+  logarithmicScale: boolean;
+  magnetCrosshair: boolean;
+  showGrid: boolean;
+  showVolume: boolean;
+}
+
+const DEFAULT_CHART_PREFERENCES: ChartPreferences = {
+  chartMode: "candles",
+  indicators: {
+    ema20: true,
+    sma50: false,
+    bollinger20: false,
+    vwap100: false,
+  },
+  logarithmicScale: false,
+  magnetCrosshair: true,
+  showGrid: true,
+  showVolume: true,
+};
+
+const INDICATORS: Array<{
+  id: IndicatorId;
+  label: string;
+  detail: string;
+  color: string;
+}> = [
+  { id: "ema20", label: "EMA 20", detail: "Fast trend", color: "#f6c86b" },
+  { id: "sma50", label: "SMA 50", detail: "Structure", color: "#63d8ff" },
+  {
+    id: "bollinger20",
+    label: "Bollinger 20",
+    detail: "2 standard deviations",
+    color: "#b9aaff",
+  },
+  { id: "vwap100", label: "VWAP 100", detail: "Volume weighted", color: "#5df2b5" },
+];
+
+function loadChartPreferences(): ChartPreferences {
+  try {
+    const raw = safeStorageGet(CHART_PREFERENCES_STORAGE_KEY);
+    if (!raw) return DEFAULT_CHART_PREFERENCES;
+    const parsed = JSON.parse(raw) as Partial<ChartPreferences>;
+    const chartMode = CHART_MODES.some((mode) => mode.id === parsed.chartMode)
+      ? parsed.chartMode as ChartMode
+      : DEFAULT_CHART_PREFERENCES.chartMode;
+    return {
+      chartMode,
+      indicators: {
+        ...DEFAULT_CHART_PREFERENCES.indicators,
+        ...(parsed.indicators ?? {}),
+      },
+      logarithmicScale: parsed.logarithmicScale === true,
+      magnetCrosshair: parsed.magnetCrosshair !== false,
+      showGrid: parsed.showGrid !== false,
+      showVolume: parsed.showVolume !== false,
+    };
+  } catch {
+    return DEFAULT_CHART_PREFERENCES;
+  }
+}
 
 function volumeColor(candle: DisplayCandle): string {
   return candle.close >= candle.open
@@ -240,18 +325,30 @@ function loadStoredDrawings(scopeKey: string): ChartDrawing[] {
   try {
     const raw = safeStorageGet(drawingStorageKey(scopeKey));
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as ChartDrawing[];
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (drawing) =>
-        typeof drawing.id === "string" &&
-        isDrawingType(drawing.type) &&
-        Array.isArray(drawing.points) &&
+    return parsed.filter((value): value is ChartDrawing => {
+      if (!value || typeof value !== "object") return false;
+      const drawing = value as Partial<ChartDrawing>;
+      if (
+        typeof drawing.id !== "string" ||
+        !isDrawingType(drawing.type) ||
+        !Array.isArray(drawing.points)
+      ) {
+        return false;
+      }
+      const requiredPoints =
+        drawing.type === "level" || drawing.type === "vertical" ? 1 : 2;
+      return (
+        drawing.points.length >= requiredPoints &&
         drawing.points.every(
           (point) =>
-            Number.isFinite(point.time) && Number.isFinite(point.price),
-        ),
-    );
+            Boolean(point) &&
+            Number.isFinite(point.time) &&
+            Number.isFinite(point.price),
+        )
+      );
+    });
   } catch {
     return [];
   }
@@ -406,7 +503,7 @@ class DrawingPaneRenderer implements IPrimitivePaneRenderer {
   draw(target: CanvasRenderingTarget2D) {
     target.useBitmapCoordinateSpace((scope) => {
       const [first, second] = this.points;
-      if (first?.x === null || first?.y === null) return;
+      if (!first || first.x === null || first.y === null) return;
       const ctx = scope.context;
       const ratio = Math.max(scope.horizontalPixelRatio, scope.verticalPixelRatio);
       const color = this.style.preview
@@ -623,9 +720,11 @@ class DrawingPrimitive implements ISeriesPrimitive<Time> {
 function activePriceSeries(
   mode: ChartMode,
   candleSeries: ISeriesApi<"Candlestick"> | null,
+  barSeries: ISeriesApi<"Bar"> | null,
   lineSeries: ISeriesApi<"Line"> | null,
   areaSeries: ISeriesApi<"Area"> | null,
 ): PriceLineSeries | null {
+  if (mode === "bars") return barSeries;
   if (mode === "line") return lineSeries;
   if (mode === "area") return areaSeries;
   return candleSeries;
@@ -641,12 +740,20 @@ export default function MarketChart({
   alertLines = [],
   patternLines = [],
 }: MarketChartProps) {
+  const stageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const barSeriesRef = useRef<ISeriesApi<"Bar"> | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const vwapSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bollingerUpperRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bollingerMiddleRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bollingerLowerRef = useRef<ISeriesApi<"Line"> | null>(null);
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<{
     from: number;
     to: number;
@@ -682,14 +789,25 @@ export default function MarketChart({
   const alertLineRefs = useRef<
     Array<{ series: PriceLineSeries; line: IPriceLine }>
   >([]);
-  const [chartMode, setChartMode] = useState<ChartMode>("candles");
+  const [chartPreferences, setChartPreferences] = useState<ChartPreferences>(
+    loadChartPreferences,
+  );
+  const chartMode = chartPreferences.chartMode;
+  const setChartMode = useCallback((mode: ChartMode) => {
+    setChartPreferences((current) => ({ ...current, chartMode: mode }));
+  }, []);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [editingDrawing, setEditingDrawing] = useState(false);
+  const [drawingHoverAction, setDrawingHoverAction] =
+    useState<DrawingHit["action"] | null>(null);
   const [hasCopiedDrawing, setHasCopiedDrawing] = useState(false);
   const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
+  const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
+  const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
   const [drawingToolsOpen, setDrawingToolsOpen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [inspectCandle, setInspectCandle] = useState<DisplayCandle | null>(null);
   const latestCandle = candles.at(-1) ?? null;
   const readoutCandle = inspectCandle ?? latestCandle;
@@ -705,6 +823,11 @@ export default function MarketChart({
     [candles, visibleLogicalRange],
   );
 
+  const selectDrawing = useCallback((drawingId: string | null) => {
+    selectedDrawingIdRef.current = drawingId;
+    setSelectedDrawingId(drawingId);
+  }, []);
+
   const detachPreview = useCallback(() => {
     const preview = previewPrimitiveRef.current;
     if (!preview) return;
@@ -715,6 +838,24 @@ export default function MarketChart({
   useEffect(() => {
     historyStateRef.current = { hasMore, historyLoading, onLoadEarlier };
   }, [hasMore, historyLoading, onLoadEarlier]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      safeStorageSet(
+        CHART_PREFERENCES_STORAGE_KEY,
+        JSON.stringify(chartPreferences),
+      );
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [chartPreferences]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === stageRef.current);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     precisionRef.current = precision;
@@ -730,7 +871,8 @@ export default function MarketChart({
       draftPointRef.current = null;
       detachPreview();
     } else {
-      setSelectedDrawingId(null);
+      selectDrawing(null);
+      setDrawingHoverAction(null);
     }
     chartRef.current?.applyOptions({
       handleScroll: {
@@ -745,7 +887,7 @@ export default function MarketChart({
         pinch: true,
       },
     });
-  }, [activeTool, detachPreview]);
+  }, [activeTool, detachPreview, selectDrawing]);
 
   useEffect(() => {
     candlesRef.current = candles;
@@ -756,12 +898,13 @@ export default function MarketChart({
     suppressDrawingSaveRef.current = true;
     draftPointRef.current = null;
     detachPreview();
-    setSelectedDrawingId(null);
+    selectDrawing(null);
+    setDrawingHoverAction(null);
     drawingEditSessionRef.current = null;
     setEditingDrawing(false);
     setDrawings(loadStoredDrawings(scopeKey));
     setInspectCandle(null);
-  }, [detachPreview, scopeKey]);
+  }, [detachPreview, scopeKey, selectDrawing]);
 
   useEffect(() => {
     if (suppressDrawingSaveRef.current) {
@@ -779,15 +922,16 @@ export default function MarketChart({
       selectedDrawingId !== null &&
       !drawings.some((drawing) => drawing.id === selectedDrawingId)
     ) {
-      setSelectedDrawingId(null);
+      selectDrawing(null);
     }
-  }, [drawings, selectedDrawingId]);
+  }, [drawings, selectDrawing, selectedDrawingId]);
 
   const drawingSeries = useCallback(
     () =>
       activePriceSeries(
         chartModeRef.current,
         candleSeriesRef.current,
+        barSeriesRef.current,
         lineSeriesRef.current,
         areaSeriesRef.current,
       ),
@@ -819,6 +963,61 @@ export default function MarketChart({
     chartRef.current?.timeScale().scrollToRealTime();
   }, []);
 
+  const toggleIndicator = useCallback((indicator: IndicatorId) => {
+    setChartPreferences((current) => ({
+      ...current,
+      indicators: {
+        ...current.indicators,
+        [indicator]: !current.indicators[indicator],
+      },
+    }));
+  }, []);
+
+  const toggleChartPreference = useCallback(
+    (
+      preference:
+        | "logarithmicScale"
+        | "magnetCrosshair"
+        | "showGrid"
+        | "showVolume",
+    ) => {
+      setChartPreferences((current) => ({
+        ...current,
+        [preference]: !current[preference],
+      }));
+    },
+    [],
+  );
+
+  const toggleFullscreen = useCallback(async () => {
+    const stage = stageRef.current;
+    if (!stage || !document.fullscreenEnabled) return;
+    try {
+      if (document.fullscreenElement === stage) {
+        await document.exitFullscreen();
+        return;
+      }
+      await stage.requestFullscreen();
+    } catch {
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  const saveSnapshot = useCallback(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const canvas = chart.takeScreenshot(true, true);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = `tickframe-${scopeKey.replace(/[^a-z0-9-]+/gi, "-")}.png`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    }, "image/png");
+  }, [scopeKey]);
+
   const pointFromMouse = useCallback((param: MouseEventParams<Time>): DrawingPoint | null => {
     const series = drawingSeries();
     if (!series || !param.point || typeof param.time !== "number") return null;
@@ -830,9 +1029,13 @@ export default function MarketChart({
     };
   }, [drawingSeries]);
 
-  const addDrawing = useCallback((drawing: ChartDrawing) => {
-    setDrawings((current) => [...current, drawing]);
-  }, []);
+  const addDrawing = useCallback(
+    (drawing: ChartDrawing) => {
+      setDrawings((current) => [...current, drawing]);
+      selectDrawing(drawing.id);
+    },
+    [selectDrawing],
+  );
 
   const updatePreview = useCallback(
     (drawing: ChartDrawing | null) => {
@@ -860,21 +1063,19 @@ export default function MarketChart({
   );
 
   const undoDrawing = useCallback(() => {
-    setDrawings((current) => {
-      const removed = current.at(-1);
-      if (removed?.id === selectedDrawingIdRef.current) {
-        setSelectedDrawingId(null);
-      }
-      return current.slice(0, -1);
-    });
-  }, []);
+    const removed = drawings.at(-1);
+    if (!removed) return;
+    setDrawings(drawings.slice(0, -1));
+    if (removed.id === selectedDrawingIdRef.current) selectDrawing(null);
+  }, [drawings, selectDrawing]);
 
   const clearDrawings = useCallback(() => {
     draftPointRef.current = null;
     detachPreview();
-    setSelectedDrawingId(null);
+    selectDrawing(null);
+    setDrawingHoverAction(null);
     setDrawings([]);
-  }, [detachPreview]);
+  }, [detachPreview, selectDrawing]);
 
   const deleteSelectedDrawing = useCallback(() => {
     const drawingId = selectedDrawingIdRef.current;
@@ -882,10 +1083,11 @@ export default function MarketChart({
     setDrawings((current) =>
       current.filter((drawing) => drawing.id !== drawingId),
     );
-    setSelectedDrawingId(null);
+    selectDrawing(null);
+    setDrawingHoverAction(null);
     drawingEditSessionRef.current = null;
     setEditingDrawing(false);
-  }, []);
+  }, [selectDrawing]);
 
   const copySelectedDrawing = useCallback(() => {
     const drawingId = selectedDrawingIdRef.current;
@@ -899,12 +1101,10 @@ export default function MarketChart({
     setHasCopiedDrawing(true);
   }, [drawings]);
 
-  const pasteCopiedDrawing = useCallback(() => {
-    const drawing = copiedDrawingRef.current;
-    if (!drawing) return;
+  const offsetDrawingCopy = useCallback((drawing: ChartDrawing) => {
     const timeDelta = candleTimeStep(candlesRef.current) * 8;
     const priceDelta = visiblePriceRange(candlesRef.current, drawing) * 0.035;
-    const pasted = moveDrawing(
+    return moveDrawing(
       {
         ...drawing,
         id: createDrawingId(),
@@ -913,9 +1113,55 @@ export default function MarketChart({
       timeDelta,
       priceDelta,
     );
-    setDrawings((current) => [...current, pasted]);
-    setSelectedDrawingId(pasted.id);
   }, []);
+
+  const appendDrawingCopy = useCallback(
+    (drawing: ChartDrawing) => {
+      const copy = offsetDrawingCopy(drawing);
+      setDrawings((current) => [...current, copy]);
+      selectDrawing(copy.id);
+    },
+    [offsetDrawingCopy, selectDrawing],
+  );
+
+  const pasteCopiedDrawing = useCallback(() => {
+    const drawing = copiedDrawingRef.current;
+    if (!drawing) return;
+    appendDrawingCopy(drawing);
+  }, [appendDrawingCopy]);
+
+  const duplicateSelectedDrawing = useCallback(() => {
+    const drawingId = selectedDrawingIdRef.current;
+    if (!drawingId) return;
+    const drawing = drawings.find((item) => item.id === drawingId);
+    if (!drawing) return;
+    appendDrawingCopy(drawing);
+  }, [appendDrawingCopy, drawings]);
+
+  const nudgeSelectedDrawing = useCallback(
+    (timeDirection: -1 | 0 | 1, priceDirection: -1 | 0 | 1, amount: number) => {
+      const drawingId = selectedDrawingIdRef.current;
+      if (!drawingId) return;
+      setDrawings((current) =>
+        current.map((drawing) => {
+          if (drawing.id !== drawingId) return drawing;
+          const timeDelta =
+            drawing.type === "level"
+              ? 0
+              : candleTimeStep(candlesRef.current) * timeDirection * amount;
+          const priceDelta =
+            drawing.type === "vertical"
+              ? 0
+              : visiblePriceRange(candlesRef.current, drawing) *
+                0.0025 *
+                priceDirection *
+                amount;
+          return moveDrawing(drawing, timeDelta, priceDelta);
+        }),
+      );
+    },
+    [],
+  );
 
   const drawingScreenPoints = useCallback(
     (drawing: ChartDrawing): ScreenPoint[] | null => {
@@ -1026,8 +1272,13 @@ export default function MarketChart({
     [drawingSeries],
   );
 
+  const isChartCanvasTarget = useCallback((target: EventTarget | null) => {
+    return target instanceof Node && Boolean(containerRef.current?.contains(target));
+  }, []);
+
   const finishDrawingEdit = useCallback(
     (event?: ReactPointerEvent<HTMLDivElement>) => {
+      if (!drawingEditSessionRef.current) return;
       if (
         event &&
         event.currentTarget.hasPointerCapture(event.pointerId)
@@ -1036,6 +1287,7 @@ export default function MarketChart({
       }
       drawingEditSessionRef.current = null;
       setEditingDrawing(false);
+      setDrawingHoverAction(null);
       chartRef.current?.applyOptions({
         handleScroll: {
           mouseWheel: true,
@@ -1050,18 +1302,27 @@ export default function MarketChart({
 
   const startDrawingEdit = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (activeToolRef.current !== "cursor") return;
+      if (
+        activeToolRef.current !== "cursor" ||
+        event.button !== 0 ||
+        !event.isPrimary ||
+        !isChartCanvasTarget(event.target)
+      ) {
+        return;
+      }
       const pointer = pointerChartPoint(event);
       if (!pointer) return;
       const hit = hitTestDrawing(pointer);
       if (!hit) {
-        setSelectedDrawingId(null);
+        selectDrawing(null);
+        setDrawingHoverAction(null);
         return;
       }
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
-      setSelectedDrawingId(hit.drawing.id);
+      selectDrawing(hit.drawing.id);
+      setDrawingHoverAction(hit.action);
       drawingEditSessionRef.current = {
         drawingId: hit.drawing.id,
         action: hit.action,
@@ -1079,13 +1340,26 @@ export default function MarketChart({
         },
       });
     },
-    [hitTestDrawing, pointerChartPoint],
+    [hitTestDrawing, isChartCanvasTarget, pointerChartPoint, selectDrawing],
   );
 
   const moveDrawingEdit = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const session = drawingEditSessionRef.current;
-      if (!session) return;
+      if (!session) {
+        if (
+          activeToolRef.current !== "cursor" ||
+          !isChartCanvasTarget(event.target)
+        ) {
+          setDrawingHoverAction(null);
+          return;
+        }
+        const pointer = pointerChartPoint(event);
+        setDrawingHoverAction(
+          pointer ? hitTestDrawing(pointer)?.action ?? null : null,
+        );
+        return;
+      }
       const pointer = pointerChartPoint(event);
       if (!pointer) return;
       event.preventDefault();
@@ -1110,7 +1384,7 @@ export default function MarketChart({
         ),
       );
     },
-    [pointerChartPoint],
+    [hitTestDrawing, isChartCanvasTarget, pointerChartPoint],
   );
 
   useEffect(() => {
@@ -1131,8 +1405,106 @@ export default function MarketChart({
         }
         return;
       }
+      if ((event.ctrlKey || event.metaKey) && shortcutKey === "d") {
+        if (selectedDrawingIdRef.current) {
+          event.preventDefault();
+          duplicateSelectedDrawing();
+        }
+        return;
+      }
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        shortcutKey === "z"
+      ) {
+        if (drawings.length > 0) {
+          event.preventDefault();
+          undoDrawing();
+        }
+        return;
+      }
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (
+          selectedDrawingIdRef.current &&
+          ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
+            event.key,
+          )
+        ) {
+          event.preventDefault();
+          const amount = event.shiftKey ? 5 : 1;
+          nudgeSelectedDrawing(
+            event.key === "ArrowLeft"
+              ? -1
+              : event.key === "ArrowRight"
+                ? 1
+                : 0,
+            event.key === "ArrowDown"
+              ? -1
+              : event.key === "ArrowUp"
+                ? 1
+                : 0,
+            amount,
+          );
+          return;
+        }
+        const modeByKey: Partial<Record<string, ChartMode>> = {
+          "1": "candles",
+          "2": "bars",
+          "3": "line",
+          "4": "area",
+        };
+        const mode = modeByKey[event.key];
+        if (mode) {
+          event.preventDefault();
+          setChartMode(mode);
+          return;
+        }
+        if (shortcutKey === "i") {
+          event.preventDefault();
+          setIndicatorMenuOpen((open) => !open);
+          setDisplayMenuOpen(false);
+          return;
+        }
+        if (shortcutKey === "g") {
+          event.preventDefault();
+          toggleChartPreference("showGrid");
+          return;
+        }
+        if (shortcutKey === "v") {
+          event.preventDefault();
+          toggleChartPreference("showVolume");
+          return;
+        }
+        if (shortcutKey === "l") {
+          event.preventDefault();
+          toggleChartPreference("logarithmicScale");
+          return;
+        }
+        if (shortcutKey === "m") {
+          event.preventDefault();
+          toggleChartPreference("magnetCrosshair");
+          return;
+        }
+        if (shortcutKey === "f") {
+          event.preventDefault();
+          void toggleFullscreen();
+          return;
+        }
+        if (shortcutKey === "r") {
+          event.preventDefault();
+          resetViewport();
+          return;
+        }
+        if (event.key === "End") {
+          event.preventDefault();
+          scrollToLatest();
+          return;
+        }
+      }
       if (event.key === "Escape") {
         setDrawingMenuOpen(false);
+        setIndicatorMenuOpen(false);
+        setDisplayMenuOpen(false);
         if (activeToolRef.current !== "cursor") {
           draftPointRef.current = null;
           detachPreview();
@@ -1140,7 +1512,7 @@ export default function MarketChart({
           return;
         }
         if (selectedDrawingIdRef.current) {
-          setSelectedDrawingId(null);
+          selectDrawing(null);
         }
         return;
       }
@@ -1154,7 +1526,22 @@ export default function MarketChart({
     };
     window.addEventListener("keydown", handleDrawingKeys);
     return () => window.removeEventListener("keydown", handleDrawingKeys);
-  }, [copySelectedDrawing, deleteSelectedDrawing, detachPreview, pasteCopiedDrawing]);
+  }, [
+    copySelectedDrawing,
+    deleteSelectedDrawing,
+    detachPreview,
+    drawings.length,
+    duplicateSelectedDrawing,
+    nudgeSelectedDrawing,
+    pasteCopiedDrawing,
+    resetViewport,
+    scrollToLatest,
+    setChartMode,
+    selectDrawing,
+    toggleChartPreference,
+    toggleFullscreen,
+    undoDrawing,
+  ]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1168,11 +1555,21 @@ export default function MarketChart({
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: "rgba(255, 255, 255, 0.045)" },
-        horzLines: { color: "rgba(255, 255, 255, 0.045)" },
+        vertLines: {
+          color: chartPreferences.showGrid
+            ? "rgba(255, 255, 255, 0.045)"
+            : "rgba(255, 255, 255, 0)",
+        },
+        horzLines: {
+          color: chartPreferences.showGrid
+            ? "rgba(255, 255, 255, 0.045)"
+            : "rgba(255, 255, 255, 0)",
+        },
       },
       crosshair: {
-        mode: CrosshairMode.Normal,
+        mode: chartPreferences.magnetCrosshair
+          ? CrosshairMode.Magnet
+          : CrosshairMode.Normal,
         vertLine: {
           color: "rgba(124, 77, 255, 0.5)",
           labelBackgroundColor: "#17172a",
@@ -1184,6 +1581,9 @@ export default function MarketChart({
       },
       rightPriceScale: {
         borderColor: "rgba(255, 255, 255, 0.08)",
+        mode: chartPreferences.logarithmicScale
+          ? PriceScaleMode.Logarithmic
+          : PriceScaleMode.Normal,
         scaleMargins: { top: 0.08, bottom: 0.25 },
       },
       timeScale: {
@@ -1215,15 +1615,25 @@ export default function MarketChart({
       borderVisible: false,
       priceLineColor: "#7c4dff",
       priceLineWidth: 1,
-      lastValueVisible: true,
+      lastValueVisible: chartMode === "candles",
+      visible: chartMode === "candles",
+    });
+
+    const barSeries = chart.addSeries(BarSeries, {
+      upColor: "#35e58a",
+      downColor: "#ff4e67",
+      thinBars: true,
+      priceLineColor: "#7c4dff",
+      lastValueVisible: chartMode === "bars",
+      visible: chartMode === "bars",
     });
 
     const lineSeries = chart.addSeries(LineSeries, {
       color: "#9b7cff",
       lineWidth: 2,
-      lastValueVisible: true,
+      lastValueVisible: chartMode === "line",
       priceLineColor: "#7c4dff",
-      visible: false,
+      visible: chartMode === "line",
     });
 
     const areaSeries = chart.addSeries(AreaSeries, {
@@ -1231,9 +1641,9 @@ export default function MarketChart({
       topColor: "rgba(124, 77, 255, 0.28)",
       bottomColor: "rgba(124, 77, 255, 0.02)",
       lineWidth: 2,
-      lastValueVisible: true,
+      lastValueVisible: chartMode === "area",
       priceLineColor: "#7c4dff",
-      visible: false,
+      visible: chartMode === "area",
     });
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
@@ -1241,16 +1651,71 @@ export default function MarketChart({
       priceScaleId: "",
       lastValueVisible: false,
       priceLineVisible: false,
+      visible: chartPreferences.showVolume,
     });
     volumeSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.82, bottom: 0 },
     });
 
+    const addIndicatorSeries = (
+      color: string,
+      lineStyle = LineStyle.Solid,
+      lineWidth: 1 | 2 | 3 | 4 = 1,
+    ) =>
+      chart.addSeries(LineSeries, {
+        color,
+        lineStyle,
+        lineWidth,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        visible: false,
+      });
+    const emaSeries = addIndicatorSeries("#f6c86b", LineStyle.Solid, 2);
+    const smaSeries = addIndicatorSeries("#63d8ff", LineStyle.Solid, 2);
+    const vwapSeries = addIndicatorSeries("#5df2b5", LineStyle.Dashed, 2);
+    const bollingerUpper = addIndicatorSeries("rgba(185, 170, 255, 0.8)");
+    const bollingerMiddle = addIndicatorSeries(
+      "rgba(185, 170, 255, 0.52)",
+      LineStyle.Dashed,
+    );
+    const bollingerLower = addIndicatorSeries("rgba(185, 170, 255, 0.8)");
+
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
+    barSeriesRef.current = barSeries;
     lineSeriesRef.current = lineSeries;
     areaSeriesRef.current = areaSeries;
     volumeSeriesRef.current = volumeSeries;
+    emaSeriesRef.current = emaSeries;
+    smaSeriesRef.current = smaSeries;
+    vwapSeriesRef.current = vwapSeries;
+    bollingerUpperRef.current = bollingerUpper;
+    bollingerMiddleRef.current = bollingerMiddle;
+    bollingerLowerRef.current = bollingerLower;
+
+    const indicatorSource = candles.slice(-INDICATOR_MAX_BARS);
+    if (chartPreferences.indicators.ema20) {
+      emaSeries.applyOptions({ visible: true });
+      emaSeries.setData(exponentialMovingAverage(indicatorSource, 20));
+    }
+    if (chartPreferences.indicators.sma50) {
+      smaSeries.applyOptions({ visible: true });
+      smaSeries.setData(simpleMovingAverage(indicatorSource, 50));
+    }
+    if (chartPreferences.indicators.vwap100) {
+      vwapSeries.applyOptions({ visible: true });
+      vwapSeries.setData(rollingVwap(indicatorSource, 100));
+    }
+    if (chartPreferences.indicators.bollinger20) {
+      const bands = bollingerBands(indicatorSource, 20);
+      for (const series of [bollingerUpper, bollingerMiddle, bollingerLower]) {
+        series.applyOptions({ visible: true });
+      }
+      bollingerUpper.setData(bands.upper);
+      bollingerMiddle.setData(bands.middle);
+      bollingerLower.setData(bands.lower);
+    }
 
     const handleVisibleRange = (range: { from: number; to: number } | null) => {
       setVisibleLogicalRange(range);
@@ -1346,9 +1811,16 @@ export default function MarketChart({
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
+      barSeriesRef.current = null;
       lineSeriesRef.current = null;
       areaSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      emaSeriesRef.current = null;
+      smaSeriesRef.current = null;
+      vwapSeriesRef.current = null;
+      bollingerUpperRef.current = null;
+      bollingerMiddleRef.current = null;
+      bollingerLowerRef.current = null;
       alertLineRefs.current = [];
       drawingPrimitiveRefs.current = [];
       patternPrimitiveRefs.current = [];
@@ -1360,12 +1832,18 @@ export default function MarketChart({
 
   useEffect(() => {
     const candleSeries = candleSeriesRef.current;
+    const barSeries = barSeriesRef.current;
     const lineSeries = lineSeriesRef.current;
     const areaSeries = areaSeriesRef.current;
-    if (!candleSeries || !lineSeries || !areaSeries) return;
+    if (!candleSeries || !barSeries || !lineSeries || !areaSeries) return;
 
     for (const item of alertLineRefs.current) item.series.removePriceLine(item.line);
-    const seriesList: PriceLineSeries[] = [candleSeries, lineSeries, areaSeries];
+    const seriesList: PriceLineSeries[] = [
+      candleSeries,
+      barSeries,
+      lineSeries,
+      areaSeries,
+    ];
     alertLineRefs.current = seriesList.flatMap((series) =>
       alertLines.map((line) => ({
         series,
@@ -1396,6 +1874,10 @@ export default function MarketChart({
       visible: chartMode === "candles",
       lastValueVisible: chartMode === "candles",
     });
+    barSeriesRef.current?.applyOptions({
+      visible: chartMode === "bars",
+      lastValueVisible: chartMode === "bars",
+    });
     lineSeriesRef.current?.applyOptions({
       visible: chartMode === "line",
       lastValueVisible: chartMode === "line",
@@ -1405,6 +1887,73 @@ export default function MarketChart({
       lastValueVisible: chartMode === "area",
     });
   }, [chartMode, detachPreview]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const volumeSeries = volumeSeriesRef.current;
+    if (!chart || !volumeSeries) return;
+    const gridColor = chartPreferences.showGrid
+      ? "rgba(255, 255, 255, 0.045)"
+      : "rgba(255, 255, 255, 0)";
+    chart.applyOptions({
+      crosshair: {
+        mode: chartPreferences.magnetCrosshair
+          ? CrosshairMode.Magnet
+          : CrosshairMode.Normal,
+      },
+      grid: {
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor },
+      },
+      rightPriceScale: {
+        mode: chartPreferences.logarithmicScale
+          ? PriceScaleMode.Logarithmic
+          : PriceScaleMode.Normal,
+      },
+    });
+    volumeSeries.applyOptions({ visible: chartPreferences.showVolume });
+  }, [
+    chartPreferences.logarithmicScale,
+    chartPreferences.magnetCrosshair,
+    chartPreferences.showGrid,
+    chartPreferences.showVolume,
+  ]);
+
+  useEffect(() => {
+    const emaSeries = emaSeriesRef.current;
+    const smaSeries = smaSeriesRef.current;
+    const vwapSeries = vwapSeriesRef.current;
+    const upperSeries = bollingerUpperRef.current;
+    const middleSeries = bollingerMiddleRef.current;
+    const lowerSeries = bollingerLowerRef.current;
+    if (
+      !emaSeries ||
+      !smaSeries ||
+      !vwapSeries ||
+      !upperSeries ||
+      !middleSeries ||
+      !lowerSeries
+    ) return;
+
+    const source = candles.slice(-INDICATOR_MAX_BARS);
+    const { indicators } = chartPreferences;
+    emaSeries.applyOptions({ visible: indicators.ema20 });
+    smaSeries.applyOptions({ visible: indicators.sma50 });
+    vwapSeries.applyOptions({ visible: indicators.vwap100 });
+    upperSeries.applyOptions({ visible: indicators.bollinger20 });
+    middleSeries.applyOptions({ visible: indicators.bollinger20 });
+    lowerSeries.applyOptions({ visible: indicators.bollinger20 });
+
+    if (indicators.ema20) emaSeries.setData(exponentialMovingAverage(source, 20));
+    if (indicators.sma50) smaSeries.setData(simpleMovingAverage(source, 50));
+    if (indicators.vwap100) vwapSeries.setData(rollingVwap(source, 100));
+    if (indicators.bollinger20) {
+      const bands = bollingerBands(source, 20);
+      upperSeries.setData(bands.upper);
+      middleSeries.setData(bands.middle);
+      lowerSeries.setData(bands.lower);
+    }
+  }, [candles, chartPreferences.indicators]);
 
   useEffect(() => {
     const series = drawingSeries();
@@ -1426,6 +1975,7 @@ export default function MarketChart({
         if (!point) continue;
         const seriesList = [
           candleSeriesRef.current,
+          barSeriesRef.current,
           lineSeriesRef.current,
           areaSeriesRef.current,
         ].filter((item): item is PriceLineSeries => item !== null);
@@ -1511,11 +2061,19 @@ export default function MarketChart({
 
   useEffect(() => {
     const candleSeries = candleSeriesRef.current;
+    const barSeries = barSeriesRef.current;
     const lineSeries = lineSeriesRef.current;
     const areaSeries = areaSeriesRef.current;
     const volumeSeries = volumeSeriesRef.current;
     const chart = chartRef.current;
-    if (!candleSeries || !lineSeries || !areaSeries || !volumeSeries || !chart) return;
+    if (
+      !candleSeries ||
+      !barSeries ||
+      !lineSeries ||
+      !areaSeries ||
+      !volumeSeries ||
+      !chart
+    ) return;
 
     const previousRange = previousRangeRef.current;
     const visibleRange = chart.timeScale().getVisibleRange();
@@ -1544,8 +2102,19 @@ export default function MarketChart({
       minMove: 1 / multiplier,
     };
     candleSeries.applyOptions({ priceFormat });
+    barSeries.applyOptions({ priceFormat });
     lineSeries.applyOptions({ priceFormat });
     areaSeries.applyOptions({ priceFormat });
+    for (const indicatorSeries of [
+      emaSeriesRef.current,
+      smaSeriesRef.current,
+      vwapSeriesRef.current,
+      bollingerUpperRef.current,
+      bollingerMiddleRef.current,
+      bollingerLowerRef.current,
+    ]) {
+      indicatorSeries?.applyOptions({ priceFormat });
+    }
 
     const candlePoints = candles.map((candle) => ({
       time: candle.time as UTCTimestamp,
@@ -1594,12 +2163,14 @@ export default function MarketChart({
     if (canUpdateTail) {
       for (let index = firstChangedIndex; index < candles.length; index += 1) {
         candleSeries.update(candlePoints[index]);
+        barSeries.update(candlePoints[index]);
         lineSeries.update(closePoints[index]);
         areaSeries.update(closePoints[index]);
         volumeSeries.update(volumePoints[index]);
       }
     } else {
       candleSeries.setData(candlePoints);
+      barSeries.setData(candlePoints);
       lineSeries.setData(closePoints);
       areaSeries.setData(closePoints);
       volumeSeries.setData(volumePoints);
@@ -1630,10 +2201,28 @@ export default function MarketChart({
       : drawings.length === 0
       ? "No drawings"
       : `${drawings.length} drawing${drawings.length === 1 ? "" : "s"}`;
+  const chartStageClassName = [
+    "chart-stage",
+    activeTool !== "cursor" ? "is-drawing-mode" : "",
+    drawingHoverAction === "move" ? "is-drawing-hover-move" : "",
+    drawingHoverAction === "point" ? "is-drawing-hover-point" : "",
+    editingDrawing ? "is-editing-drawing" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
-      className="chart-stage"
+      ref={stageRef}
+      className={chartStageClassName}
+      onLostPointerCapture={finishDrawingEdit}
+      onPointerCancelCapture={finishDrawingEdit}
+      onPointerDownCapture={startDrawingEdit}
+      onPointerLeave={() => {
+        if (!drawingEditSessionRef.current) setDrawingHoverAction(null);
+      }}
+      onPointerMoveCapture={moveDrawingEdit}
+      onPointerUpCapture={finishDrawingEdit}
       onWheelCapture={(event) => {
         if (!event.ctrlKey && !event.metaKey) {
           event.stopPropagation();
@@ -1675,7 +2264,47 @@ export default function MarketChart({
             );
           })}
         </div>
+        {readoutCandle && (
+          <div className="tv-chart-readout" aria-label="OHLC values">
+            <span>O {formatChartPrice(readoutCandle.open, precision)}</span>
+            <span>H {formatChartPrice(readoutCandle.high, precision)}</span>
+            <span>L {formatChartPrice(readoutCandle.low, precision)}</span>
+            <span>C {formatChartPrice(readoutCandle.close, precision)}</span>
+            <span>V {formatCompact(readoutCandle.volume)}</span>
+            <span>T {new Date(readoutCandle.time * 1000).toLocaleTimeString()}</span>
+          </div>
+        )}
         <div className="tv-toolbar-group tv-toolbar-actions" aria-label="Chart actions">
+          <button
+            aria-label="Indicators"
+            aria-expanded={indicatorMenuOpen}
+            aria-pressed={Object.values(chartPreferences.indicators).some(Boolean)}
+            className={Object.values(chartPreferences.indicators).some(Boolean) ? "active" : ""}
+            data-tooltip="Indicators"
+            title="Choose chart indicators (I)"
+            type="button"
+            onClick={() => {
+              setIndicatorMenuOpen((open) => !open);
+              setDisplayMenuOpen(false);
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <ChartSpline aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label="Chart display settings"
+            aria-expanded={displayMenuOpen}
+            data-tooltip="Display"
+            title="Volume, grid, and price scale"
+            type="button"
+            onClick={() => {
+              setDisplayMenuOpen((open) => !open);
+              setIndicatorMenuOpen(false);
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <Grid3X3 aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
           <button
             aria-label="Toggle drawing tools"
             aria-pressed={drawingToolsOpen}
@@ -1701,6 +2330,16 @@ export default function MarketChart({
             <Maximize2 aria-hidden="true" size={16} strokeWidth={1.8} />
           </button>
           <button
+            aria-label="Scroll to latest candle"
+            data-tooltip="Latest"
+            title="Return to the latest candle (End)"
+            disabled={candles.length === 0}
+            type="button"
+            onClick={scrollToLatest}
+          >
+            <TrendingUp aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
+          <button
             aria-label="Load earlier history"
             data-tooltip={historyLoading ? "Loading history" : "History"}
             disabled={!hasMore || historyLoading}
@@ -1714,14 +2353,140 @@ export default function MarketChart({
             aria-label="Drawing actions"
             aria-expanded={drawingMenuOpen}
             data-tooltip="Drawing actions"
-            title="Copy, paste, or clear drawings"
+            title="Duplicate, copy, paste, undo, or delete drawings"
             type="button"
-            onClick={() => setDrawingMenuOpen((open) => !open)}
+            onClick={() => {
+              setDrawingMenuOpen((open) => !open);
+              setIndicatorMenuOpen(false);
+              setDisplayMenuOpen(false);
+            }}
           >
             <Ellipsis aria-hidden="true" size={17} strokeWidth={1.8} />
           </button>
+          <button
+            aria-label="Save chart snapshot"
+            data-tooltip="Snapshot"
+            title="Save chart as PNG"
+            disabled={candles.length === 0}
+            type="button"
+            onClick={saveSnapshot}
+          >
+            <Camera aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label={isFullscreen ? "Exit fullscreen chart" : "Open fullscreen chart"}
+            aria-pressed={isFullscreen}
+            className={isFullscreen ? "active" : ""}
+            data-tooltip="Fullscreen"
+            title="Toggle fullscreen chart (F)"
+            type="button"
+            onClick={() => void toggleFullscreen()}
+          >
+            <Expand aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
         </div>
       </div>
+      {indicatorMenuOpen && (
+        <div className="chart-control-menu chart-indicator-menu" role="menu" aria-label="Indicators">
+          <header>
+            <span>Indicators</span>
+            <small>Calculated locally</small>
+          </header>
+          {INDICATORS.map((indicator) => (
+            <button
+              aria-checked={chartPreferences.indicators[indicator.id]}
+              key={indicator.id}
+              role="menuitemcheckbox"
+              type="button"
+              onClick={() => toggleIndicator(indicator.id)}
+            >
+              <i style={{ backgroundColor: indicator.color }} />
+              <span>
+                <strong>{indicator.label}</strong>
+                <small>{indicator.detail}</small>
+              </span>
+              <b>{chartPreferences.indicators[indicator.id] ? "ON" : "OFF"}</b>
+            </button>
+          ))}
+        </div>
+      )}
+      {displayMenuOpen && (
+        <div className="chart-control-menu chart-display-menu" role="menu" aria-label="Chart display">
+          <header>
+            <span>Display</span>
+            <small>Chart workspace</small>
+          </header>
+          <button
+            aria-checked={chartPreferences.showVolume}
+            role="menuitemcheckbox"
+            type="button"
+            onClick={() => toggleChartPreference("showVolume")}
+          >
+            <Volume2 aria-hidden="true" size={15} />
+            <span><strong>Volume</strong><small>Bottom histogram</small></span>
+            <b>{chartPreferences.showVolume ? "ON" : "OFF"}</b>
+          </button>
+          <button
+            aria-checked={chartPreferences.showGrid}
+            role="menuitemcheckbox"
+            type="button"
+            onClick={() => toggleChartPreference("showGrid")}
+          >
+            <Grid3X3 aria-hidden="true" size={15} />
+            <span><strong>Grid</strong><small>Price and time guides</small></span>
+            <b>{chartPreferences.showGrid ? "ON" : "OFF"}</b>
+          </button>
+          <button
+            aria-checked={chartPreferences.logarithmicScale}
+            role="menuitemcheckbox"
+            type="button"
+            onClick={() => toggleChartPreference("logarithmicScale")}
+          >
+            <ChartNoAxesCombined aria-hidden="true" size={15} />
+            <span><strong>Log scale</strong><small>Percentage-like spacing</small></span>
+            <b>{chartPreferences.logarithmicScale ? "ON" : "OFF"}</b>
+          </button>
+          <button
+            aria-checked={chartPreferences.magnetCrosshair}
+            role="menuitemcheckbox"
+            type="button"
+            onClick={() => toggleChartPreference("magnetCrosshair")}
+          >
+            <ScanLine aria-hidden="true" size={15} />
+            <span><strong>Magnet crosshair</strong><small>Snap to OHLC values</small></span>
+            <b>{chartPreferences.magnetCrosshair ? "ON" : "OFF"}</b>
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() =>
+              setChartPreferences({
+                ...DEFAULT_CHART_PREFERENCES,
+                indicators: { ...DEFAULT_CHART_PREFERENCES.indicators },
+              })
+            }
+          >
+            <Eraser aria-hidden="true" size={15} />
+            <span><strong>Reset display</strong><small>Restore Tickframe defaults</small></span>
+            <b>RESET</b>
+          </button>
+        </div>
+      )}
+      {Object.values(chartPreferences.indicators).some(Boolean) && (
+        <div className="chart-indicator-legend" aria-label="Active indicators">
+          {INDICATORS.filter((item) => chartPreferences.indicators[item.id]).map((item) => (
+            <button
+              key={item.id}
+              title={`Hide ${item.label}`}
+              type="button"
+              onClick={() => toggleIndicator(item.id)}
+            >
+              <i style={{ backgroundColor: item.color }} />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
       {drawingToolsOpen && (
         <div className="tv-drawing-tools" aria-label="Drawing tools">
           {DRAWING_TOOLS.map((tool) => {
@@ -1753,6 +2518,18 @@ export default function MarketChart({
             role="menuitem"
             type="button"
             onClick={() => {
+              duplicateSelectedDrawing();
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <CopyPlus aria-hidden="true" size={14} />
+            Duplicate selected
+          </button>
+          <button
+            disabled={selectedDrawing === null}
+            role="menuitem"
+            type="button"
+            onClick={() => {
               copySelectedDrawing();
               setDrawingMenuOpen(false);
             }}
@@ -1771,6 +2548,18 @@ export default function MarketChart({
           >
             <ClipboardPaste aria-hidden="true" size={14} />
             Paste drawing
+          </button>
+          <button
+            disabled={drawings.length === 0}
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              undoDrawing();
+              setDrawingMenuOpen(false);
+            }}
+          >
+            <Undo2 aria-hidden="true" size={14} />
+            Undo last drawing
           </button>
           <button
             disabled={selectedDrawing === null}
@@ -1796,17 +2585,6 @@ export default function MarketChart({
             <Eraser aria-hidden="true" size={14} />
             Clear all drawings
           </button>
-        </div>
-      )}
-
-      {readoutCandle && (
-        <div className="tv-chart-readout" aria-label="OHLC values">
-          <span>O {formatChartPrice(readoutCandle.open, precision)}</span>
-          <span>H {formatChartPrice(readoutCandle.high, precision)}</span>
-          <span>L {formatChartPrice(readoutCandle.low, precision)}</span>
-          <span>C {formatChartPrice(readoutCandle.close, precision)}</span>
-          <span>V {formatCompact(readoutCandle.volume)}</span>
-          <span>T {new Date(readoutCandle.time * 1000).toLocaleTimeString()}</span>
         </div>
       )}
 
