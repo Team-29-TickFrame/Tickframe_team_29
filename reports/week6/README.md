@@ -52,10 +52,38 @@ Public summary:
 - Week 6 retrospective: ./retrospective.md
 - Week 6 LLM report: ./llm-report.md
 
-## Contribution Traceability (Week 6)
-
-- kristina19-gif: #199, #201, #202, #210, #215 (+ PRs #226, #227, #230, #231)
-- Other team members: add their issue/PR links before final submission.
+3. Summary of contributions:
+Ivan Guzhov
+• Supported Week 6 trial-release and product-access readiness through Sprint 4
+reviewer assignment on release/access-related issues.
+• Helped keep Week 6 release-readiness expectations aligned with product access,
+changelog, README, and customer/TA demonstration requirements.
+Roman Mitrofanov
+• Hardened the platform and refined the analytics workspace during Sprint 4.
+• Worked on MVP changelog / release-documentation alignment.
+• Supported Sprint 4 documentation and evidence traceability through reviewer
+labels on several Assignment 6 tasks.
+• Helped keep Week 6 public/private evidence and process requirements aligned
+with the assignment rules.
+Kristina Pilipchuk
+• Refined the Product Backlog and planned Sprint 4.
+• Updated the public README and customer-facing documentation entry points.
+• Prepared the Week 6 transition-readiness meeting and customer trial scope.
+• Prepared the Week 6 public report and evidence index.
+Diana Samoilova
+• Worked on confirming the final transition outcome and product usefulness.
+• Conducted Sprint Review preparation for Week 6.
+• Conducted Sprint Retrospective preparation for Week 6.
+• Prepared the public MVP v3 demo video.
+Anastasia Kaiumova
+• Maintained the customer handover documentation for Assignment 6.
+• Updated docs/customer-handover.md with the actual Week 6 handover baseline,
+transferred instructions, setup, deployment, verification, troubleshooting, and
+support expectations.
+• Prepared the Week 6 private Moodle submission package structure and evidence
+checklist.
+• Worked on Assignment 6 presentation preparation, including the slide-deck path,
+rehearsed presentation video requirements, and Demo Day readiness.
 
 ## Screenshots
 
