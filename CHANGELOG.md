@@ -8,6 +8,71 @@ generated with [git-cliff](https://git-cliff.org/) using `cliff.toml`. The final
 entries are curated so the upgrade notes stay straightforward for the team and
 customer reviewers.
 
+## [3.0.0] - 2026-07-12
+
+MVP v3 is the Week 6 handover-candidate release. It turns the analytics screen
+into a configurable working environment, expands the chart from a passive
+viewer into an interactive analysis tool, and hardens the real-data ML path.
+Upgrade by rebuilding the Docker Compose stack so the frontend, backend, and ML
+dependencies are refreshed together.
+
+### Added
+
+- Add an advanced market chart with Candles, Line, Area, Heikin-Ashi, and
+  Baseline views; crosshair and OHLC inspection; zoom, pan, fit, latest, and
+  history navigation; indicator overlays; and compact timeframe controls.
+- Add persistent chart drawings for trend lines, horizontal and vertical
+  levels, rectangles, Fibonacci retracements, and measurements, including
+  selection, movement, duplication, deletion, visibility, locking, and style
+  controls.
+- Add a configurable dashboard workspace with balanced, chart-focused, and
+  signal-focused presets, drag-and-drop panel placement, horizontal and
+  vertical resizing, sensible per-panel limits, and saved browser preferences.
+- Add responsive metrics layouts for VWAP, RSI, momentum, volume activity,
+  volatility estimators, mean-reversion statistics, market anomalies, and
+  cross-pair correlations.
+- Add real-market-data ML pattern inference backed by LightGBM, including
+  probability calibration, supported-pattern metadata, progress states, chart
+  overlays, and explicit non-trading-advice presentation.
+- Add scrollable alert and metric-event panels with pinned quick templates,
+  compact states, browser notifications, audio cues, and persistent rules.
+- Add Week 6 customer handover, transition-readiness, Sprint Review, reflection,
+  and release evidence.
+
+### Changed
+
+- Refine the dashboard density, typography, panel headers, resize handles, and
+  responsive breakpoints so the chart keeps useful height on laptop displays
+  while narrow panels reflow instead of clipping information.
+- Make panel dimensions follow the panel type rather than its current slot, so
+  moving the chart, metrics, ML, alerts, or signals preserves appropriate size
+  constraints and interaction behavior.
+- Keep alert templates fixed at the top while active alerts appear in a
+  separately scrollable region; keep the ML panel vertically stable while
+  retaining drag-and-drop placement.
+- Improve Binance dataset preparation, weak labeling, model training, artifact
+  loading, and backend inference behavior for repeatable real-data ML runs.
+- Harden Docker, Vite, Nginx, environment defaults, service health checks, and
+  customer-facing run/deployment documentation for a more predictable local
+  startup.
+
+### Fixed
+
+- Fix chart toolbar and OHLC readout overlap, drawing selection and movement,
+  duplicated interactions, stale pointer state, and drawing persistence edge
+  cases.
+- Fix metrics cards and market statistics being clipped or disappearing when
+  the panel is narrowed; the panel now grows to fit reflowed content within a
+  bounded maximum size.
+- Fix oversized empty metric areas, malformed text wrapping, horizontal data
+  overflow, and inconsistent panel minimum sizes.
+- Fix alerts, metric events, and compact right-rail panels so they can be made
+  smaller without losing access to content; overflow is handled by internal
+  scrolling.
+- Fix Binance training-data defects and ML model-loading failures, with clearer
+  fallback and progress states when insufficient candles are available.
+- Fix critical-coverage and quality checks for the updated backend and ML paths.
+
 ## [2.0.0] - 2026-07-05
 
 MVP v2 release. Upgrade from MVP v1 by rebuilding the Docker Compose stack,
@@ -107,5 +172,6 @@ public MVP v0 deployment remains historical evidence only.
 - TICKFRAME-0011 PATCH Fix public MVP v0 video playback as baseline evidence.
 - TICKFRAME-0064 PATCH Remove the duplicate uppercase pull request template.
 
+[3.0.0]: https://github.com/Team-29-TickFrame/Tickframe_team_29/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/Team-29-TickFrame/Tickframe_team_29/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/Team-29-TickFrame/Tickframe_team_29/releases/tag/v1.0.0
