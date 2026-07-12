@@ -116,9 +116,7 @@ class BoundedCandidateSampler:
 
     def sampled_count(self) -> int:
         return sum(
-            len(rows)
-            for years in self._buckets.values()
-            for rows in years.values()
+            len(rows) for years in self._buckets.values() for rows in years.values()
         )
 
 
@@ -238,8 +236,7 @@ def main() -> None:
     }
 
     feature_paths = {
-        timeframe: feature_path_for(prepared_dir, timeframe)
-        for timeframe in timeframes
+        timeframe: feature_path_for(prepared_dir, timeframe) for timeframe in timeframes
     }
     temporary_feature_paths = {
         timeframe: path.with_suffix(".jsonl.tmp")
@@ -253,7 +250,9 @@ def main() -> None:
     try:
         for symbol in symbols:
             normalized_path = normalized_dir / f"{symbol}-{SOURCE_TIMEFRAME}.csv"
-            print(f"prepare symbol={symbol} load_normalized={normalized_path}", flush=True)
+            print(
+                f"prepare symbol={symbol} load_normalized={normalized_path}", flush=True
+            )
             archive_summary: Dict[str, object] = {}
             if not args.offline_normalized:
                 monthly_archives = list_monthly_archives(symbol)
@@ -392,7 +391,9 @@ def main() -> None:
     )
 
 
-def dataset_timeframes(*, config: Dict[str, object], args: argparse.Namespace) -> List[str]:
+def dataset_timeframes(
+    *, config: Dict[str, object], args: argparse.Namespace
+) -> List[str]:
     configured = args.timeframes or config.get("datasetTimeframes")
     if configured is None:
         configured = [str(config.get("timeframe", SOURCE_TIMEFRAME))]
@@ -535,8 +536,7 @@ def normalize_archives(
                         candles_by_open_time[open_time] = candle
 
     candles = [
-        candles_by_open_time[open_time]
-        for open_time in sorted(candles_by_open_time)
+        candles_by_open_time[open_time] for open_time in sorted(candles_by_open_time)
     ]
     rewrite_normalized_candles(candles, output_path)
     return NormalizationStats(
@@ -560,7 +560,9 @@ def replace_file(source: Path, target: Path) -> None:
             time.sleep(0.5)
 
 
-def load_ordered_candles(path: Path) -> tuple[List[Dict[str, object]], Dict[str, object]]:
+def load_ordered_candles(
+    path: Path,
+) -> tuple[List[Dict[str, object]], Dict[str, object]]:
     candles_by_open_time: Dict[int, Dict[str, object]] = {}
     duplicate_count = 0
     source_ms_rows = 0
@@ -598,8 +600,7 @@ def load_ordered_candles(path: Path) -> tuple[List[Dict[str, object]], Dict[str,
             candles_by_open_time[open_time] = candle
 
     candles = [
-        candles_by_open_time[open_time]
-        for open_time in sorted(candles_by_open_time)
+        candles_by_open_time[open_time] for open_time in sorted(candles_by_open_time)
     ]
     return candles, {
         "rows": rows,
@@ -655,7 +656,10 @@ def resample_candles(
     previous_open_time: Optional[int] = None
     for candle in candles:
         open_time = int(candle["openTime"])
-        if previous_open_time is not None and open_time - previous_open_time != ONE_MINUTE_MS:
+        if (
+            previous_open_time is not None
+            and open_time - previous_open_time != ONE_MINUTE_MS
+        ):
             bucket = []
             bucket_start = None
         previous_open_time = open_time
@@ -704,7 +708,10 @@ def prepare_features_from_candles(
     seen = 0
     for candle_index, candle in enumerate(candles, start=1):
         open_time = int(candle["openTime"])
-        if previous_open_time is not None and open_time - previous_open_time != timeframe_ms:
+        if (
+            previous_open_time is not None
+            and open_time - previous_open_time != timeframe_ms
+        ):
             skipped_gap_windows += max(0, len(window) - window_size + 1)
             window.clear()
         previous_open_time = open_time
@@ -760,7 +767,9 @@ def prepare_features_from_candles(
                 for label in PATTERN_LABELS
             },
             "softScores": {
-                f"{label}_score": round(float(weak_label.label_scores.get(label, 0.0)), 6)
+                f"{label}_score": round(
+                    float(weak_label.label_scores.get(label, 0.0)), 6
+                )
                 for label in PATTERN_LABELS
             },
             "hardNegativeFor": hard_negative_for,
@@ -802,8 +811,7 @@ def prepare_features_from_candles(
         "labelCounts": dict(sorted(label_counts.items())),
         "candidateCounts": candidates.seen_counts_by_label(),
         "sampledCandidateCounts": {
-            label: len(rows)
-            for label, rows in sorted(sampled_candidates.items())
+            label: len(rows) for label, rows in sorted(sampled_candidates.items())
         },
         "candidateCapPerLabelYear": candidate_cap_per_label_year,
         "hardNegativeCounts": dict(sorted(hard_negative_counts.items())),

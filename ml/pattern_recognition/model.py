@@ -30,17 +30,13 @@ class PatternClassifier(Protocol):
         labels: Sequence[str],
         *,
         feature_names: Sequence[str],
-    ) -> None:
-        ...
+    ) -> None: ...
 
-    def predict(self, features: Sequence[Sequence[float]]) -> List[str]:
-        ...
+    def predict(self, features: Sequence[Sequence[float]]) -> List[str]: ...
 
-    def predict_one(self, features: Sequence[float]) -> Prediction:
-        ...
+    def predict_one(self, features: Sequence[float]) -> Prediction: ...
 
-    def save(self, path: Path) -> None:
-        ...
+    def save(self, path: Path) -> None: ...
 
 
 class GaussianNaiveBayesClassifier:
@@ -258,8 +254,7 @@ class BoostedTreeClassifier:
             raw_probabilities = estimator.predict_proba([list(features)])[0]
         classes = [str(label) for label in getattr(estimator, "classes_", self.labels)]
         probabilities = {
-            label: float(value)
-            for label, value in zip(classes, raw_probabilities)
+            label: float(value) for label, value in zip(classes, raw_probabilities)
         }
         for label in self.labels:
             probabilities.setdefault(label, 0.0)
@@ -292,7 +287,9 @@ class BoostedTreeClassifier:
     def load(cls, path: Path) -> "BoostedTreeClassifier":
         payload = json.loads(path.read_text(encoding="utf-8"))
         model = cls(
-            backend=str(payload.get("requestedBackend", payload.get("backend", "auto"))),
+            backend=str(
+                payload.get("requestedBackend", payload.get("backend", "auto"))
+            ),
             random_state=int(payload.get("randomState", 42)),
         )
         model.labels = list(payload["labels"])
@@ -312,8 +309,17 @@ def create_classifier(
     normalized = model_type.strip().lower().replace("-", "_")
     if normalized in {"gaussian", "gaussian_nb", "gaussian_naive_bayes"}:
         return GaussianNaiveBayesClassifier()
-    if normalized in {"auto", "lightgbm", "hist_gradient_boosting", "histgradientboosting"}:
-        backend = "hist_gradient_boosting" if normalized == "histgradientboosting" else normalized
+    if normalized in {
+        "auto",
+        "lightgbm",
+        "hist_gradient_boosting",
+        "histgradientboosting",
+    }:
+        backend = (
+            "hist_gradient_boosting"
+            if normalized == "histgradientboosting"
+            else normalized
+        )
         return BoostedTreeClassifier(backend=backend, random_state=seed)
     raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -335,9 +341,7 @@ def _build_boosted_estimator(
 ) -> tuple[str, object]:
     normalized = backend.strip().lower().replace("-", "_")
     attempts = (
-        ["lightgbm", "hist_gradient_boosting"]
-        if normalized == "auto"
-        else [normalized]
+        ["lightgbm", "hist_gradient_boosting"] if normalized == "auto" else [normalized]
     )
     errors: List[str] = []
     for attempt in attempts:
@@ -378,10 +382,7 @@ def _build_boosted_estimator(
                 ),
             )
         errors.append(f"unknown backend: {attempt}")
-    raise RuntimeError(
-        "No boosted-tree backend is available. "
-        + " | ".join(errors)
-    )
+    raise RuntimeError("No boosted-tree backend is available. " + " | ".join(errors))
 
 
 def evaluate_predictions(
