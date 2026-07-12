@@ -91,6 +91,53 @@ workflow for team delivery.
   - Quality and maintainability: scope includes architecture/process docs, ADR alignment, QA/DoD evidence, and release-readiness work.
   - Feasibility: tasks are sliced into inspectable Assignment 5 PBIs with explicit dependencies for controlled delivery within Sprint 3.
 
+## Sprint 4
+
+- Milestone: [Sprint 4](https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/4)
+- Dates: 2026-07-06 to 2026-07-12
+- Sprint Goal: deliver the Assignment 6 Week 6 trial / handover-candidate release, validate customer-facing documentation, run transition-readiness and customer trial evidence, and prepare follow-up work for Sprint 5.
+- Focus: Week 6 trial release, product access stabilization, customer-facing documentation handover readiness, transition-readiness meeting, and Week 6 reporting/submission evidence.
+- Total Story Points: 36
+- Planned items:
+  - [A6-P01](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/199)
+  - [A6-P02](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/200)
+  - [A6-P03](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/201)
+  - [A6-P05](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/202)
+  - [A6-P04](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/203)
+  - [A6-P13](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/211)
+  - [A6-S03](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/214)
+  - [A6-S01](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/215)
+  - [A6-C01](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/217)
+- Scope rationale:
+  - Customer value: prioritizes a real Week 6 trial/handover-candidate increment and customer-facing entry points.
+  - Transition readiness: includes handover documentation, transition meeting evidence, and access/deployment readiness checks.
+  - Feasibility: Week 6 scope is split to unblock Week 7 follow-up maintenance and final delivery tasks.
+
+## Sprint 5
+
+- Milestone: [Sprint 5](https://github.com/Team-29-TickFrame/Tickframe_team_29/milestone/5)
+- Dates: 2026-07-13 to 2026-07-19
+- Sprint Goal: complete Assignment 6 Week 7 follow-up maintenance, final customer transition, MVP v3 release, final UAT/Sprint Review evidence, and Demo Day readiness.
+- Focus: follow-up fixes from Week 6 trial, final transition confirmation, final MVP v3 release/readiness, Week 7 reporting, and Demo Day preparation.
+- Total Story Points: 44
+- Planned items:
+  - [A6-P07](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/204)
+  - [A6-P06](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/205)
+  - [A6-P09](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/206)
+  - [A6-P10](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/207)
+  - [A6-P11](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/208)
+  - [A6-P14](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/209)
+  - [A6-P12](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/210)
+  - [A6-P08](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/212)
+  - [A6-S02](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/213)
+  - [A6-S04](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/216)
+  - [A6-C03](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/218)
+  - [A6-C02](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/219)
+- Scope rationale:
+  - Customer value: focuses on final MVP v3 reliability, usability, and transition outcome.
+  - Delivery readiness: includes final release, final public report, and final private submission preparation.
+  - Final course outcome: provides complete, inspectable Assignment 6 Week 6/Week 7 delivery evidence without post-course speculative scope.
+
 ## Roadmap Notes
 
 - Sprint milestones are used as the authoritative Sprint planning containers.
