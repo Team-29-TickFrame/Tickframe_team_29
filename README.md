@@ -60,6 +60,10 @@ policy. Old second candles are compressed automatically.
 - Issue forms: [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/)
 - PR template: [.github/pull_request_template.md](.github/pull_request_template.md)
 - Development process and configuration management: [docs/development-process.md](docs/development-process.md)
+- Current product access artifact (Week 6 trial baseline): [Tickframe MVP v2.0.0 release](https://github.com/Team-29-TickFrame/Tickframe_team_29/releases/tag/v2.0.0)
+- Customer handover guide: [docs/customer-handover.md](docs/customer-handover.md)
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Agent guidance: [AGENTS.md](AGENTS.md)
 
 ## Run the Complete Product
 
