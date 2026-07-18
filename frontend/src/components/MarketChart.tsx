@@ -163,7 +163,7 @@ interface DrawingEditSession {
 const DEFAULT_VISIBLE_BARS = 120;
 const INDICATOR_MAX_BARS = 5_000;
 const DRAWINGS_STORAGE_PREFIX = "tickframe.chartDrawings.v2:";
-const CHART_PREFERENCES_STORAGE_KEY = "tickframe.chartPreferences.v1";
+const CHART_PREFERENCES_STORAGE_KEY = "tickframe.chartPreferences.v2";
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
 const DRAWING_TOOLS: Array<{
@@ -838,6 +838,19 @@ export default function MarketChart({
   useEffect(() => {
     historyStateRef.current = { hasMore, historyLoading, onLoadEarlier };
   }, [hasMore, historyLoading, onLoadEarlier]);
+
+  useEffect(() => {
+    setChartPreferences((current) => {
+      if (!current.indicators.ema20) return current;
+      return {
+        ...current,
+        indicators: {
+          ...current.indicators,
+          ema20: false,
+        },
+      };
+    });
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
