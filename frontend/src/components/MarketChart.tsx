@@ -216,7 +216,7 @@ interface ChartPreferences {
 const DEFAULT_CHART_PREFERENCES: ChartPreferences = {
   chartMode: "candles",
   indicators: {
-    ema20: true,
+    ema20: false,
     sma50: false,
     bollinger20: false,
     vwap100: false,
