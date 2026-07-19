@@ -152,18 +152,33 @@ The customer accepted the current project state with several future improvements
 
 ## User Acceptance Trial
 
-The final customer review included verification of:
+Maintained UAT scenarios: [`../../docs/user-acceptance-tests.md`](../../docs/user-acceptance-tests.md)
+
+The final customer review included UAT-related verification of:
 - repository accessibility;
 - deployment instructions;
 - Docker Compose configuration;
-- runtime environment;
-- backend API;
-- frontend interface;
+- runtime environment and `.env.example`;
+- backend API and frontend interface;
 - monitoring stack;
 - customer documentation;
 - remaining limitations.
 
-No critical issues preventing independent technical evaluation were identified.
+A separate standalone customer-executed UAT session was not conducted during
+Week 7. The final Sprint Review and transition-confirmation discussion covered
+the customer-critical UAT areas needed for final transition and product
+usefulness evidence.
+
+| Scenario | Result | Public-safe feedback summary | Follow-up issue/PBI |
+|---|---|---|---|
+| UAT-004 | Passed with follow-up | Improved pattern visualization behavior was reviewed; customer requested clearer ML/rule-based comparison as future work. | [#246](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/246), [#256](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/256) |
+| UAT-005 | Passed with follow-up | Pattern-name-without-visualization behavior was addressed; detector comparison remains a future improvement. | [#246](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/246), [#256](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/256) |
+| UAT-007 | Passed with follow-up | Repository, README/run instructions, Docker Compose, `.env.example`, and operational documentation were reviewed and considered sufficient for the achieved transition level. | [#212](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/212), [#213](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/213) |
+| UAT-008 | Passed with follow-up | Customer confirmed acceptance of the project. Handover status is `Ready for independent use` and `Accepted with follow-up items`. | [#212](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/212), [#216](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/216) |
+
+No critical issue preventing independent technical evaluation was identified.
+Remaining items are future improvements and do not block the achieved MVP v3
+handover level.
 
 
 ## Final Release

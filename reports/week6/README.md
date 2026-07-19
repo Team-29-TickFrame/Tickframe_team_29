@@ -39,6 +39,26 @@ Public summary:
 - Feedback generally acceptable for current stage.
 - Optional follow-up polish moved to Week 7.
 
+## UAT and Customer Inspection Summary
+
+Maintained UAT scenarios: [`../../docs/user-acceptance-tests.md`](../../docs/user-acceptance-tests.md)
+
+Week 6 customer-facing UAT was executed during the guided customer trial,
+Sprint Review discussion, repository inspection, and transition-readiness
+conversation on 2026-07-12. Private recording links, exact timecodes,
+credentials, and customer-identifying details are stored only in the private
+Moodle submission package.
+
+| Scenario | Result | Public-safe feedback summary | Follow-up issue/PBI |
+|---|---|---|---|
+| UAT-004 | Passed with follow-up | Pattern-analysis behavior was visible, but the customer asked for stronger validation and manual checking of detected patterns. | [#219](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/219), [#221](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/221), [#224](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/224) |
+| UAT-005 | Partially passed with follow-up | Chart and pattern visualization were reviewed, but some visualization behavior remained inconsistent and alerts were not the main UAT focus of this session. | [#219](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/219), [#224](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/224) |
+| UAT-006 | Passed with follow-up | MVP v3 trial access was reviewed; no hard customer-access blocker was recorded. | [#218](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/218) |
+| UAT-007 | Passed with follow-up | Repository and Docker-based handover path were understandable; additional port configuration should be moved into ENV variables. | [#212](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/212), [#218](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/218), [#219](https://github.com/Team-29-TickFrame/Tickframe_team_29/issues/219) |
+
+No failed Week 6 UAT scenario was recorded. Remaining UAT gaps are captured as
+traceable Week 7 follow-up issues rather than private-only notes.
+
 ## Sprint Artifacts / PR Evidence
 
 - #226: https://github.com/Team-29-TickFrame/Tickframe_team_29/pull/226
