@@ -9,6 +9,7 @@ import type {
   MarketsResponse,
   MetricsResponse,
   MlPatternResponse,
+  PatternDetectorMode,
   Timeframe,
 } from "./types";
 
@@ -176,12 +177,14 @@ export function fetchMlPattern(
   exchange: Exchange,
   instrumentId: string,
   timeframe: Timeframe,
+  mode: PatternDetectorMode = "ml",
   signal?: AbortSignal,
 ) {
   const query = new URLSearchParams({
     exchange,
     instrumentId,
     timeframe,
+    mode,
   });
   return request<MlPatternResponse>(`/api/v1/patterns/ml?${query}`, { signal });
 }

@@ -3,7 +3,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.app.pattern_ml import PatternMLDetector, SUPPORTED_PATTERN_TIMEFRAMES
+from backend.app.pattern_ml import (
+    CLASS_BASE_THRESHOLDS,
+    PatternMLDetector,
+    SUPPORTED_PATTERN_TIMEFRAMES,
+)
 from ml.pattern_recognition import PATTERN_MODEL_VERSION, WINDOW_SIZE
 from ml.pattern_recognition.features import FEATURE_NAMES, extract_features
 from ml.pattern_recognition.model import GaussianNaiveBayesClassifier
@@ -179,6 +183,69 @@ class PatternMLDetectorTests(unittest.TestCase):
         self.assertFalse(result["passesThreshold"])
         self.assertFalse(result["prediction"]["passesThreshold"])
         self.assertEqual(result["ruleBased"]["label"], "triangle")
+
+    def test_rule_based_mode_detects_without_loading_model_artifact(self) -> None:
+        detector = PatternMLDetector(model_path=Path("missing-model.json"))
+
+        with patch.object(
+            detector,
+            "_load_model",
+            side_effect=AssertionError("rule-based mode must not load ML model"),
+        ):
+            result = detector.predict_rule_based(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="1m",
+                source="fixture-test",
+                candles=fixture_candles("double_top"),
+            )
+
+        self.assertEqual(result["status"], "pattern_detected")
+        self.assertEqual(result["detectorMode"], "rule_based")
+        self.assertEqual(result["modelType"], "RuleBasedDetector")
+        self.assertEqual(result["prediction"]["label"], "double_top")
+        self.assertEqual(result["prediction"]["thresholdMode"], "dynamic")
+        self.assertLess(
+            result["prediction"]["recommendedThreshold"],
+            CLASS_BASE_THRESHOLDS["double_top"],
+        )
+        self.assertEqual(result["ruleBased"]["label"], "double_top")
+        self.assertTrue(result["passesThreshold"])
+
+    def test_rule_based_none_uses_dynamic_threshold_cap(self) -> None:
+        detector = PatternMLDetector(model_path=Path("missing-model.json"))
+        none_label = {
+            "label": "none",
+            "score": 0.0,
+            "reason": "forced none",
+            "anchors": [],
+        }
+
+        with (
+            patch.object(
+                detector,
+                "_load_model",
+                side_effect=AssertionError("rule-based mode must not load ML model"),
+            ),
+            patch(
+                "backend.app.pattern_ml._rule_based_explanation",
+                return_value=none_label,
+            ),
+        ):
+            result = detector.predict_rule_based(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="1m",
+                source="fixture-test",
+                candles=fixture_candles("double_top"),
+            )
+
+        self.assertEqual(result["status"], "no_reliable_pattern")
+        self.assertEqual(result["detectorMode"], "rule_based")
+        self.assertEqual(result["recommendedThreshold"], 0.92)
+        self.assertEqual(result["confidenceThreshold"], 0.92)
+        self.assertIsNone(result["prediction"])
+        self.assertEqual(result["ruleBased"]["label"], "none")
 
     def test_model_unavailable_is_non_crashing_status(self) -> None:
         detector = PatternMLDetector(model_path=Path("missing-model.json"))

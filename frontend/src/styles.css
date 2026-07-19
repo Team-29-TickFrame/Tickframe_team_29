@@ -1439,6 +1439,39 @@ button:focus-visible {
   color: #8493a3;
 }
 
+.pattern-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.pattern-mode-toggle button {
+  min-width: 34px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: 700 8px/1 var(--mono);
+  cursor: pointer;
+}
+
+.pattern-mode-toggle button:hover {
+  color: var(--text);
+}
+
+.pattern-mode-toggle button.active {
+  border-color: rgba(99, 216, 255, 0.32);
+  background: rgba(99, 216, 255, 0.12);
+  color: var(--cyan);
+}
+
 .metric-list {
   min-height: 0;
   margin: 0;

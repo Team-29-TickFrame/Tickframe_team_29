@@ -37,6 +37,7 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
                             exchange="binance",
                             instrument_id="BTC-USDT",
                             timeframe=timeframe,
+                            mode="ml",
                         )
 
                 mock_history.assert_awaited_once_with(
@@ -87,6 +88,7 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     exchange="binance",
                     instrument_id="BTC-USDT",
                     timeframe="1m",
+                    mode="ml",
                 )
 
         mock_history.assert_awaited_once_with(
@@ -102,6 +104,45 @@ class MlPatternApiIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(result["status"], {"pattern_detected", "no_reliable_pattern"})
         self.assertIsNotNone(result["prediction"])
         self.assertIn("ruleBased", result)
+
+    async def test_rule_based_mode_uses_history_without_model_inference(self) -> None:
+        candles = fixture_candles("double_top")
+        history_response = {
+            "source": "historical_candles",
+            "candles": candles,
+        }
+        mock_history = AsyncMock(return_value=history_response)
+        detector = PatternMLDetector(model_path=Path("missing-model.json"))
+
+        with (
+            patch.object(
+                detector,
+                "_load_model",
+                side_effect=AssertionError("rule-based API must not load ML model"),
+            ),
+            patch("backend.app.main.pattern_ml_detector", detector),
+            patch("backend.app.main.service.candle_history", new=mock_history),
+        ):
+            result = await ml_patterns(
+                exchange="binance",
+                instrument_id="BTC-USDT",
+                timeframe="1m",
+                mode="rule_based",
+            )
+
+        mock_history.assert_awaited_once_with(
+            exchange="binance",
+            instrument_id="BTC-USDT",
+            timeframe="1m",
+            limit=240,
+            from_ms=None,
+            to_ms=None,
+        )
+        self.assertEqual(result["detectorMode"], "rule_based")
+        self.assertEqual(result["modelType"], "RuleBasedDetector")
+        self.assertEqual(result["status"], "pattern_detected")
+        self.assertEqual(result["prediction"]["label"], "double_top")
+        self.assertEqual(result["ruleBased"]["label"], "double_top")
 
 
 if __name__ == "__main__":
