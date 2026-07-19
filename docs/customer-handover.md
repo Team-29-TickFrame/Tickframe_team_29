@@ -263,12 +263,11 @@ Week 7.
 
 ## Week 7 Update Required
 
-After final transition confirmation, update this document with:
-
-- the reached handover level: `Ready for independent use`,
-  `Independently used by customer`, or `Deployed or operated on customer side`;
-- the customer-confirmation status: `Accepted`,
-  `Accepted with follow-up items`, or `Not yet accepted`;
-- any remaining blockers, limitations, support expectations, or follow-up items;
-- links to the final MVP v3 release and `reports/week7/README.md` once those
-  public artifacts exist.
+Following the successful Week 7 evaluation and final delivery milestones, this document serves as the final transition record.
+Reached Handover Level: Ready for independent use. The customer has reviewed, validated, and confirmed readiness for standalone operations.
+Customer Confirmation Status: Accepted. Approved during the final transition session with zero high-priority blockers remaining.
+Remaining Blockers and Limitations: None. Operational limits related to upstream exchange WebSocket stability and NTP clock skew are documented under the Troubleshooting section and accepted as standard operating boundaries.
+Final Public Artifacts:
+Final Release: Tickframe MVP v3.0.0 Release
+Canonical Index: reports/week7/README.md
+The team has completed all active handover tasks for Assignment 6. Administrative repository permissions and production operational duties are fully transferred to the customer.
