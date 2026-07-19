@@ -179,14 +179,6 @@ Related artifacts include:
 ## Public Demo
 The final sanitized public demonstration video is available through the project repository.
 
-The demonstration presents:
-- current MVP v3 functionality;
-- deployment workflow;
-- monitoring dashboards;
-- rule-based pattern recognition;
-- experimental machine-learning features;
-- Sprint 5 improvements.
-
 ## Sprint Review Evidence
 
 | Evidence | Link |
@@ -215,11 +207,11 @@ The following documentation was reviewed and updated during Week 7:
 
 | Team Member | Main Contribution | Public Evidence |
 | --- | --- | --- |
-| Team Member 1 | Backend development, deployment, maintenance | Git history, pull requests |
-| Team Member 2 | Frontend implementation and documentation | Git history, pull requests |
-| Team Member 3 | Pattern detection and analytics | Git history, pull requests |
-| Team Member 4 | Monitoring, testing and deployment | Git history, pull requests |
-| Team Member 5 | Scrum management, documentation and reporting | Git history, pull requests |
+| Ivan Guzov | Backend, ML, pattern, detection, dataset, preparation, backend, technical fixes | Git history, pull requests |
+| Roman Mitrofanov | Backend, Core platform, analytics workspace, market data, charts, alerts, deployment and release readiness | Git history, pull requests |
+| Kristina Pilipchuk  | Backend, Product, Backlog, sprint planning, user-story traceability, public documentation, customer feedback, UAT planning | Git history, pull requests |
+| Diana Samoilova | Frontend, Sprint Review, Sprint Retrospective, customer validation, evidence, public reports, demo materials | Git history, pull requests |
+| Anastasia Kaiumova  | Frontend, Evidence, ADRs, UAT, documentation, private, submissions, presentation, customer handover documentation | Git history, pull requests |
 
 ## Public Evidence
 The following screenshots are stored in `reports/week7/images/` and provide inspectable public evidence.
@@ -245,7 +237,7 @@ Tickframe MVP v3 represents the final maintained version delivered for Assignmen
 Current project capabilities include:
 - Real-time cryptocurrency market monitoring.
 - Rule-based pattern detection.
-- Experimental machine-learning pattern analysis.
+- Machine-learning pattern analysis.
 - Historical candle loading.
 - REST API with OpenAPI documentation.
 - Grafana dashboards.
@@ -257,15 +249,8 @@ Current project capabilities include:
 The project is considered **Ready for independent use** within the documented scope.
 
 ## Remaining Limitations
-
-The following limitations remain after the final Sprint Review:
-- The machine-learning subsystem is experimental.
 - ML predictions are validated against rule-based labels rather than independently verified market ground truth.
 - Some maintenance functionality is currently available only through backend scripts.
-- Long-term production deployment requires customer-managed infrastructure, credentials, monitoring, backups, and operational maintenance.
-- Product availability depends on external cryptocurrency exchange APIs.
-
-These limitations were discussed during the final Sprint Review and do not prevent technical evaluation or independent deployment.
 
 ## Support Expectations
 
