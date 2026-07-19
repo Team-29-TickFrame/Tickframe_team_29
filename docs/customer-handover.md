@@ -261,13 +261,34 @@ operation, customer-side deployment, and final acceptance are not claimed by
 this Week 6 baseline; those outcomes must be confirmed and documented during
 Week 7.
 
-## Week 7 Update Required
+## Week 7 Final Transition Outcome
+Following the Week 7 Sprint Review, Tickframe MVP v3 reached the handover level **Ready for independent use**.
 
-Following the successful Week 7 evaluation and final delivery milestones, this document serves as the final transition record.
-Reached Handover Level: Ready for independent use. The customer has reviewed, validated, and confirmed readiness for standalone operations.
-Customer Confirmation Status: Accepted. Approved during the final transition session with zero high-priority blockers remaining.
-Remaining Blockers and Limitations: None. Operational limits related to upstream exchange WebSocket stability and NTP clock skew are documented under the Troubleshooting section and accepted as standard operating boundaries.
-Final Public Artifacts:
-Final Release: Tickframe MVP v3.0.0 Release
-Canonical Index: reports/week7/README.md
-The team has completed all active handover tasks for Assignment 6. Administrative repository permissions and production operational duties are fully transferred to the customer.
+### Handover Level
+Ready for independent use
+
+The customer confirmed that the provided documentation, deployment instructions, and repository are sufficient for the current transition scope.
+
+### Customer Confirmation
+Accepted with follow-up items
+
+The customer reviewed the repository, Docker Compose deployment, runtime configuration, operational documentation, and product functionality.
+
+The following follow-up items remain:
+
+- Add a frontend switch between ML-based and rule-based detection.
+- Complete the frontend interface for maintenance scripts.
+- Continue improving the experimental ML subsystem.
+
+These items do not prevent independent technical use of the product.
+
+### Remaining Limitations
+- The ML subsystem remains experimental.
+- ML predictions depend on rule-based validation.
+- Product behaviour depends on external exchange availability.
+- Long-term production operation requires customer-managed infrastructure, secrets, backups, and monitoring.
+
+### Final Public Artifacts
+- Tickframe MVP v3 Release
+- `reports/week7/README.md`
+- `docs/customer-handover.md`
