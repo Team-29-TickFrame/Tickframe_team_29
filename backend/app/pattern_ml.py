@@ -153,9 +153,12 @@ class PatternMLDetector:
             rule_based=rule_based,
             configured_floor=self.confidence_threshold,
         )
+        rule_label = str(rule_based.get("label", "none"))
+        rule_agrees = prediction.label != "none" and rule_label == prediction.label
         passes_threshold = (
             prediction.label != "none"
             and prediction.confidence >= threshold["recommendedThreshold"]
+            and rule_agrees
         )
         status = "pattern_detected" if passes_threshold else "no_reliable_pattern"
         return {

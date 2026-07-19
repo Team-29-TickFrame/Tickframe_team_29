@@ -146,6 +146,40 @@ class PatternMLDetectorTests(unittest.TestCase):
         self.assertEqual(result["ruleBased"]["label"], "double_top")
         self.assertGreater(len(result["ruleBased"]["anchors"]), 0)
 
+    def test_rule_based_label_mismatch_blocks_detected_status(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "model.json"
+            write_fixture_model(model_path)
+            detector = PatternMLDetector(model_path=model_path)
+            mismatch = {
+                "label": "triangle",
+                "score": 0.82,
+                "reason": "forced mismatch",
+                "anchors": [],
+            }
+
+            with patch(
+                "backend.app.pattern_ml._rule_based_explanation",
+                return_value=mismatch,
+            ):
+                result = detector.predict(
+                    exchange="binance",
+                    instrument_id="BTC-USDT",
+                    timeframe="1m",
+                    source="fixture-test",
+                    candles=fixture_candles("double_top"),
+                )
+
+        self.assertEqual(result["status"], "no_reliable_pattern")
+        self.assertEqual(
+            result["message"],
+            "No reliable ML pattern is above the configured threshold.",
+        )
+        self.assertEqual(result["prediction"]["label"], "double_top")
+        self.assertFalse(result["passesThreshold"])
+        self.assertFalse(result["prediction"]["passesThreshold"])
+        self.assertEqual(result["ruleBased"]["label"], "triangle")
+
     def test_model_unavailable_is_non_crashing_status(self) -> None:
         detector = PatternMLDetector(model_path=Path("missing-model.json"))
 
