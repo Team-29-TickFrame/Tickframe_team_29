@@ -297,10 +297,13 @@ async def ml_patterns(
     exchange: str,
     instrument_id: str = Query(alias="instrumentId"),
     timeframe: str = Query(default="1m"),
+    mode: str = Query(default="ml"),
 ) -> dict:
     ensure_supported_market(exchange, instrument_id)
     if timeframe not in TIMEFRAME_SECONDS:
         raise HTTPException(status_code=400, detail="Unsupported timeframe")
+    if mode not in {"ml", "rule_based"}:
+        raise HTTPException(status_code=400, detail="Unsupported pattern mode")
     try:
         history = await service.candle_history(
             exchange=exchange,
@@ -312,6 +315,14 @@ async def ml_patterns(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    if mode == "rule_based":
+        return pattern_ml_detector.predict_rule_based(
+            exchange=exchange,
+            instrument_id=instrument_id,
+            timeframe=timeframe,
+            source=str(history["source"]),
+            candles=history["candles"],
+        )
     return pattern_ml_detector.predict(
         exchange=exchange,
         instrument_id=instrument_id,

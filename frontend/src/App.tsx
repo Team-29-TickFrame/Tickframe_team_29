@@ -58,6 +58,7 @@ import type {
   MetricPoint,
   MetricsResponse,
   MlPatternResponse,
+  PatternDetectorMode,
   StreamStatus,
   Timeframe,
 } from "./types";
@@ -82,6 +83,13 @@ const ML_PATTERN_TIMEFRAMES = new Set<Timeframe>([
   "1h",
   "1d",
 ]);
+const PATTERN_DETECTOR_MODES: Array<{
+  id: PatternDetectorMode;
+  label: string;
+}> = [
+  { id: "ml", label: "ML" },
+  { id: "rule_based", label: "Rules" },
+];
 const HISTORY_PAGE_SIZE = 1500;
 const INITIAL_CHART_READY_CANDLES = 240;
 const METRICS_LIMIT = 300;
@@ -1602,6 +1610,8 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [instrumentId, setInstrumentId] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState<Timeframe>("1m");
+  const [patternDetectorMode, setPatternDetectorMode] =
+    useState<PatternDetectorMode>("ml");
   const [candleData, setCandleData] = useState<{
     scope: string;
     values: Candle[];
@@ -2581,7 +2591,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
   const statsMetrics =
     statsData.scope === statsScope ? statsData.value : null;
   const latestClosedCandleTime = candles.at(-1)?.closeTime ?? null;
-  const mlPatternScope = `${exchange}:${instrumentId}:${timeframe}:${latestClosedCandleTime ?? "none"}`;
+  const mlPatternScope = `${exchange}:${instrumentId}:${timeframe}:${patternDetectorMode}:${latestClosedCandleTime ?? "none"}`;
   const mlPattern =
     mlPatternData.scope === mlPatternScope ? mlPatternData.value : null;
   const patternLines = useMemo(() => buildPatternLines(mlPattern), [mlPattern]);
@@ -2598,6 +2608,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
           exchange,
           instrumentId,
           timeframe,
+          patternDetectorMode,
           controller.signal,
         );
         if (!active) return;
@@ -2617,7 +2628,14 @@ function Dashboard({ session, onLogout }: DashboardProps) {
       active = false;
       controller.abort();
     };
-  }, [exchange, instrumentId, timeframe, latestClosedCandleTime, mlPatternScope]);
+  }, [
+    exchange,
+    instrumentId,
+    timeframe,
+    patternDetectorMode,
+    latestClosedCandleTime,
+    mlPatternScope,
+  ]);
 
   const latestMetrics = statsMetrics?.latest ?? null;
   const statsSummary = statsMetrics?.summary ?? null;
@@ -3537,8 +3555,14 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                 <div className="panel-title-with-logo">
                   <CoinLogo base={instrument?.base} className="coin-logo-xs" />
                   <div>
-                    <span className="eyebrow">ML PATTERN</span>
-                    <strong>{mlPattern?.modelVersion ?? "pattern-real-data-v1"}</strong>
+                    <span className="eyebrow">
+                      {patternDetectorMode === "ml" ? "ML PATTERN" : "RULE PATTERN"}
+                    </span>
+                    <strong>
+                      {patternDetectorMode === "ml"
+                        ? mlPattern?.modelVersion ?? "pattern-real-data-v1"
+                        : "rule-based detector"}
+                    </strong>
                   </div>
                 </div>
                 <WorkspaceHeaderDragZone
@@ -3547,6 +3571,24 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   {...workspaceDragZoneProps}
                 />
                 <div className="panel-head-actions" draggable={false}>
+                  <div
+                    className="pattern-mode-toggle"
+                    role="group"
+                    aria-label="Pattern detector mode"
+                  >
+                    {PATTERN_DETECTOR_MODES.map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        className={
+                          patternDetectorMode === mode.id ? "active" : ""
+                        }
+                        onClick={() => setPatternDetectorMode(mode.id)}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
                   <span
                     className={`quality-badge ${
                       mlPatternLoading
@@ -3558,7 +3600,9 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                   >
                     {mlPatternLoading
                       ? "CALC"
-                      : ML_PATTERN_TIMEFRAMES.has(timeframe)
+                      : patternDetectorMode === "rule_based"
+                        ? "RULES"
+                        : ML_PATTERN_TIMEFRAMES.has(timeframe)
                         ? "ML ON"
                         : "LOCKED"}
                   </span>
@@ -3589,7 +3633,11 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                     mlPattern.status === "pattern_detected" && (
                       <div className="ml-pattern-demo-metrics">
                         <div>
-                          <span>Confidence</span>
+                          <span>
+                            {patternDetectorMode === "rule_based"
+                              ? "Score"
+                              : "Confidence"}
+                          </span>
                           <strong>
                             {formatScore(mlPattern.prediction.confidence)}
                           </strong>
@@ -3621,7 +3669,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
                     </strong>
                   </span>
                   <span>
-                    Confidence
+                    {patternDetectorMode === "rule_based" ? "Score" : "Confidence"}
                     <strong>
                       {formatConfidence(
                         mlPattern?.status === "pattern_detected"

@@ -76,6 +76,7 @@ class PatternMLDetector:
                     f"{', '.join(SUPPORTED_PATTERN_TIMEFRAMES)} candles."
                 ),
                 "modelVersion": PATTERN_MODEL_VERSION,
+                "detectorMode": "ml",
                 "supportedTimeframes": list(SUPPORTED_PATTERN_TIMEFRAMES),
                 "exchange": exchange,
                 "instrumentId": instrument_id,
@@ -94,6 +95,7 @@ class PatternMLDetector:
                 "message": self._load_errors.get(timeframe)
                 or "ML model artifact is unavailable.",
                 "modelVersion": PATTERN_MODEL_VERSION,
+                "detectorMode": "ml",
                 "supportedTimeframes": list(SUPPORTED_PATTERN_TIMEFRAMES),
                 "exchange": exchange,
                 "instrumentId": instrument_id,
@@ -105,11 +107,7 @@ class PatternMLDetector:
                 "alternatives": [],
             }
 
-        closed = [
-            candle
-            for candle in candles
-            if _has_complete_ohlcv(candle) and str(candle.get("status")) != "incomplete"
-        ][-WINDOW_SIZE:]
+        closed = _closed_candles(candles)[-WINDOW_SIZE:]
         if len(closed) < WINDOW_SIZE:
             return {
                 "status": "insufficient_data",
@@ -118,6 +116,7 @@ class PatternMLDetector:
                     f"received {len(closed)}."
                 ),
                 "modelVersion": PATTERN_MODEL_VERSION,
+                "detectorMode": "ml",
                 "supportedTimeframes": list(SUPPORTED_PATTERN_TIMEFRAMES),
                 "exchange": exchange,
                 "instrumentId": instrument_id,
@@ -170,6 +169,7 @@ class PatternMLDetector:
             ),
             "modelVersion": PATTERN_MODEL_VERSION,
             "modelType": self._model_type(model),
+            "detectorMode": "ml",
             "supportedTimeframes": list(SUPPORTED_PATTERN_TIMEFRAMES),
             "exchange": exchange,
             "instrumentId": instrument_id,
@@ -198,6 +198,107 @@ class PatternMLDetector:
             "experimental": True,
         }
 
+    def predict_rule_based(
+        self,
+        *,
+        exchange: str,
+        instrument_id: str,
+        timeframe: str,
+        source: str,
+        candles: Sequence[Dict[str, object]],
+    ) -> Dict[str, object]:
+        generated_at = unix_ms()
+        closed = _closed_candles(candles)
+        if len(closed) < WINDOW_SIZE:
+            return {
+                "status": "insufficient_data",
+                "message": (
+                    f"Need {WINDOW_SIZE} complete {timeframe} candles; "
+                    f"received {len(closed)}."
+                ),
+                "modelVersion": PATTERN_MODEL_VERSION,
+                "modelType": "RuleBasedDetector",
+                "detectorMode": "rule_based",
+                "supportedTimeframes": [timeframe],
+                "exchange": exchange,
+                "instrumentId": instrument_id,
+                "timeframe": timeframe,
+                "windowSize": WINDOW_SIZE,
+                "source": source,
+                "generatedAt": generated_at,
+                "prediction": None,
+                "alternatives": [],
+                "dataFrom": None,
+                "dataTo": None,
+                "candleCount": len(closed),
+            }
+
+        rule_based = _rule_based_explanation(closed[-WINDOW_SIZE:])
+        rule_label = str(rule_based.get("label", "none"))
+        rule_score = float(rule_based.get("score", 0.0) or 0.0)
+        threshold = _dynamic_threshold(
+            label=rule_label,
+            confidence=rule_score,
+            probabilities={rule_label: rule_score},
+            rule_based=rule_based,
+            configured_floor=self.confidence_threshold,
+        )
+        recommended_threshold = threshold["recommendedThreshold"]
+        passes_threshold = (
+            rule_label != "none" and rule_score >= recommended_threshold
+        )
+        status = "pattern_detected" if passes_threshold else "no_reliable_pattern"
+        prediction = (
+            {
+                "label": rule_label,
+                "confidence": round(rule_score, 6),
+                "recommendedThreshold": recommended_threshold,
+                "passesThreshold": passes_threshold,
+                "thresholdMode": "dynamic",
+                "thresholdReason": threshold["reason"],
+            }
+            if rule_label != "none"
+            else None
+        )
+        alternatives = []
+        if rule_label != "none":
+            alternatives.append(
+                {
+                    "label": rule_label,
+                    "confidence": round(rule_score, 6),
+                }
+            )
+        return {
+            "status": status,
+            "message": (
+                "Rule-based detector matched chart geometry."
+                if status == "pattern_detected"
+                else "No reliable pattern detected by the rule-based detector."
+            ),
+            "modelVersion": PATTERN_MODEL_VERSION,
+            "modelType": "RuleBasedDetector",
+            "detectorMode": "rule_based",
+            "supportedTimeframes": [timeframe],
+            "exchange": exchange,
+            "instrumentId": instrument_id,
+            "timeframe": timeframe,
+            "windowSize": WINDOW_SIZE,
+            "source": source,
+            "generatedAt": generated_at,
+            "confidenceThreshold": recommended_threshold,
+            "configuredConfidenceThreshold": self.confidence_threshold,
+            "recommendedThreshold": recommended_threshold,
+            "passesThreshold": passes_threshold,
+            "thresholdMode": "dynamic",
+            "prediction": prediction,
+            "alternatives": alternatives,
+            "dataFrom": int(closed[-WINDOW_SIZE]["openTime"]),
+            "dataTo": int(closed[-1]["closeTime"]),
+            "candleCount": WINDOW_SIZE,
+            "ruleBased": rule_based,
+            "experimental": True,
+        }
+
     def _load_model(self, timeframe: str = "1m") -> Optional[PatternClassifier]:
         if timeframe in self._models:
             return self._models[timeframe]
@@ -220,6 +321,14 @@ def _has_complete_ohlcv(candle: Dict[str, object]) -> bool:
     return all(
         candle.get(field) is not None for field in ("open", "high", "low", "close")
     )
+
+
+def _closed_candles(candles: Sequence[Dict[str, object]]) -> list[Dict[str, object]]:
+    return [
+        candle
+        for candle in candles
+        if _has_complete_ohlcv(candle) and str(candle.get("status")) != "incomplete"
+    ]
 
 
 def _rule_based_explanation(

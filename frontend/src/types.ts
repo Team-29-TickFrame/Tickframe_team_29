@@ -204,11 +204,14 @@ export type MlPatternStatus =
   | "insufficient_data"
   | "model_unavailable";
 
+export type PatternDetectorMode = "ml" | "rule_based";
+
 export interface MlPatternResponse {
   status: MlPatternStatus;
   message: string;
   modelVersion: string;
   modelType?: string;
+  detectorMode?: PatternDetectorMode;
   supportedTimeframes: Timeframe[];
   exchange: Exchange;
   instrumentId: string;
