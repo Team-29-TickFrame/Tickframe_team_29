@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 5s
-  evaluation_interval: 5s
+  scrape_interval: PROMETHEUS_SCRAPE_INTERVAL_PLACEHOLDER
+  evaluation_interval: PROMETHEUS_EVALUATION_INTERVAL_PLACEHOLDER
 
 scrape_configs:
   - job_name: tickframe-backend

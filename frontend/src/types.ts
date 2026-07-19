@@ -381,3 +381,32 @@ export interface AuthResponse {
 export interface CurrentUserResponse {
   user: AuthUser;
 }
+
+export interface ScriptParameter {
+  name: string;
+  label: string;
+  kind: "text" | "number" | "boolean" | "select";
+  default: string | number | boolean;
+  options?: string[];
+  minimum?: number;
+  maximum?: number;
+  placeholder?: string;
+}
+
+export interface ScriptDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  parameters: ScriptParameter[];
+}
+
+export interface ScriptRun {
+  id: string;
+  scriptId: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  output: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  exitCode: number | null;
+}

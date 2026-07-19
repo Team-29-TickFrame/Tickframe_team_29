@@ -77,9 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--database-url",
-        default=normalize_database_url(
-            os.getenv("DATABASE_URL") or os.getenv("TICKFRAME_DATABASE_URL")
-        ),
+        default=normalize_database_url(os.getenv("DATABASE_URL")),
     )
     return parser.parse_args()
 
@@ -607,9 +605,7 @@ def normalize_database_url(value: Optional[str]) -> Optional[str]:
 
 
 def bybit_base_urls() -> Sequence[str]:
-    configured = os.getenv("TICKFRAME_BYBIT_REST_URLS") or os.getenv(
-        "TICKFRAME_BYBIT_BASE_URLS"
-    )
+    configured = os.getenv("TICKFRAME_BYBIT_REST_URLS")
     if configured:
         values = [value.strip() for value in configured.split(",") if value.strip()]
         if values:
@@ -618,9 +614,7 @@ def bybit_base_urls() -> Sequence[str]:
 
 
 def binance_base_urls() -> Sequence[str]:
-    configured = os.getenv("TICKFRAME_BINANCE_REST_URLS") or os.getenv(
-        "TICKFRAME_BINANCE_BASE_URLS"
-    )
+    configured = os.getenv("TICKFRAME_BINANCE_REST_URLS")
     if configured:
         values = [value.strip() for value in configured.split(",") if value.strip()]
         if values:

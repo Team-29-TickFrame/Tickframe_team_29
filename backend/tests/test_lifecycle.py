@@ -10,6 +10,22 @@ from backend.app.models import Trade
 from backend.app.service import MarketDataService
 
 
+class RuntimeSettingsTests(unittest.TestCase):
+    def test_cors_origins_include_local_and_configured_frontends(self) -> None:
+        origins = main.cors_origins(
+            "4173",
+            "https://terminal.example.com/, https://admin.example.com",
+        )
+
+        self.assertIn("http://127.0.0.1:4173", origins)
+        self.assertIn("https://terminal.example.com", origins)
+        self.assertIn("https://admin.example.com", origins)
+
+    def test_invalid_cors_origin_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "HTTP origins"):
+            main.cors_origins("4173", "terminal.example.com")
+
+
 class ApplicationLifespanTests(unittest.IsolatedAsyncioTestCase):
     async def test_lifespan_always_stops_services_after_runtime_error(self) -> None:
         auth = AsyncMock()

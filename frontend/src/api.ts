@@ -10,6 +10,8 @@ import type {
   MetricsResponse,
   MlPatternResponse,
   PatternDetectorMode,
+  ScriptDefinition,
+  ScriptRun,
   Timeframe,
 } from "./types";
 
@@ -59,7 +61,14 @@ async function request<T>(
     });
 
     if (!response.ok) {
-      const message = await response.text();
+      const body = await response.text();
+      let message = body;
+      try {
+        const parsed = JSON.parse(body) as { detail?: string };
+        if (typeof parsed.detail === "string") message = parsed.detail;
+      } catch {
+        // Non-JSON errors are already suitable for display.
+      }
       throw new Error(message || `Request failed with ${response.status}`);
     }
 
@@ -124,6 +133,42 @@ export function fetchCurrentUser(token: string, signal?: AbortSignal) {
 export function logout(token: string, signal?: AbortSignal) {
   return request<{ status: "ok" }>("/api/v1/auth/logout", {
     method: "POST",
+    token,
+    signal,
+  });
+}
+
+export function fetchScripts(token: string, signal?: AbortSignal) {
+  return request<{ scripts: ScriptDefinition[] }>("/api/v1/scripts", {
+    token,
+    signal,
+  });
+}
+
+export function fetchScriptAccess(token: string, signal?: AbortSignal) {
+  return request<{ allowed: boolean }>("/api/v1/scripts/access", {
+    token,
+    signal,
+  });
+}
+
+export function startScript(
+  scriptId: string,
+  parameters: Record<string, string | number | boolean>,
+  token: string,
+  signal?: AbortSignal,
+) {
+  return request<{ run: ScriptRun }>(`/api/v1/scripts/${scriptId}/runs`, {
+    method: "POST",
+    body: { parameters },
+    token,
+    signal,
+    timeoutMs: 30_000,
+  });
+}
+
+export function fetchScriptRun(runId: string, token: string, signal?: AbortSignal) {
+  return request<{ run: ScriptRun }>(`/api/v1/scripts/runs/${runId}`, {
     token,
     signal,
   });

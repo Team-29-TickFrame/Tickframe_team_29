@@ -17,6 +17,7 @@ RUN addgroup --system tickframe \
 
 COPY --chown=tickframe:tickframe backend /app/backend
 COPY --chown=tickframe:tickframe ml /app/ml
+RUN mkdir -p /app/data && chown -R tickframe:tickframe /app/data
 
 USER tickframe
 
