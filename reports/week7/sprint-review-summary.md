@@ -163,10 +163,3 @@ These limitations do not prevent the system from operating but represent opportu
 
 ## Sprint Review Outcome
 The customer confirmed that MVP v3 provides the planned functionality and that the overall architecture, deployment process, documentation, and operational workflow are understandable.
-
-No critical deployment or transition issues were identified during the review.
-
-The main follow-up work requested by the customer is:
-* implement the ML/rule-based detection switch;
-* complete the frontend maintenance-script interface;
-* continue improving the experimental ML subsystem.
