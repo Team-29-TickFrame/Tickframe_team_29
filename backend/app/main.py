@@ -16,10 +16,11 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .auth import AuthConflict, AuthInvalidCredentials, AuthService
+from .auth import AuthConflict, AuthInvalidCredentials, AuthService, AuthUser
 from .config import load_config
 from .history import TIMEFRAME_SECONDS
 from .pattern_ml import pattern_ml_detector
+from .script_runner import script_access_allowed, script_runner
 from .service import MarketDataService
 
 
@@ -70,6 +71,10 @@ class DisplayLatencyRequest(BaseModel):
     samples: list[DisplayLatencySample] = Field(min_length=1, max_length=200)
 
 
+class ScriptRunRequest(BaseModel):
+    parameters: dict[str, object] = Field(default_factory=dict)
+
+
 def model_dump_aliases(model: BaseModel) -> dict:
     if hasattr(model, "model_dump"):
         return model.model_dump(by_alias=True)
@@ -102,11 +107,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         try:
-            if service_started:
-                await service.stop()
+            await script_runner.shutdown()
         finally:
-            if auth_started:
-                await auth_service.stop()
+            try:
+                if service_started:
+                    await service.stop()
+            finally:
+                if auth_started:
+                    await auth_service.stop()
 
 
 app = FastAPI(
@@ -116,17 +124,31 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-frontend_port = os.getenv("FRONTEND_PORT", "4173")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+def cors_origins(frontend_port: str, configured: Optional[str] = None) -> list[str]:
+    origins = [
         f"http://localhost:{frontend_port}",
         f"http://127.0.0.1:{frontend_port}",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://tickframe.h1n.ru",
-    ],
+    ]
+    raw_value = (
+        os.getenv("TICKFRAME_CORS_ORIGINS", "") if configured is None else configured
+    )
+    for value in raw_value.replace(";", ",").split(","):
+        origin = value.strip().rstrip("/")
+        if origin and origin not in origins:
+            if origin != "*" and not origin.startswith(("http://", "https://")):
+                raise ValueError("TICKFRAME_CORS_ORIGINS must contain HTTP origins")
+            origins.append(origin)
+    return origins
+
+
+frontend_port = os.getenv("FRONTEND_PORT", "4173")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins(frontend_port),
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
@@ -205,6 +227,61 @@ async def current_user(authorization: Optional[str] = Header(default=None)) -> d
 async def logout(authorization: Optional[str] = Header(default=None)) -> dict:
     await auth_service.logout(bearer_token(authorization))
     return {"status": "ok"}
+
+
+async def script_user(authorization: Optional[str]) -> AuthUser:
+    user = await auth_service.current_user(bearer_token(authorization))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Session expired")
+    if not script_access_allowed(user.email):
+        raise HTTPException(
+            status_code=403, detail="This account cannot access scripts"
+        )
+    return user
+
+
+@app.get("/api/v1/scripts/access")
+async def script_access(authorization: Optional[str] = Header(default=None)) -> dict:
+    user = await auth_service.current_user(bearer_token(authorization))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Session expired")
+    return {"allowed": script_access_allowed(user.email)}
+
+
+@app.get("/api/v1/scripts")
+async def scripts(authorization: Optional[str] = Header(default=None)) -> dict:
+    await script_user(authorization)
+    return {"scripts": script_runner.catalog()}
+
+
+@app.post("/api/v1/scripts/{script_id}/runs", status_code=202)
+async def run_script(
+    script_id: str,
+    payload: ScriptRunRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> dict:
+    user = await script_user(authorization)
+    try:
+        run = await script_runner.start(script_id, payload.parameters, user.id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Unknown script") from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=429, detail=str(error)) from error
+    return {"run": run.to_api()}
+
+
+@app.get("/api/v1/scripts/runs/{run_id}")
+async def script_run(
+    run_id: str,
+    authorization: Optional[str] = Header(default=None),
+) -> dict:
+    user = await script_user(authorization)
+    run = script_runner.get(run_id)
+    if run is None or run.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Unknown script run")
+    return {"run": run.to_api()}
 
 
 @app.get("/api/v1/instruments")

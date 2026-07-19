@@ -66,6 +66,13 @@ Secrets handling policy:
 
 - Local/dev and deployment entry point: `docker-compose.yml`
 - Product run/deploy guidance: `README.md` sections "Run the Complete Product" and "Deployment"
+- Maintained operational scripts can also be launched from the authenticated
+  **Scripts** page. The backend uses a fixed allowlist and validated arguments;
+  it does not accept arbitrary shell commands. Guest sessions have no access to
+  the Scripts page or its API.
+- `TICKFRAME_SCRIPT_RUNNER_EMAILS` is the comma-separated, case-insensitive
+  allowlist for script operators. An empty list denies access to all accounts;
+  backend authorization is enforced on every Scripts API request.
 
 ## Git workflow used by the team
 

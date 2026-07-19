@@ -67,7 +67,9 @@ policy. Old second candles are compressed automatically.
 
 ## Run the Complete Product
 
-Create the local environment file and choose a real password:
+Create the local environment file and replace both placeholder passwords.
+`.env.example` is the canonical list of customer-facing runtime settings; each
+entry has a short operational comment.
 
 ```bash
 cp .env.example .env
@@ -108,6 +110,24 @@ docker compose exec backend python -m backend.scripts.history --days 30
 The command is idempotent: reruns update the same candle keys instead of
 duplicating rows.
 
+The same maintained operations are available from the frontend under
+**Scripts**. The page exposes validated controls for candle backfills, parallel
+history loading, ML dataset preparation, model training, and the critical
+coverage check. The page and its API are available only after signing in;
+guest sessions cannot view or execute server-side scripts. Jobs run one at a
+time and their exit status and captured output are shown in the page.
+
+Grant access by listing account emails in `.env` (matching is
+case-insensitive), then restart the backend:
+
+```dotenv
+TICKFRAME_SCRIPT_RUNNER_EMAILS=admin@example.com,ops@example.com
+```
+
+An empty value denies access to every account. The allowlist is enforced by the
+backend for catalog reads, job starts, and job-status requests; hiding the tab
+in the frontend is only an additional UX measure.
+
 Load official Binance `1s` historical candles for exact second charts:
 
 ```bash
@@ -136,6 +156,10 @@ The maintained market config may omit an exchange symbol when that venue has no
 active Spot market. For example, the canonical `GRAM-USDT` instrument currently
 uses Bybit's `GRAMUSDT` Spot symbol and does not subscribe to Binance while
 Binance reports the old `TONUSDT` market as unavailable.
+
+Use `TICKFRAME_ENABLED_INSTRUMENTS` to enable a subset without editing YAML.
+Use `TICKFRAME_MARKETS_CONFIG_FILE` to mount a different catalog when adding or
+changing instrument definitions.
 
 After backend startup or exchange reconnection, Tickframe automatically
 backfills recent public `1m` OHLCV into `historical_candles` so chart windows do

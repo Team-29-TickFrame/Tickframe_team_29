@@ -74,14 +74,25 @@ when published.
 Create a private `.env` file from [.env.example](../.env.example). Never commit
 the real `.env` file.
 
-Required or important values:
+The maintained `.env.example` is the canonical, commented runtime configuration.
+Important groups are:
 
-- `POSTGRES_PASSWORD`: required for TimescaleDB. Replace the placeholder with a
-  strong private value.
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, and
+  `POSTGRES_PORT`: database connection and identity. Keep the password URL-safe.
 - `BACKEND_PORT`, `FRONTEND_PORT`, `PROMETHEUS_PORT`, `GRAFANA_PORT`: optional
   host port overrides when defaults conflict with another local service.
-- `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`: optional Grafana bootstrap
-  admin credentials. The public example uses demo-safe values only.
+- `TICKFRAME_AUTH_SESSION_DAYS`, `TICKFRAME_CORS_ORIGINS`, and
+  `TICKFRAME_SCRIPT_RUNNER_EMAILS`: authentication and browser/API access.
+- `TICKFRAME_SCRIPT_MAX_*` and `TICKFRAME_SCRIPT_*_TIMEOUT_SECONDS`: Scripts
+  concurrency, retained output/history, and execution time limits.
+- `TICKFRAME_DISABLE_COLLECTORS`, `TICKFRAME_MARKETS_CONFIG_FILE`,
+  `TICKFRAME_ENABLED_INSTRUMENTS`,
+  `TICKFRAME_ALLOWED_LATENESS_MS`, and `TICKFRAME_RAW_TRADE_RETENTION_HOURS`:
+  market catalog selection and ingestion windows.
+- `PROMETHEUS_SCRAPE_INTERVAL`, `PROMETHEUS_EVALUATION_INTERVAL`, and
+  `PROMETHEUS_RETENTION_TIME`: observability frequency and local retention.
+- `GRAFANA_ADMIN_*`, `GRAFANA_ANONYMOUS_*`, and `GRAFANA_DEFAULT_THEME`:
+  Grafana bootstrap access and UI defaults. The admin password is required.
 - `TICKFRAME_BINANCE_WS_URLS`, `TICKFRAME_BYBIT_WS_URLS`,
   `TICKFRAME_BINANCE_REST_URLS`, `TICKFRAME_BYBIT_REST_URLS`: optional endpoint
   fallback overrides for networks where an exchange domain is blocked or
@@ -92,8 +103,8 @@ Required or important values:
   `TICKFRAME_SECOND_REPAIR_HOURS`: recovery and historical backfill controls.
 - `TICKFRAME_STABLE_CHART_DELAY_MS`: stable short-timeframe chart delay for late
   exchange messages.
-- `TICKFRAME_PATTERN_CONFIDENCE_THRESHOLD`: threshold for the experimental
-  `1m` ML pattern detector.
+- `TICKFRAME_PATTERN_CONFIDENCE_THRESHOLD` and `TICKFRAME_PATTERN_MODEL_PATH`:
+  pattern detector threshold and optional artifact override.
 - `TICKFRAME_SHUTDOWN_TIMEOUT`: graceful backend queue-drain timeout.
 
 The backend receives `DATABASE_URL` from Docker Compose. A customer running the
@@ -119,8 +130,8 @@ Steps:
    cp .env.example .env
    ```
 
-3. Replace the example `POSTGRES_PASSWORD` and any other private values in
-   `.env`.
+3. Replace the example `POSTGRES_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, and any
+   other private values in `.env`.
 4. Start the full product:
 
    ```bash

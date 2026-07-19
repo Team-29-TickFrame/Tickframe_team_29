@@ -26,6 +26,7 @@ import {
   fetchMarkets,
   fetchMetrics,
   fetchMlPattern,
+  fetchScriptAccess,
   login,
   logout,
   marketWebSocketUrl,
@@ -64,6 +65,7 @@ import type {
 } from "./types";
 
 const MarketChart = lazy(() => import("./components/MarketChart"));
+const ScriptsView = lazy(() => import("./ScriptsView"));
 
 const EXCHANGES: Exchange[] = ["binance", "bybit"];
 const TIMEFRAMES: Timeframe[] = [
@@ -121,7 +123,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-type ActiveView = "dashboard" | "alerts";
+type ActiveView = "dashboard" | "alerts" | "scripts";
 type AlertMetricId =
   | "price"
   | "rsi"
@@ -1607,11 +1609,24 @@ function useMarketFeed() {
 function Dashboard({ session, onLogout }: DashboardProps) {
   const { instruments, markets, health, streamStatus, error } = useMarketFeed();
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
+  const [scriptAccess, setScriptAccess] = useState(false);
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [instrumentId, setInstrumentId] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState<Timeframe>("1m");
   const [patternDetectorMode, setPatternDetectorMode] =
     useState<PatternDetectorMode>("ml");
+
+  useEffect(() => {
+    if (session.token === GUEST_AUTH_TOKEN) {
+      setScriptAccess(false);
+      return;
+    }
+    const controller = new AbortController();
+    fetchScriptAccess(session.token, controller.signal)
+      .then(({ allowed }) => setScriptAccess(allowed))
+      .catch(() => setScriptAccess(false));
+    return () => controller.abort();
+  }, [session.token]);
   const [candleData, setCandleData] = useState<{
     scope: string;
     values: Candle[];
@@ -3008,11 +3023,16 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             <span className="nav-index">02</span>
             <span>Alerts</span>
           </button>
-          <button className="nav-item" type="button" disabled>
-            <span className="nav-index">03</span>
-            <span>History</span>
-            <small>soon</small>
-          </button>
+          {scriptAccess && (
+            <button
+              className={`nav-item ${activeView === "scripts" ? "active" : ""}`}
+              type="button"
+              onClick={() => setActiveView("scripts")}
+            >
+              <span className="nav-index">03</span>
+              <span>Scripts</span>
+            </button>
+          )}
         </nav>
 
       </aside>
@@ -3968,7 +3988,7 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             />
           </aside>
         </section>
-        ) : (
+        ) : activeView === "alerts" ? (
         <section className="alerts-workspace" aria-label="User alerts">
           <div className="alerts-main">
             <article className="panel alert-builder-panel">
@@ -4254,6 +4274,12 @@ function Dashboard({ session, onLogout }: DashboardProps) {
             </article>
           </aside>
         </section>
+        ) : (
+          scriptAccess ? (
+            <Suspense fallback={<section className="scripts-workspace panel">Loading scripts…</section>}>
+              <ScriptsView token={session.token} />
+            </Suspense>
+          ) : null
         )}
 
         <footer className="system-footer">
@@ -4389,10 +4415,11 @@ function AuthScreen({
             quantitative metrics in one workspace.
           </p>
 
-          <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
+          <div className="auth-tabs" role="group" aria-label="Authentication mode">
             <button
               type="button"
               className={!isRegister ? "active" : ""}
+              aria-pressed={!isRegister}
               onClick={() => {
                 setMode("login");
                 setError(null);
@@ -4403,6 +4430,7 @@ function AuthScreen({
             <button
               type="button"
               className={isRegister ? "active" : ""}
+              aria-pressed={isRegister}
               onClick={() => {
                 setMode("register");
                 setError(null);
@@ -4418,6 +4446,7 @@ function AuthScreen({
                 Display name
                 <input
                   autoComplete="name"
+                  name="displayName"
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="Roman"
@@ -4430,6 +4459,7 @@ function AuthScreen({
               <input
                 autoComplete="email"
                 inputMode="email"
+                name="email"
                 required
                 type="email"
                 value={email}
@@ -4443,6 +4473,7 @@ function AuthScreen({
               <input
                 autoComplete={isRegister ? "new-password" : "current-password"}
                 minLength={8}
+                name="password"
                 required
                 type="password"
                 value={password}

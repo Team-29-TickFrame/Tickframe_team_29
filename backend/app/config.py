@@ -95,7 +95,10 @@ class AppConfig:
             raise KeyError(f"Unknown {exchange} symbol: {exchange_symbol}") from error
 
 
-def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
+def load_config(path: Optional[Path] = None) -> AppConfig:
+    if path is None:
+        configured_path = os.getenv("TICKFRAME_MARKETS_CONFIG_PATH")
+        path = Path(configured_path) if configured_path else DEFAULT_CONFIG_PATH
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("Market configuration must be a YAML object")
@@ -185,8 +188,37 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
                 )
             exchange_symbols[key] = instrument.instrument_id
 
-    allowed_lateness_ms = int(payload["allowed_lateness_ms"])
-    raw_trade_retention_hours = int(payload["raw_trade_retention_hours"])
+    configured_instruments = os.getenv("TICKFRAME_ENABLED_INSTRUMENTS", "").strip()
+    if configured_instruments and configured_instruments.lower() not in {"all", "*"}:
+        enabled_ids = {
+            value.strip().upper()
+            for value in configured_instruments.split(",")
+            if value.strip()
+        }
+        unknown_ids = enabled_ids.difference(instrument_ids)
+        if unknown_ids:
+            raise ValueError(
+                "TICKFRAME_ENABLED_INSTRUMENTS contains unknown IDs: "
+                f"{sorted(unknown_ids)}"
+            )
+        instruments = [
+            instrument
+            for instrument in instruments
+            if instrument.instrument_id in enabled_ids
+        ]
+        if not instruments:
+            raise ValueError("TICKFRAME_ENABLED_INSTRUMENTS must not be empty")
+
+    allowed_lateness_ms = env_int(
+        "TICKFRAME_ALLOWED_LATENESS_MS",
+        int(payload["allowed_lateness_ms"]),
+        minimum=0,
+    )
+    raw_trade_retention_hours = env_int(
+        "TICKFRAME_RAW_TRADE_RETENTION_HOURS",
+        int(payload["raw_trade_retention_hours"]),
+        minimum=1,
+    )
     if allowed_lateness_ms < 0:
         raise ValueError("allowed_lateness_ms must be non-negative")
     if raw_trade_retention_hours <= 0:
@@ -204,6 +236,19 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
         exchanges=exchanges,
         instruments=instruments,
     )
+
+
+def env_int(name: str, default: int, *, minimum: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer") from error
+    if value < minimum:
+        raise ValueError(f"{name} must be at least {minimum}")
+    return value
 
 
 def websocket_urls_for(

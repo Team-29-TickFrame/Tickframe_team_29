@@ -8,3 +8,6 @@ alembic>=1.14,<2
 numpy>=1.26,<2
 scikit-learn>=1.5,<2
 lightgbm>=4.5,<5
+# Runtime dependencies for the quality-gate job exposed in the Scripts UI.
+coverage>=7,<8
+hypothesis>=6,<7
