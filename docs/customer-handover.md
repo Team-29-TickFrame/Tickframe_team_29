@@ -262,7 +262,6 @@ this Week 6 baseline; those outcomes must be confirmed and documented during
 Week 7.
 
 ## Week 7 Final Transition Outcome
-Following the Week 7 Sprint Review, Tickframe MVP v3 reached the handover level **Ready for independent use**.
 
 ### Handover Level
 Ready for independent use
